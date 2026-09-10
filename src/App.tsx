@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { AuthPage } from './components/AuthPage'
 import { LandingPage } from './components/LandingPage'
+import { ShopPage } from './components/ShopPage'
 
-export type Route = 'landing' | 'login' | 'register' | 'forgot-password'
+export type Route = 'landing' | 'shop' | 'login' | 'register' | 'forgot-password'
 
 function getRoute(): Route {
   const path = window.location.hash.replace(/^#\/?/, '')
-  if (path === 'login' || path === 'register' || path === 'forgot-password') {
+  if (path === 'shop' || path === 'login' || path === 'register' || path === 'forgot-password') {
     return path
   }
   return 'landing'
@@ -23,6 +24,10 @@ function App() {
 
   if (route === 'landing') {
     return <LandingPage />
+  }
+
+  if (route === 'shop') {
+    return <ShopPage />
   }
 
   return <AuthPage type={route} />
