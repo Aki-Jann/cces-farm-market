@@ -1,0 +1,251 @@
+.authCanvas {
+  align-items: center;
+  background: #f4f4f4;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 32px;
+}
+
+.authCard {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 3px 5px rgb(0 0 0 / 10%);
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+  padding: 30px;
+  width: min(640px, 100%);
+}
+
+.authCard > .logo {
+  align-self: center;
+}
+
+.authHeading {
+  color: #191919;
+  text-align: center;
+}
+
+.authHeading h1 {
+  color: #017632;
+  font-size: 44px;
+  line-height: 1.05;
+  margin: 0;
+}
+
+.authHeading p {
+  font-size: 20px;
+  margin: 4px 0 0;
+}
+
+.authFields,
+.passwordGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.passwordGroup {
+  align-items: flex-end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: 100%;
+}
+
+.field > span {
+  color: #017632;
+  font-size: 25px;
+  font-weight: 600;
+}
+
+.field input {
+  background: #f5f5f5;
+  border: 0;
+  border-radius: 5px;
+  color: #191919;
+  font-size: 24px;
+  min-height: 49px;
+  outline: 2px solid transparent;
+  padding: 14px 20px;
+  width: 100%;
+}
+
+.field input::placeholder {
+  color: #6c7175;
+  opacity: 1;
+}
+
+.field input:focus {
+  outline-color: #8ccca1;
+}
+
+.inlineLink,
+.backLink,
+.switchPrompt a,
+.registerAction a {
+  color: #017632;
+  font-size: 16px;
+  text-decoration: none;
+}
+
+.inlineLink {
+  padding: 0 9px;
+}
+
+.submitButton {
+  background: #cce9d5;
+  border: 0;
+  border-radius: 5px;
+  color: #017632;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 10px 20px;
+}
+
+.submitButton:hover,
+.registerAction a:hover,
+.backLink:hover,
+.inlineLink:hover {
+  text-decoration: underline;
+}
+
+.switchPrompt,
+.backLink {
+  align-self: center;
+  font-size: 16px;
+  margin: -2px 0 0;
+}
+
+.forgotCard {
+  gap: 20px;
+  min-height: 320px;
+  padding: 40px 45px 48px;
+}
+
+.forgotCard .authHeading h1 {
+  font-size: 44px;
+}
+
+.backLink {
+  margin-top: 6px;
+}
+
+.registerCard {
+  max-width: 1259px;
+  padding: 30px;
+}
+
+.registerCard > .logo {
+  width: 535px;
+}
+
+.registerCard > .logo span {
+  font-size: 69px;
+}
+
+.registerCard > .logo small {
+  font-size: 13px;
+}
+
+.registerFields {
+  display: grid;
+  gap: 25px 16px;
+  grid-template-columns: repeat(12, 1fr);
+}
+
+.registerFields .field:nth-child(1),
+.registerFields .field:nth-child(2),
+.registerFields .field:nth-child(3),
+.registerFields .field:nth-child(4) {
+  grid-column: span 6;
+}
+
+.registerFields .field:nth-child(5),
+.registerFields .field:nth-child(6) {
+  grid-column: span 3;
+}
+
+.registerFields .field:nth-child(7) {
+  grid-column: span 4;
+}
+
+.registerFields .field:nth-child(8) {
+  grid-column: span 8;
+}
+
+.registerAction {
+  align-self: end;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  grid-column: span 4;
+  grid-row: 4;
+}
+
+.registerAction p {
+  color: #017632;
+  font-size: 16px;
+  text-align: center;
+}
+
+.disabledButton {
+  background: #d9d9d9;
+  border: 0;
+  border-radius: 5px;
+  color: #6c7175;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 18px 26px;
+}
+
+@media (max-width: 760px) {
+  .authCanvas {
+    padding: 16px;
+  }
+
+  .authCard,
+  .forgotCard,
+  .registerCard {
+    padding: 28px 20px;
+  }
+
+  .authHeading h1,
+  .forgotCard .authHeading h1 {
+    font-size: 34px;
+  }
+
+  .field > span {
+    font-size: 19px;
+  }
+
+  .field input {
+    font-size: 18px;
+  }
+
+  .registerCard > .logo,
+  .registerCard > .logo span {
+    width: 100%;
+  }
+
+  .registerCard > .logo span {
+    font-size: 44px;
+  }
+
+  .registerCard > .logo small {
+    font-size: 8px;
+  }
+
+  .registerFields {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .registerAction {
+    order: 10;
+  }
+}
