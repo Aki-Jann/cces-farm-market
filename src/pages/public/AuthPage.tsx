@@ -204,7 +204,7 @@ if (!birthdayDate || Number.isNaN(birthdayDate.getTime())) {
           <>
             {loginError && <p className={styles.registrationError} role="alert">{loginError}</p>}
             <button type="submit" className={styles.submitButton}>SUBMIT</button>
-            <p className={styles.switchPrompt}>New to Roots&Routes? <a href="#/register">Register Here</a></p>
+            <p className={styles.switchPrompt}>New to GreenMarket? <a href="#/register">Register Here</a></p>
           </>
         )}
         {isForgot && <a href="#/login" className={styles.backLink}>Back to Login</a>}
