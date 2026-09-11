@@ -4,16 +4,8 @@ import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
+import { productImages, resolveProductImage } from '../../utils/productImages'
 import styles from './ShopPage.module.css'
-import apple from '../../assets/shop-apple.png'
-import banana from '../../assets/shop-banana.png'
-import pepper from '../../assets/shop-pepper.png'
-import cabbage from '../../assets/shop-cabbage.png'
-import carrot from '../../assets/shop-carrot.png'
-import corn from '../../assets/shop-corn.png'
-import cucumber from '../../assets/shop-cucumber.png'
-import guava from '../../assets/shop-guava.png'
-import gumamela from '../../assets/shop-gumamela.png'
 
 type Category = 'All' | 'Vegetables' | 'Fruits' | 'Grains' | 'Flowers'
 
@@ -31,15 +23,15 @@ type CartItem = Product & { quantity: number }
 
 const categories: Category[] = ['All', 'Vegetables', 'Fruits', 'Grains', 'Flowers']
 const localImages: Record<string, string> = {
-  APPLE: apple,
-  BANANA: banana,
-  'BELL PEPPER': pepper,
-  CABBAGE: cabbage,
-  CARROT: carrot,
-  CORN: corn,
-  CUCUMBER: cucumber,
-  GUAVA: guava,
-  GUMAMELA: gumamela,
+  APPLE: productImages['shop-apple.png'],
+  BANANA: productImages['shop-banana.png'],
+  'BELL PEPPER': productImages['shop-pepper.png'],
+  CABBAGE: productImages['shop-cabbage.png'],
+  CARROT: productImages['shop-carrot.png'],
+  CORN: productImages['shop-corn.png'],
+  CUCUMBER: productImages['shop-cucumber.png'],
+  GUAVA: productImages['shop-guava.png'],
+  GUMAMELA: productImages['shop-gumamela.png'],
 }
 
 function currency(value: number) {
@@ -184,7 +176,7 @@ export function ShopPage() {
             price: typeof data.price === 'number' ? data.price : 0,
             stock: typeof data.stock === 'number' ? data.stock : 0,
             unit: typeof data.unit === 'string' ? data.unit : 'KG',
-            image: typeof data.imageUrl === 'string' && data.imageUrl ? data.imageUrl : (localImages[name] ?? apple),
+            image: resolveProductImage(data.imageUrl, localImages[name] ?? 'shop-apple.png'),
           }]
         })
         setProducts(loadedProducts)
