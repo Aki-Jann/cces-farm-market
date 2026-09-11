@@ -4,7 +4,7 @@ import { addDoc, collection, doc, getDocs, serverTimestamp, updateDoc } from 'fi
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { db } from '../../firebase/firestore'
-import { productImages, resolveProductImage } from '../../utils/productImages'
+import { productImageKey, productImages, resolveProductImage } from '../../utils/productImages'
 import styles from './AdminProductsPage.module.css'
 
 type ProductCategory = 'VEGETABLES' | 'FRUITS' | 'GRAINS' | 'FLOWERS'
@@ -153,7 +153,7 @@ export function AdminProductsPage() {
       price: Number(normalized.price),
       stock: Number(normalized.stock),
       unit: normalized.unit,
-      imageUrl: normalized.image,
+      imageUrl: productImageKey(normalized.image),
       isAvailable: Boolean(normalized.available),
     }
 
