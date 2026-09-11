@@ -1,0 +1,373 @@
+.authCanvas {
+  align-items: center;
+  background: #f4f4f4;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 32px;
+}
+
+.authCard {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 3px 5px rgb(0 0 0 / 10%);
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+  padding: 30px;
+  width: min(640px, 100%);
+}
+
+.authLogo {
+  align-self: center;
+  display: flex;
+  justify-content: center;
+}
+
+.authHeading {
+  color: #191919;
+  text-align: center;
+}
+
+.authHeading h1 {
+  color: #017632;
+  font-size: 44px;
+  line-height: 1.05;
+  margin: 0;
+}
+
+.authHeading p {
+  font-size: 20px;
+  margin: 4px 0 0;
+}
+
+.authFields,
+.passwordGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.passwordGroup {
+  align-items: flex-end;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: 100%;
+}
+
+.field > span {
+  color: #017632;
+  font-size: 25px;
+  font-weight: 600;
+}
+
+.field input {
+  background: #f5f5f5;
+  border: 0;
+  border-radius: 5px;
+  color: #191919;
+  font-size: 24px;
+  min-height: 49px;
+  outline: 2px solid transparent;
+  padding: 14px 20px;
+  width: 100%;
+}
+
+.field input::placeholder {
+  color: #6c7175;
+  opacity: 1;
+}
+
+.field input:focus {
+  outline-color: #8ccca1;
+}
+
+.fieldError,
+.registrationError {
+  color: #b42318;
+  font-size: 14px;
+}
+
+.fieldError {
+  margin: -3px 0 0;
+}
+
+.inlineLink,
+.backLink,
+.switchPrompt a,
+.registerAction a {
+  color: #017632;
+  font-size: 16px;
+  text-decoration: none;
+}
+
+.inlineLink {
+  padding: 0 9px;
+}
+
+.submitButton {
+  background: #cce9d5;
+  border: 0;
+  border-radius: 5px;
+  color: #017632;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 10px 20px;
+}
+
+.submitButton:hover,
+.registerAction a:hover,
+.backLink:hover,
+.inlineLink:hover {
+  text-decoration: underline;
+}
+
+.switchPrompt,
+.backLink {
+  align-self: center;
+  font-size: 16px;
+  margin: -2px 0 0;
+}
+
+.forgotCard {
+  gap: 20px;
+  min-height: 320px;
+  padding: 40px 45px 48px;
+}
+
+.forgotCard .authHeading h1 {
+  font-size: 44px;
+}
+
+.backLink {
+  margin-top: 6px;
+}
+
+.registerCard {
+  height: 877px;
+  max-width: 1259px;
+  width: min(1259px, 100%);
+  gap: 30px;
+  padding: 30px;
+}
+
+.registerCard > div:first-child {
+  height: 107px;
+  width: 100%;
+}
+
+.registerCard > div:first-child span {
+  font-size: 69px;
+  line-height: 92px;
+}
+
+.registerCard > div:first-child small {
+  font-size: 13px;
+}
+
+.registerFields {
+  position: relative;
+  height: 551px;
+}
+
+.registerFields .field {
+  position: absolute;
+  width: auto;
+}
+
+.registerFields .field:nth-child(1) {
+  left: 0;
+  top: 0;
+  width: 589px;
+}
+
+.registerFields .field:nth-child(2) {
+  left: 610px;
+  top: 0;
+  width: 589px;
+}
+
+.registerFields .field:nth-child(3) {
+  left: 0;
+  top: 144px;
+  width: 589px;
+}
+
+.registerFields .field:nth-child(4) {
+  left: 608px;
+  top: 144px;
+  width: 591px;
+}
+
+.registerFields .field:nth-child(5) {
+  left: 0;
+  top: 288px;
+  width: 369px;
+}
+
+.registerFields .field:nth-child(6) {
+  left: 388px;
+  top: 288px;
+  width: 369px;
+}
+
+.registerFields .field:nth-child(7) {
+  left: 782px;
+  top: 288px;
+  width: 417px;
+}
+
+.registerFields .field:nth-child(8) {
+  left: 0;
+  top: 432px;
+  width: 757px;
+}
+
+.registerAction {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  right: 0;
+  top: 471px;
+  width: 417px;
+}
+
+.registerAction p {
+  position: absolute;
+  right: 0;
+  top: -42px;
+  color: #017632;
+  font-size: 16px;
+  margin: 0;
+  white-space: nowrap;
+  text-align: center;
+  width: 417px;
+}
+
+.registerAction .registrationError {
+  margin: 0 0 8px;
+  position: static;
+  text-align: center;
+  white-space: normal;
+  width: 100%;
+}
+
+.disabledButton {
+  background: #d9d9d9;
+  border: 0;
+  border-radius: 5px;
+  color: #6c7175;
+  cursor: pointer;
+  font-size: 16px;
+  height: 63px;
+  padding: 0 26px;
+  width: 100%;
+}
+
+@media (min-width: 761px) and (max-width: 1378px) {
+  .registerCard {
+    height: auto;
+  }
+
+  .registerFields {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 24px 18px;
+    height: auto;
+  }
+
+  .registerFields .field,
+  .registerFields .field:nth-child(n) {
+    position: static;
+    width: auto;
+  }
+
+  .registerFields .field:nth-child(-n + 4) {
+    grid-column: span 3;
+  }
+
+  .registerFields .field:nth-child(n + 5):nth-child(-n + 7) {
+    grid-column: span 2;
+  }
+
+  .registerFields .field:nth-child(8) {
+    grid-column: span 4;
+  }
+
+  .registerAction {
+    grid-column: span 2;
+    position: static;
+    width: auto;
+  }
+
+  .registerAction p {
+    position: static;
+    width: auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .authCanvas {
+    padding: 16px;
+  }
+
+  .authCard,
+  .forgotCard,
+  .registerCard {
+    padding: 28px 20px;
+  }
+
+  .authHeading h1,
+  .forgotCard .authHeading h1 {
+    font-size: 34px;
+  }
+
+  .field > span {
+    font-size: 19px;
+  }
+
+  .field input {
+    font-size: 18px;
+  }
+
+  .registerCard > div:first-child,
+  .registerCard > div:first-child span {
+    width: 100%;
+  }
+
+  .registerCard {
+    height: auto;
+  }
+
+  .registerCard > div:first-child span {
+    font-size: 44px;
+    line-height: 1.2;
+  }
+
+  .registerCard > div:first-child small {
+    font-size: 8px;
+  }
+
+  .registerFields {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+  }
+
+  .registerFields .field:nth-child(n),
+  .registerAction {
+    position: static;
+    margin-left: 0;
+    order: 10;
+    width: 100%;
+  }
+
+  .registerAction p {
+    position: static;
+    width: auto;
+  }
+}

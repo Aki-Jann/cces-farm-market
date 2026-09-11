@@ -1,0 +1,89 @@
+.sidebar {
+  align-items: center;
+  background: #fff;
+  box-sizing: border-box;
+  box-shadow: 0 3px 5px rgb(0 0 0 / 10%);
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 100vh;
+  padding: 17px 10px 20px;
+  text-align: center;
+  width: 190px;
+}
+
+.top {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.rule {
+  border-top: 1px solid #017632;
+  flex: 0 0 1px;
+  margin: 0 -10px;
+  width: calc(100% + 20px);
+}
+
+.sidebar a {
+  border-radius: 5px;
+  color: #017632;
+  display: block;
+  flex: 0 0 auto;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: normal;
+  margin: 0;
+  padding: 9px 26px 8px;
+  text-decoration: none;
+  width: 170px;
+}
+
+.sidebar a:hover {
+  background: #e9f5ec;
+}
+
+.sidebar a:focus-visible {
+  outline: 2px solid #017632;
+  outline-offset: 2px;
+}
+
+.sidebar .active {
+  background: #017632;
+  color: #fff;
+  font-weight: 700;
+}
+
+@media (max-width: 700px) {
+  .sidebar {
+    flex-direction: row;
+    min-height: auto;
+    padding: 8px;
+    width: auto;
+  }
+
+  .top {
+    align-items: center;
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .sidebar :global(.logo),
+  .rule {
+    display: none;
+  }
+
+  .sidebar a {
+    font-size: 11px;
+    padding: 8px;
+    width: auto;
+  }
+
+  .sidebar > a {
+    margin-left: auto;
+  }
+}

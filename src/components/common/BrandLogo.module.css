@@ -1,0 +1,46 @@
+.logo {
+  color: #017632;
+  text-align: center;
+  width: 100%;
+}
+
+.logo span {
+  display: block;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 39px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  width: 100%;
+}
+
+.logo small {
+  display: block;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.15px;
+  line-height: 1;
+  margin-top: 2px;
+  text-align: center;
+  width: 100%;
+}
+
+.compact {
+  height: 34.833px;
+  width: 190px;
+}
+
+.compact span {
+  background: linear-gradient(48deg, #017632 1%, #aae044);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  font-size: 22.72px;
+  line-height: 30.337px;
+}
+
+.compact small {
+  font-size: 4.28px;
+  line-height: normal;
+  margin-top: 0;
+}

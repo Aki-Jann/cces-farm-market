@@ -1,0 +1,65 @@
+.page { background: #f4f4f4; color: #191919; display: flex; min-height: 100vh; }
+.content { flex: 1; min-width: 0; }
+.header { align-items: center; background: #fff; box-shadow: 0 3px 5px rgb(0 0 0 / 10%); display: flex; gap: 20px; padding: 20px; }
+.header h1 { color: #017632; font-size: 48px; margin: 0; }
+.header button { background: transparent; border: 0; border-radius: 5px; color: #017632; cursor: pointer; font-size: 12px; padding: 9px 26px; white-space: nowrap; }
+.header .activeTab { background: #017632; color: #fff; font-weight: 700; }
+.search { align-items: center; background: #f5f5f5; border-radius: 53px; display: flex; flex: 1; gap: 8px; height: 50px; padding: 0 20px; }
+.search span { color: #6c7175; font-size: 25px; }
+.search input { background: transparent; border: 0; font-size: 18px; min-width: 0; outline: 0; width: 100%; }
+.dashboard { display: flex; flex-direction: column; gap: 14px; margin: 20px auto; max-width: 1190px; }
+.stats { display: grid; gap: 20px; grid-template-columns: repeat(4, 1fr); }
+.stat { align-items: center; background: #fff; border-radius: 10px; box-shadow: 0 3px 5px rgb(0 0 0 / 10%); display: flex; gap: 10px; justify-content: center; min-height: 57px; }
+.stat strong { color: #017632; font-size: 32px; }
+.stat span { font-size: 20px; }
+.ordersPanel { background: #fff; box-shadow: 0 3px 5px rgb(0 0 0 / 10%); display: flex; min-height: 617px; }
+.orderList { border-right: 1px solid #d9d9d9; flex: 0 0 255px; }
+.orderList button { align-items: flex-start; background: #fff; border: 0; border-bottom: 1px solid #d9d9d9; cursor: pointer; display: grid; gap: 6px; grid-template-columns: 1fr auto; padding: 18px 14px; text-align: left; width: 100%; }
+.orderList button.selected { border: 2px solid #017632; padding: 16px 12px; }
+.orderList button div { display: flex; flex-direction: column; min-width: 0; }
+.orderList strong { font-size: 14px; }
+.orderList small, .orderList u { color: #6c7175; font-size: 11px; }
+.orderList b { color: #017632; font-size: 15px; grid-column: 2; }
+.statusBadge { border-radius: 5px; color: #fff; font-size: 11px; font-weight: 700; padding: 3px 5px; white-space: nowrap; }
+.pending { background: #aae044; }
+.confirmed, .packed, .delivered { background: #017632; }
+.details { flex: 1; min-width: 0; }
+.customer { align-items: flex-start; display: flex; justify-content: space-between; padding: 20px 14px; }
+.customer h2 { font-size: 25px; margin: 0; }
+.customer p { font-size: 17px; margin: 4px 0; }
+.timeline { align-items: center; display: flex; padding: 5px 14px 20px; }
+.timelineStep { align-items: center; color: #6c7175; display: flex; flex: 1; gap: 6px; min-width: 0; }
+.timelineStep span { align-items: center; background: #d9d9d9; border-radius: 50%; color: #6c7175; display: flex; flex: 0 0 36px; font-size: 18px; height: 36px; justify-content: center; }
+.timelineStep strong { font-size: 11px; }
+.timelineStep i { border-top: 2px solid #6c7175; flex: 1; }
+.timelineStep.reached { color: #017632; }
+.timelineStep.reached span { background: #017632; color: #fff; }
+.timelineStep.reached i { border-color: #017632; }
+.items { background: #cce9d5; padding: 10px 14px; }
+.itemRow { border-bottom: 1px solid #6c7175; display: grid; gap: 10px; grid-template-columns: 2fr 1fr 1fr 1.2fr; padding: 9px 0; }
+.itemRow span:nth-child(n+2), .itemRow strong:last-child { text-align: right; }
+.totalRow { display: flex; justify-content: space-between; padding-top: 14px; }
+.detailFooter {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  padding: 20px 14px;
+}
+.detailFooter button {
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 9px 26px;
+}
+.completedButton {
+  background: #d9d9d9;
+  color: #6c7175;
+}
+.nextButton {
+  background: #017632;
+  color: #fff;
+  margin-left: auto;
+}
+@media (max-width: 1050px) { .dashboard { margin: 20px; } .header { flex-wrap: wrap; } .stats { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 700px) { .page { display: block; } .header { padding: 12px; } .header h1 { font-size: 30px; } .header button { padding: 8px 4px; } .dashboard { margin: 10px 6px; } .ordersPanel { flex-direction: column; } .orderList { border-bottom: 1px solid #d9d9d9; border-right: 0; flex-basis: auto; max-height: 260px; overflow: auto; } .timelineStep strong { display: none; } .itemRow { font-size: 12px; } }

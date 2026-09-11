@@ -1,0 +1,144 @@
+.header {
+  align-items: center;
+  background: #fff;
+  box-shadow: 0 3px 5px rgb(0 0 0 / 10%);
+  display: flex;
+  gap: 20px;
+  min-height: 90px;
+  padding: 20px;
+}
+
+.header h1 {
+  color: #017632;
+  flex: 0 0 auto;
+  font-size: 48px;
+  line-height: 1;
+  margin: 0;
+}
+
+.search {
+  align-items: center;
+  background: #f5f5f5;
+  border-radius: 53px;
+  display: flex;
+  flex: 1 1 260px;
+  gap: 8px;
+  height: 50px;
+  min-width: 0;
+  padding: 0 20px;
+}
+
+.search span {
+  color: #6c7175;
+  flex: 0 0 auto;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.search input {
+  background: transparent;
+  border: 0;
+  color: #191919;
+  font-size: 20px;
+  min-width: 0;
+  outline: 0;
+  width: 100%;
+}
+
+.actions {
+  align-items: center;
+  display: flex;
+  flex: 0 0 auto;
+  gap: 20px;
+}
+
+.logoSlot {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.actions :where(button, a) {
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  color: #017632;
+  cursor: pointer;
+  font: inherit;
+  font-size: 16px;
+  padding: 9px 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.actions :where(button, a):hover,
+.actions :where(button, a):focus-visible {
+  background: #cce9d5;
+  outline: 0;
+}
+
+.actions :where(button, a)[aria-current='page'],
+.actions :where(button, a).active {
+  background: #017632;
+  color: #fff;
+  font-weight: 700;
+}
+
+.stacked {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.stacked .search {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+.stacked > :last-child {
+  width: 100%;
+}
+
+@media (max-width: 1050px) {
+  .header {
+    flex-wrap: wrap;
+  }
+
+  .search {
+    order: 3;
+    flex-basis: 100%;
+  }
+
+  .stacked .search {
+    order: initial;
+  }
+}
+
+@media (max-width: 700px) {
+  .header {
+    gap: 12px;
+    min-height: 0;
+    padding: 12px;
+  }
+
+  .header h1 {
+    font-size: 30px;
+  }
+
+  .actions {
+    gap: 4px;
+    overflow-x: auto;
+    width: 100%;
+  }
+
+  .actions :where(button, a) {
+    font-size: 12px;
+    padding: 8px 4px;
+  }
+
+  .search {
+    height: 46px;
+  }
+
+  .search input {
+    font-size: 16px;
+  }
+}
