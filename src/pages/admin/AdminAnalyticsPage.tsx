@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
-import { AdminSidebar } from './AdminSidebar'
-import { Header } from './Header'
-import apple from '../assets/shop-apple.png'
-import banana from '../assets/shop-banana.png'
-import carrot from '../assets/shop-carrot.png'
-import corn from '../assets/shop-corn.png'
-import gumamela from '../assets/shop-gumamela.png'
+import { AdminSidebar } from '../../components/layout/AdminSidebar'
+import { Header } from '../../components/layout/Header'
+import apple from '../../assets/shop-apple.png'
+import banana from '../../assets/shop-banana.png'
+import carrot from '../../assets/shop-carrot.png'
+import corn from '../../assets/shop-corn.png'
+import gumamela from '../../assets/shop-gumamela.png'
 import styles from './AdminAnalyticsPage.module.css'
 
 type Period = 'DAY' | 'WEEK' | 'MONTH'
@@ -62,9 +62,39 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   return <article className={styles.metric}><h2>{label}</h2><strong>{value}</strong></article>
 }
 
-function BarChart({ title, points, comparison = false }: { title: string; points: Point[]; comparison?: boolean }) {
-  const max = Math.max(...points.map((point) => point.value))
-  return <section className={styles.panel}><h2>{title}</h2><div className={`${styles.barChart} ${comparison ? styles.dual : ''}`}>{points.map((point) => <div className={styles.barColumn} key={point.label}><span className={styles.barTrack}><i style={{ height: `${(point.value / max) * 100}%` }} /><b style={comparison ? { height: `${Math.max(15, (point.value * .75 / max) * 100)}%` } : undefined} /></span><small>{point.label}</small></div>)}</div></section>
+function chartPath(points: Point[], max: number, width: number, height: number) {
+  const step = width / Math.max(points.length - 1, 1)
+  const coordinates = points.map((point, index) => [index * step, height - (point.value / max) * height])
+  return coordinates.reduce((path, [x, y], index) => {
+    if (index === 0) return `M ${x} ${y}`
+    const [previousX, previousY] = coordinates[index - 1]
+    const midpoint = (previousX + x) / 2
+    return `${path} C ${midpoint} ${previousY}, ${midpoint} ${y}, ${x} ${y}`
+  }, '')
+}
+
+function LineChart({ title, points, comparison }: { title: string; points: Point[]; comparison: Point[] }) {
+  const width = 360
+  const height = 112
+  const max = Math.ceil(Math.max(...points.map((point) => point.value), ...comparison.map((point) => point.value)) / 50) * 50
+  return <section className={styles.panel}><h2>{title}</h2><div className={styles.lineChart}>
+    <svg viewBox={`0 0 ${width + 32} ${height + 28}`} role="img" aria-label={`${title} line chart`}>
+      {[0, 1, 2, 3, 4].map((tick) => {
+        const y = height - (tick / 4) * height
+        return <g key={tick}><line x1="28" x2={width + 28} y1={y} y2={y} className={styles.gridLine} /><text x="0" y={y + 4} className={styles.axisLabel}>{Math.round((max * tick) / 4)}</text></g>
+      })}
+      <g transform="translate(28 0)"><path d={chartPath(comparison, max, width, height)} className={styles.comparisonLine} /><path d={chartPath(points, max, width, height)} className={styles.revenueLine} />{points.map((point, index) => <circle key={point.label} cx={(index * width) / Math.max(points.length - 1, 1)} cy={height - (point.value / max) * height} r="2.5" className={styles.revenuePoint} />)}</g>
+      {points.map((point, index) => <text key={point.label} x={28 + (index * width) / Math.max(points.length - 1, 1)} y={height + 22} textAnchor="middle" className={styles.axisLabel}>{point.label}</text>)}
+    </svg>
+  </div></section>
+}
+
+function TransactionChart({ title, points, comparison }: { title: string; points: Point[]; comparison: Point[] }) {
+  const max = Math.ceil(Math.max(...points.map((point) => point.value), ...comparison.map((point) => point.value)) / 50) * 50
+  return <section className={styles.panel}><h2>{title}</h2><div className={styles.transactionChart}>
+    <div className={styles.barGrid}>{[0, 1, 2, 3].map((tick) => <span key={tick} style={{ bottom: `${(tick / 3) * 100}%` }}><b>{Math.round((max * tick) / 3)}</b></span>)}</div>
+    <div className={styles.barGroups}>{points.map((point, index) => <div className={styles.barGroup} key={point.label}><i style={{ height: `${(point.value / max) * 100}%` }} /><b style={{ height: `${(comparison[index].value / max) * 100}%` }} /><small>{point.label}</small></div>)}</div>
+  </div></section>
 }
 
 function CategoryChart({ categories }: { categories: AnalyticsData['categories'] }) {
@@ -82,5 +112,5 @@ export function AdminAnalyticsPage() {
   const analytics = data[period]
   const title = period === 'DAY' ? 'DAILY' : period === 'WEEK' ? 'WEEKLY' : 'MONTHLY'
   const visibleTop = useMemo(() => analytics.top.filter((product) => product.name.toLowerCase().includes(search.toLowerCase())), [analytics.top, search])
-  return <main className={styles.page}><AdminSidebar active="analytics" /><section className={styles.content}><Header title="ANALYTICS" search={search} onSearchChange={(event) => setSearch(event.target.value)} /><div className={styles.dashboard}><div className={styles.metrics}><MetricCard label="TOTAL REVENUE" value={currency(analytics.totalRevenue)} /><MetricCard label="TOTAL ORDER" value={analytics.totalOrders.toLocaleString()} /><MetricCard label="AVG REVENUE/ORDER" value={currency(analytics.average)} /><MetricCard label="PROFIT MARGIN" value={`${analytics.margin}%`} /></div><div className={styles.chartGrid}><div className={styles.chartWithFilter}><BarChart title={`${title} REVENUE TREND`} points={analytics.revenue} /><div className={styles.filters}>{(['DAY', 'WEEK', 'MONTH'] as Period[]).map((item) => <button className={period === item ? styles.activeFilter : ''} key={item} type="button" onClick={() => setPeriod(item)}>{item[0] + item.slice(1).toLowerCase()}</button>)}</div></div><BarChart title={`${title} TRANSACTIONS`} points={analytics.transactions} comparison /></div><div className={styles.lowerGrid}><CategoryChart categories={analytics.categories} /><ProductRanking title="TOP SELLING PRODUCTS" products={visibleTop} /><ProductRanking title="UNDERPERFORMING PRODUCTS" products={analytics.underperforming} underperforming /></div></div></section></main>
+  return <main className={styles.page}><AdminSidebar active="analytics" /><section className={styles.content}><Header title="ANALYTICS" search={search} onSearchChange={(event) => setSearch(event.target.value)} /><div className={styles.dashboard}><div className={styles.metrics}><MetricCard label="TOTAL REVENUE" value={currency(analytics.totalRevenue)} /><MetricCard label="TOTAL ORDER" value={analytics.totalOrders.toLocaleString()} /><MetricCard label="AVG REVENUE/ORDER" value={currency(analytics.average)} /><MetricCard label="PROFIT MARGIN" value={`${analytics.margin}%`} /></div><div className={styles.chartGrid}><div className={styles.chartWithFilter}><LineChart title={`${title} REVENUE TREND`} points={analytics.revenue} comparison={analytics.comparison} /><div className={styles.filters}>{(['DAY', 'WEEK', 'MONTH'] as Period[]).map((item) => <button className={period === item ? styles.activeFilter : ''} key={item} type="button" onClick={() => setPeriod(item)}>{item[0] + item.slice(1).toLowerCase()}</button>)}</div></div><div className={styles.chartWithFilter}><TransactionChart title={`${title} TRANSACTIONS`} points={analytics.transactions} comparison={analytics.comparison} /><div className={styles.filters}>{(['DAY', 'WEEK', 'MONTH'] as Period[]).map((item) => <button className={period === item ? styles.activeFilter : ''} key={item} type="button" onClick={() => setPeriod(item)}>{item[0] + item.slice(1).toLowerCase()}</button>)}</div></div></div><div className={styles.lowerGrid}><CategoryChart categories={analytics.categories} /><ProductRanking title="TOP SELLING PRODUCTS" products={visibleTop} /><ProductRanking title="UNDERPERFORMING PRODUCTS" products={analytics.underperforming} underperforming /></div></div></section></main>
 }

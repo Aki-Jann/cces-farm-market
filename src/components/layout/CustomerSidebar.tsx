@@ -1,4 +1,4 @@
-import { BrandLogo } from './BrandLogo'
+import { BrandLogo } from '../common/BrandLogo'
 import styles from './CustomerSidebar.module.css'
 
 export type CustomerNavItem = 'shop' | 'orders' | 'messages' | 'account'

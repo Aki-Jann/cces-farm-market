@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { CustomerSidebar } from './CustomerSidebar'
-import { Header } from './Header'
+import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
+import { Header } from '../../components/layout/Header'
 import styles from './AccountPage.module.css'
 
 type AccountData = { name: string; email: string; contact: string; address: string }

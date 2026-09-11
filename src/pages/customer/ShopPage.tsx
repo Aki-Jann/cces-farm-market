@@ -1,16 +1,16 @@
 import { useMemo, useState } from 'react'
-import { BrandLogo } from './BrandLogo'
-import { Header } from './Header'
+import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
+import { Header } from '../../components/layout/Header'
 import styles from './ShopPage.module.css'
-import apple from '../assets/shop-apple.png'
-import banana from '../assets/shop-banana.png'
-import pepper from '../assets/shop-pepper.png'
-import cabbage from '../assets/shop-cabbage.png'
-import carrot from '../assets/shop-carrot.png'
-import corn from '../assets/shop-corn.png'
-import cucumber from '../assets/shop-cucumber.png'
-import guava from '../assets/shop-guava.png'
-import gumamela from '../assets/shop-gumamela.png'
+import apple from '../../assets/shop-apple.png'
+import banana from '../../assets/shop-banana.png'
+import pepper from '../../assets/shop-pepper.png'
+import cabbage from '../../assets/shop-cabbage.png'
+import carrot from '../../assets/shop-carrot.png'
+import corn from '../../assets/shop-corn.png'
+import cucumber from '../../assets/shop-cucumber.png'
+import guava from '../../assets/shop-guava.png'
+import gumamela from '../../assets/shop-gumamela.png'
 
 type Category = 'All' | 'Vegetables' | 'Fruits' | 'Grains' | 'Flowers'
 
@@ -177,16 +177,7 @@ export function ShopPage() {
 
   return (
     <main className={styles.shop}>
-      <nav className={styles.sidebar}>
-        <div>
-          <BrandLogo compact />
-          <div className={styles.sideRule} />
-          <a className={styles.activeNav} href="#/shop">SHOP</a>
-          <a href="#/orders">ORDERS</a>
-          <a href="#/messages">MESSAGE</a>
-        </div>
-        <a href="#/account">MY ACCOUNT</a>
-      </nav>
+      <CustomerSidebar active="shop" />
       <section className={styles.catalog}>
         <Header
           className={styles.catalogHeader}

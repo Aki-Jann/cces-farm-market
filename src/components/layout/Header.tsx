@@ -24,7 +24,7 @@ export function Header({ title, search, onSearchChange, actions, secondary, logo
         </label>
       )}
       {actions && <nav className={styles.actions}>{actions}</nav>}
-      {logo}
+      {logo && <div className={styles.logoSlot}>{logo}</div>}
       {secondary}
     </header>
   )

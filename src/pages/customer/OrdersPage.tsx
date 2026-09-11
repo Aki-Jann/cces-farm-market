@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { BrandLogo } from './BrandLogo'
-import { Header } from './Header'
+import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
+import { Header } from '../../components/layout/Header'
 import styles from './OrdersPage.module.css'
 
 type OrderStatus = 'DELIVERED' | 'PENDING'
@@ -62,21 +62,6 @@ export function OrderDetails({ order }: { order: Order }) {
   )
 }
 
-function Sidebar() {
-  return (
-    <nav className={styles.sidebar}>
-      <div>
-        <BrandLogo compact />
-        <div className={styles.rule} />
-        <a href="#/shop">SHOP</a>
-        <a className={styles.activeNav} href="#/orders">ORDERS</a>
-        <a href="#/messages">MESSAGE</a>
-      </div>
-      <a href="#/account">MY ACCOUNT</a>
-    </nav>
-  )
-}
-
 export function OrdersPage() {
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -85,7 +70,7 @@ export function OrdersPage() {
 
   return (
     <main className={styles.ordersPage}>
-      <Sidebar />
+      <CustomerSidebar active="orders" />
       <section className={styles.ordersContent}>
         <Header title="ORDERS" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
         <section className={styles.orderPanel}>

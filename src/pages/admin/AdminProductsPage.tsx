@@ -1,16 +1,16 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { AdminSidebar } from './AdminSidebar'
-import { Header } from './Header'
-import apple from '../assets/shop-apple.png'
-import banana from '../assets/shop-banana.png'
-import pepper from '../assets/shop-pepper.png'
-import cabbage from '../assets/shop-cabbage.png'
-import carrot from '../assets/shop-carrot.png'
-import corn from '../assets/shop-corn.png'
-import cucumber from '../assets/shop-cucumber.png'
-import guava from '../assets/shop-guava.png'
-import gumamela from '../assets/shop-gumamela.png'
+import { AdminSidebar } from '../../components/layout/AdminSidebar'
+import { Header } from '../../components/layout/Header'
+import apple from '../../assets/shop-apple.png'
+import banana from '../../assets/shop-banana.png'
+import pepper from '../../assets/shop-pepper.png'
+import cabbage from '../../assets/shop-cabbage.png'
+import carrot from '../../assets/shop-carrot.png'
+import corn from '../../assets/shop-corn.png'
+import cucumber from '../../assets/shop-cucumber.png'
+import guava from '../../assets/shop-guava.png'
+import gumamela from '../../assets/shop-gumamela.png'
 import styles from './AdminProductsPage.module.css'
 
 type ProductCategory = 'VEGETABLES' | 'FRUITS' | 'GRAINS' | 'FLOWERS'
@@ -59,9 +59,9 @@ function emptyDraft(): ProductDraft {
   return { name: '', category: 'VEGETABLES', price: 100, stock: 0, unit: 'KG', image: imageOptions[0].value, available: true }
 }
 
-function ProductCard({ product, onEdit }: { product: Product; onEdit: () => void }) {
+function ProductCard({ product, selected, onEdit }: { product: Product; selected: boolean; onEdit: () => void }) {
   return (
-    <article className={styles.productCard}>
+    <article className={`${styles.productCard} ${selected ? styles.selectedCard : ''}`}>
       <img src={product.image} alt={product.name} />
       <div className={styles.productInfo}>
         <div>
@@ -85,11 +85,6 @@ function ProductForm({ draft, editing, onChange, onSubmit }: {
   return (
     <form className={styles.form} onSubmit={onSubmit}>
       <div className={styles.imagePreview}><img src={draft.image} alt="Product preview" /></div>
-      <label>PRODUCT IMAGE
-        <select value={draft.image} onChange={(event) => onChange({ ...draft, image: event.target.value })}>
-          {imageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-        </select>
-      </label>
       <label>PRODUCT NAME
         <input required value={draft.name} placeholder="e.g. TOMATO" onChange={(event) => onChange({ ...draft, name: event.target.value.toUpperCase() })} />
       </label>
@@ -98,9 +93,11 @@ function ProductForm({ draft, editing, onChange, onSubmit }: {
       </div></fieldset>
       <div className={styles.formRow}>
         <label>STOCK<input min="0" required type="number" value={draft.stock} onChange={(event) => onChange({ ...draft, stock: Number(event.target.value) })} /></label>
-        <label>UNIT<select value={draft.unit} onChange={(event) => onChange({ ...draft, unit: event.target.value })}><option>KG</option><option>PIECE</option><option>BUNDLE</option></select></label>
       </div>
-      <label>PRICE<input min="0" required step="0.01" type="number" value={draft.price} onChange={(event) => onChange({ ...draft, price: Number(event.target.value) })} /></label>
+      <fieldset><legend>PRICE</legend><div className={styles.priceOptions}>
+        {[100, 200, 300].map((price) => <button className={draft.price === price ? styles.selectedChip : ''} type="button" key={price} onClick={() => onChange({ ...draft, price })}>₱{price}.00</button>)}
+      </div>
+      <input min="0" required step="0.01" type="number" value={draft.price} aria-label="PRICE" placeholder="e.g. ₱100.00" onChange={(event) => onChange({ ...draft, price: Number(event.target.value) })} /></fieldset>
       <label className={styles.availability}><input type="checkbox" checked={draft.available} onChange={(event) => onChange({ ...draft, available: event.target.checked })} /> AVAILABLE FOR ORDER</label>
       <button className={styles.submit} type="submit">{editing ? 'SAVE CHANGES' : 'SUBMIT'}</button>
     </form>
@@ -109,8 +106,9 @@ function ProductForm({ draft, editing, onChange, onSubmit }: {
 
 export function AdminProductsPage() {
   const [products, setProducts] = useState(initialProducts)
-  const [selectedId, setSelectedId] = useState<string | null>(initialProducts[0].id)
-  const [draft, setDraft] = useState<ProductDraft>(initialProducts[0])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [draft, setDraft] = useState<ProductDraft>(emptyDraft())
+  const [isFormOpen, setIsFormOpen] = useState(false)
   const [search, setSearch] = useState('')
   const selectedProduct = products.find((product) => product.id === selectedId)
   const visibleProducts = useMemo(() => products.filter((product) => `${product.name} ${product.category}`.toLowerCase().includes(search.toLowerCase())), [products, search])
@@ -118,11 +116,13 @@ export function AdminProductsPage() {
   function startAdd() {
     setSelectedId(null)
     setDraft(emptyDraft())
+    setIsFormOpen(true)
   }
 
   function startEdit(product: Product) {
     setSelectedId(product.id)
     setDraft({ ...product })
+    setIsFormOpen(true)
   }
 
   function saveProduct(event: FormEvent<HTMLFormElement>) {
@@ -143,13 +143,13 @@ export function AdminProductsPage() {
       <AdminSidebar active="products" />
       <section className={styles.content}>
         <Header title="PRODUCTS" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
-        <div className={styles.workspace}>
-          <section className={styles.grid}>
-            <button className={`${styles.addTile} ${!selectedId ? styles.activeTile : ''}`} type="button" onClick={startAdd}><span>+</span><strong>ADD NEW PRODUCT</strong></button>
-            {visibleProducts.map((product) => <ProductCard key={product.id} product={product} onEdit={() => startEdit(product)} />)}
+        <div className={`${styles.workspace} ${isFormOpen ? styles.workspaceWithForm : ''}`}>
+          <section className={`${styles.grid} ${isFormOpen ? styles.gridWithForm : styles.gridList}`}>
+            <button className={`${styles.addTile} ${isFormOpen && !selectedId ? styles.activeTile : ''}`} type="button" onClick={startAdd}><span>+</span><strong>ADD NEW PRODUCT</strong></button>
+            {visibleProducts.map((product) => <ProductCard key={product.id} product={product} selected={selectedId === product.id} onEdit={() => startEdit(product)} />)}
             {visibleProducts.length === 0 && <p className={styles.empty}>No products found.</p>}
           </section>
-          <ProductForm draft={draft} editing={Boolean(selectedId)} onChange={setDraft} onSubmit={saveProduct} />
+          {isFormOpen && <ProductForm draft={draft} editing={Boolean(selectedId)} onChange={setDraft} onSubmit={saveProduct} />}
         </div>
       </section>
     </main>

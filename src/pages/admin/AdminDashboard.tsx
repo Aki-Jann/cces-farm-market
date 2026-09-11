@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { AdminSidebar } from './AdminSidebar'
-import { Header } from './Header'
+import { AdminSidebar } from '../../components/layout/AdminSidebar'
+import { Header } from '../../components/layout/Header'
 import styles from './AdminDashboard.module.css'
 
 type RevenuePoint = { day: string; amount: number; fill: 'green' | 'lime' | 'empty' }

@@ -1,11 +1,11 @@
-import { BrandLogo } from './BrandLogo'
+import { BrandLogo } from '../../components/common/BrandLogo'
 import styles from './LandingPage.module.css'
-import heroImage from '../assets/landing-hero.png'
-import appleImage from '../assets/apple.png'
-import pepperImage from '../assets/bell-pepper.png'
-import cornImage from '../assets/corn.png'
-import gumamelaImage from '../assets/gumamela.png'
-import storyImage from '../assets/our-story.png'
+import heroImage from '../../assets/landing-hero.png'
+import appleImage from '../../assets/apple.png'
+import pepperImage from '../../assets/bell-pepper.png'
+import cornImage from '../../assets/corn.png'
+import gumamelaImage from '../../assets/gumamela.png'
+import storyImage from '../../assets/our-story.png'
 
 const products = [
   { name: 'APPLE', category: 'FRUITS', image: appleImage },
@@ -20,7 +20,7 @@ export function LandingPage() {
       <header className={styles.header}>
         <a href="#/" aria-label="GreenMarket home"><BrandLogo compact /></a>
         <nav>
-          <a href="#shop">SHOP</a>
+          <a href="#shops">SHOP</a>
           <a href="#about">ABOUT</a>
           <a href="#/login" className={styles.loginLink}>LOG IN</a>
         </nav>
@@ -36,7 +36,7 @@ export function LandingPage() {
             <span>● Direct Connection</span>
             <span>● Simple Communication</span>
           </div>
-          <a href="#shop">SHOP THIS WEEK’S HARVEST</a>
+          <a href="#shops">SHOP THIS WEEK’S HARVEST</a>
         </div>
       </section>
 
@@ -47,7 +47,7 @@ export function LandingPage() {
         <span>Direct orders<br /><small>Online pre-order available</small></span>
       </section>
 
-      <section className={styles.products} id="shop">
+      <section className={styles.products} id="shops">
         <h2>Connecting Zamboanga Farmers and Buyers<br />Through Smart Commerce</h2>
         <div className={styles.productGrid}>
           {products.map((product) => (
@@ -57,7 +57,7 @@ export function LandingPage() {
                 <div><strong>{product.name}</strong><small>{product.category}</small></div>
                 <div className={styles.price}><strong>₱100.00</strong><small>PER KG</small></div>
               </div>
-              <button type="button" onClick={() => { window.location.hash = '/shop' }}>ADD TO CART</button>
+              <button type="button" onClick={() => { window.location.hash = '/login' }}>ADD TO CART</button>
             </article>
           ))}
         </div>
@@ -68,7 +68,7 @@ export function LandingPage() {
         <p className={styles.storyLabel}>OUR STORY</p>
         <img src={storyImage} alt="Agricultores de la Paz community" />
         <p className={styles.storyText}>We are the Agricultores De La Paz, a community of growers working together to bring our harvest directly to buyers. Farming is our livelihood, but selling our produce has always been a challenge. Through this platform, we can share our crops at fair prices, reduce waste, and reach more people who value fresh, local food.</p>
-        <button type="button" onClick={() => { window.location.hash = '/shop' }}>ORDER DIRECTLY FROM US</button>
+        <button type="button" onClick={() => { window.location.hash = '/login' }}>ORDER DIRECTLY FROM US</button>
       </section>
 
       <footer><BrandLogo compact /><span>cces@adzu.edu.ph</span><span>+63 992 091 8674</span><span>Ateneo de Zamboanga University, La Purisima St., Zamboanga City 7000, Philippines</span></footer>

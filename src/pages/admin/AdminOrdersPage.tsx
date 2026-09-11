@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
-import { AdminSidebar } from './AdminSidebar'
-import { Header } from './Header'
+import { useEffect, useMemo, useState } from 'react'
+import { AdminSidebar } from '../../components/layout/AdminSidebar'
+import { Header } from '../../components/layout/Header'
 import styles from './AdminOrdersPage.module.css'
 
 type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PACKED' | 'DELIVERED'
@@ -107,8 +107,13 @@ function OrderDetails({ order, onAdvance }: { order: Order; onAdvance: () => voi
 export function AdminOrdersPage() {
   const [orders, setOrders] = useState(mockOrders)
   const [selectedId, setSelectedId] = useState(mockOrders[0].id)
-  const [archive, setArchive] = useState(false)
+  const [archive, setArchive] = useState(() => window.location.hash.replace(/^#\/?/, '') === 'admin/orders/archive')
   const [search, setSearch] = useState('')
+  useEffect(() => {
+    const syncArchiveState = () => setArchive(window.location.hash.replace(/^#\/?/, '') === 'admin/orders/archive')
+    window.addEventListener('hashchange', syncArchiveState)
+    return () => window.removeEventListener('hashchange', syncArchiveState)
+  }, [])
   const visibleOrders = useMemo(() => orders.filter((order) => (archive ? order.status === 'DELIVERED' : order.status !== 'DELIVERED') && `${order.id} ${order.customer}`.toLowerCase().includes(search.toLowerCase())), [archive, orders, search])
   const selected = visibleOrders.find((order) => order.id === selectedId) ?? visibleOrders[0]
   const counts = statusOrder.reduce<Record<OrderStatus, number>>((result, status) => ({ ...result, [status]: orders.filter((order) => order.status === status).length }), {} as Record<OrderStatus, number>)

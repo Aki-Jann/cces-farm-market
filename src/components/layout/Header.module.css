@@ -52,6 +52,11 @@
   gap: 20px;
 }
 
+.logoSlot {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
 .actions :where(button, a) {
   background: transparent;
   border: 0;

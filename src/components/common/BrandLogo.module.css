@@ -1,7 +1,7 @@
 .logo {
   color: #017632;
   text-align: center;
-  width: 306px;
+  width: 100%;
 }
 
 .logo span {
@@ -10,6 +10,8 @@
   font-size: 39px;
   font-weight: 700;
   line-height: 1.2;
+  text-align: center;
+  width: 100%;
 }
 
 .logo small {
@@ -19,6 +21,8 @@
   letter-spacing: 0.15px;
   line-height: 1;
   margin-top: 2px;
+  text-align: center;
+  width: 100%;
 }
 
 .compact {

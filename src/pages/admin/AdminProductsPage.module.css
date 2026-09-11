@@ -5,11 +5,26 @@
 .search { align-items: center; background: #f5f5f5; border-radius: 53px; display: flex; flex: 1; gap: 10px; height: 50px; padding: 0 20px; }
 .search span { color: #6c7175; font-size: 28px; }
 .search input { background: transparent; border: 0; font-size: 20px; outline: 0; width: 100%; }
-.workspace { align-items: flex-start; display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr) 530px; margin: 20px auto; max-width: 1190px; }
-.grid { display: grid; gap: 15px; grid-template-columns: repeat(2, minmax(160px, 1fr)); }
+.workspace {
+  align-items: flex-start;
+  display: block;
+  margin: 28px auto;
+  max-width: 940px;
+  width: calc(100% - 40px);
+}
+.workspaceWithForm {
+  display: grid;
+  gap: 30px;
+  grid-template-columns: minmax(0, 1fr) 545px;
+  max-width: 1210px;
+}
+.grid { display: grid; gap: 20px; }
+.gridList { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.gridWithForm { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .productCard, .addTile, .form { background: #fff; border: 0; border-radius: 10px; box-shadow: 0 3px 5px rgb(0 0 0 / 10%); min-width: 0; padding: 15px; }
 .productCard { display: flex; flex-direction: column; }
-.productCard > img { height: 180px; object-fit: contain; width: 100%; }
+.selectedCard { border: 1px solid #017632; padding: 14px; }
+.productCard > img { height: 220px; object-fit: contain; width: 100%; }
 .productInfo { align-items: flex-end; display: flex; justify-content: space-between; margin-top: 5px; }
 .productInfo > div { display: flex; flex-direction: column; min-width: 0; }
 .productInfo strong { font-size: 16px; }
@@ -18,25 +33,32 @@
 .productInfo .unavailable { color: #a33; }
 .price { align-items: flex-end; }
 .price strong { color: #017632; font-size: 20px; white-space: nowrap; }
-.productCard > button, .categoryGrid button { background: #cce9d5; border: 0; border-radius: 5px; color: #017632; cursor: pointer; padding: 8px; }
+.productCard > button, .categoryGrid button, .priceOptions button { background: #cce9d5; border: 0; border-radius: 5px; color: #017632; cursor: pointer; padding: 8px; }
 .productCard > button { margin-top: 8px; width: 100%; }
-.addTile { align-items: center; color: #017632; cursor: pointer; display: flex; flex-direction: column; gap: 20px; justify-content: center; min-height: 310px; }
+.addTile { align-items: center; color: #017632; cursor: pointer; display: flex; flex-direction: column; gap: 20px; justify-content: center; min-height: 364px; }
 .addTile span { font-size: 78px; font-weight: 300; line-height: .8; }
 .addTile strong { font-size: 17px; }
 .activeTile { background: #017632; color: #fff; }
-.form { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 20px; }
-.imagePreview { background: #f5f5f5; border-radius: 10px; height: 235px; overflow: hidden; }
+.form { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 20px; }
+.imagePreview {
+  background: #f5f5f5;
+  border-radius: 10px;
+  height: 320px;
+  overflow: hidden;
+}
 .imagePreview img { height: 100%; object-fit: cover; width: 100%; }
 .form label, .form legend { display: flex; flex-direction: column; font-size: 13px; gap: 6px; }
-.form input, .form select { background: #f5f5f5; border: 0; border-radius: 28px; box-sizing: border-box; font-size: 17px; padding: 10px 15px; width: 100%; }
+.form input, .form select { background: #f5f5f5; border: 0; border-radius: 28px; box-sizing: border-box; font-size: 16px; min-height: 32px; padding: 7px 15px; width: 100%; }
 .form fieldset { border: 0; margin: 0; padding: 0; }
-.categoryGrid { display: grid; gap: 8px; grid-template-columns: repeat(3, 1fr); margin-top: 5px; }
+.categoryGrid, .priceOptions { display: grid; gap: 8px; grid-template-columns: repeat(3, 1fr); margin-top: 5px; }
 .categoryGrid .selectedChip { background: #017632; color: #fff; font-weight: 700; }
-.formRow { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+.priceOptions .selectedChip { background: #017632; color: #fff; font-weight: 700; }
+.form fieldset > input { margin-top: 8px; }
+.formRow { display: grid; gap: 10px; grid-template-columns: 1fr; }
 .availability { align-items: center; flex-direction: row !important; }
 .availability input { accent-color: #017632; width: auto; }
 .submit { background: #017632; border: 0; border-radius: 5px; color: #fff; cursor: pointer; font-weight: 700; padding: 10px; }
 .empty { color: #6c7175; grid-column: 1 / -1; text-align: center; }
-@media (max-width: 1100px) { .workspace { grid-template-columns: minmax(0, 1fr) 390px; margin: 20px; } }
-@media (max-width: 800px) { .page { display: block; } .header { padding: 12px; } .header h1 { font-size: 30px; } .workspace { display: flex; flex-direction: column; margin: 12px 6px; } .grid { width: 100%; } .form { position: static; width: 100%; } }
+@media (max-width: 1100px) { .workspace { margin: 20px auto; } .workspaceWithForm { grid-template-columns: minmax(0, 1fr) 390px; } }
+@media (max-width: 800px) { .page { display: block; } .header { padding: 12px; } .header h1 { font-size: 30px; } .workspace { display: flex; flex-direction: column; margin: 12px 6px; } .grid, .gridList, .gridWithForm { grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; } .form { margin: 12px 0 0; position: static; width: 100%; } }
 @media (max-width: 500px) { .grid { grid-template-columns: 1fr; } .productCard > img { height: 150px; } }

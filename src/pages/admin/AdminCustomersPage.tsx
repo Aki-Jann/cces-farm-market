@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { AdminSidebar } from './AdminSidebar'
-import { Header } from './Header'
+import { AdminSidebar } from '../../components/layout/AdminSidebar'
+import { Header } from '../../components/layout/Header'
 import styles from './AdminCustomersPage.module.css'
 
 type Message = { id: string; text: string; timestamp: string; sender: 'customer' | 'admin' }

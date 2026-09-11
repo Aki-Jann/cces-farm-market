@@ -1,4 +1,4 @@
-import { BrandLogo } from './BrandLogo'
+import { BrandLogo } from '../common/BrandLogo'
 import styles from './AdminSidebar.module.css'
 
 type AdminNavItem = 'dashboard' | 'orders' | 'products' | 'customers' | 'analytics'
@@ -15,7 +15,7 @@ export function AdminSidebar({ active }: { active: AdminNavItem }) {
   return (
     <nav className={styles.sidebar} aria-label="Admin navigation">
       <div className={styles.top}>
-        <BrandLogo compact />
+        <div className={styles.logo}><BrandLogo compact /></div>
         <div className={styles.rule} />
         {links.map((link) => (
           <a className={active === link.key ? styles.active : ''} href={link.href} key={link.key}>

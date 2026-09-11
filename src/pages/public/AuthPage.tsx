@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react'
-import { BrandLogo } from './BrandLogo'
+import { BrandLogo } from '../../components/common/BrandLogo'
 import styles from './AuthPage.module.css'
 
 export type AuthType = 'login' | 'register' | 'forgot-password'
@@ -32,7 +32,7 @@ export function AuthPage({ type }: { type: AuthType }) {
     return (
       <main className={styles.authCanvas}>
         <form className={`${styles.authCard} ${styles.registerCard}`} onSubmit={(event) => submitMock(event, '/login')}>
-          <BrandLogo />
+          <div className={styles.authLogo}><BrandLogo /></div>
           <div className={styles.authHeading}>
             <h1>Register</h1>
             <p>Create your account</p>
@@ -59,7 +59,7 @@ export function AuthPage({ type }: { type: AuthType }) {
   return (
     <main className={styles.authCanvas}>
       <form className={`${styles.authCard} ${isForgot ? styles.forgotCard : ''}`} onSubmit={(event) => submitMock(event, isForgot ? '/login' : '/shop')}>
-        <BrandLogo />
+        <div className={styles.authLogo}><BrandLogo /></div>
         <div className={styles.authHeading}>
           <h1>{isForgot ? 'Forgot Password' : 'Welcome Back!'}</h1>
           <p>{isForgot ? 'We’ll email you a reset link' : 'Sign in to your account'}</p>
