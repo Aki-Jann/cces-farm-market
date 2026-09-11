@@ -39,7 +39,27 @@
 .itemRow { border-bottom: 1px solid #6c7175; display: grid; gap: 10px; grid-template-columns: 2fr 1fr 1fr 1.2fr; padding: 9px 0; }
 .itemRow span:nth-child(n+2), .itemRow strong:last-child { text-align: right; }
 .totalRow { display: flex; justify-content: space-between; padding-top: 14px; }
-.detailFooter { align-items: center; display: flex; justify-content: space-between; padding: 20px 14px; }
-.detailFooter button { background: #017632; border: 0; border-radius: 5px; color: #fff; cursor: pointer; font-weight: 700; padding: 9px 26px; }
+.detailFooter {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  padding: 20px 14px;
+}
+.detailFooter button {
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 9px 26px;
+}
+.completedButton {
+  background: #d9d9d9;
+  color: #6c7175;
+}
+.nextButton {
+  background: #017632;
+  color: #fff;
+  margin-left: auto;
+}
 @media (max-width: 1050px) { .dashboard { margin: 20px; } .header { flex-wrap: wrap; } .stats { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 700px) { .page { display: block; } .header { padding: 12px; } .header h1 { font-size: 30px; } .header button { padding: 8px 4px; } .dashboard { margin: 10px 6px; } .ordersPanel { flex-direction: column; } .orderList { border-bottom: 1px solid #d9d9d9; border-right: 0; flex-basis: auto; max-height: 260px; overflow: auto; } .timelineStep strong { display: none; } .itemRow { font-size: 12px; } }
