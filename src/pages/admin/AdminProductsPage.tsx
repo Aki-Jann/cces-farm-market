@@ -4,15 +4,7 @@ import { addDoc, collection, doc, getDocs, serverTimestamp, updateDoc } from 'fi
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { db } from '../../firebase/firestore'
-import apple from '../../assets/shop-apple.png'
-import banana from '../../assets/shop-banana.png'
-import pepper from '../../assets/shop-pepper.png'
-import cabbage from '../../assets/shop-cabbage.png'
-import carrot from '../../assets/shop-carrot.png'
-import corn from '../../assets/shop-corn.png'
-import cucumber from '../../assets/shop-cucumber.png'
-import guava from '../../assets/shop-guava.png'
-import gumamela from '../../assets/shop-gumamela.png'
+import { productImages, resolveProductImage } from '../../utils/productImages'
 import styles from './AdminProductsPage.module.css'
 
 type ProductCategory = 'VEGETABLES' | 'FRUITS' | 'GRAINS' | 'FLOWERS'
@@ -30,15 +22,15 @@ type ProductDraft = Omit<Product, 'id'>
 
 const categories: ProductCategory[] = ['VEGETABLES', 'FRUITS', 'GRAINS', 'FLOWERS']
 const imageOptions = [
-  { label: 'Apple', value: apple },
-  { label: 'Banana', value: banana },
-  { label: 'Bell Pepper', value: pepper },
-  { label: 'Cabbage', value: cabbage },
-  { label: 'Carrot', value: carrot },
-  { label: 'Corn', value: corn },
-  { label: 'Cucumber', value: cucumber },
-  { label: 'Guava', value: guava },
-  { label: 'Gumamela', value: gumamela },
+  { label: 'Apple', value: productImages['shop-apple.png'] },
+  { label: 'Banana', value: productImages['shop-banana.png'] },
+  { label: 'Bell Pepper', value: productImages['shop-pepper.png'] },
+  { label: 'Cabbage', value: productImages['shop-cabbage.png'] },
+  { label: 'Carrot', value: productImages['shop-carrot.png'] },
+  { label: 'Corn', value: productImages['shop-corn.png'] },
+  { label: 'Cucumber', value: productImages['shop-cucumber.png'] },
+  { label: 'Guava', value: productImages['shop-guava.png'] },
+  { label: 'Gumamela', value: productImages['shop-gumamela.png'] },
 ]
 
 function currency(value: number) {
@@ -113,7 +105,7 @@ export function AdminProductsPage() {
         const snapshot = await getDocs(collection(db, 'products'))
         setProducts(snapshot.docs.map((product) => {
           const data = product.data()
-          const imageUrl = typeof data.imageUrl === 'string' && data.imageUrl ? data.imageUrl : imageOptions[0].value
+          const imageUrl = resolveProductImage(data.imageUrl, 'shop-apple.png')
           return {
             id: product.id,
             name: typeof data.name === 'string' ? data.name : '',
