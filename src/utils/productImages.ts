@@ -20,13 +20,19 @@ export const productImages = {
   'shop-gumamela.png': gumamela,
 } as const
 
+export function productImageKey(value: string) {
+  return (Object.entries(productImages).find(([, image]) => image === value)?.[0] ?? value)
+}
+
 export function resolveProductImage(value: unknown, fallback = 'shop-apple.png') {
   if (typeof value === 'string' && value) {
     const filename = value.split('/').pop() ?? ''
-    if (filename in productImages) {
-      return productImages[filename as keyof typeof productImages]
+    const imageKey = Object.keys(productImages).find((key) => filename === key || filename.startsWith(`${key.replace('.png', '-')}`))
+    const isLocalPath = value === filename || value.includes('/src/assets/') || value.startsWith('src/assets/') || value.startsWith('/assets/')
+    if (isLocalPath && imageKey) {
+      return productImages[imageKey as keyof typeof productImages]
     }
-    if (!value.includes('/src/assets/')) {
+    if (!isLocalPath) {
       return value
     }
   }
