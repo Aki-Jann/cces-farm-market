@@ -22,11 +22,6 @@
   width: 100%;
 }
 
-.sidebar .logo {
-  transform: scale(.72);
-  transform-origin: center top;
-}
-
 .sideRule {
   border-top: 1px solid #017632;
   margin: -7px -10px 20px;
@@ -335,9 +330,9 @@
   text-align: center;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1200px) {
   .sidebar {
-    flex-basis: 130px;
+    flex-basis: 170px;
   }
 
   .cart {

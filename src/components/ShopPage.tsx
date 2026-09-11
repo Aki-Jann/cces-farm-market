@@ -166,10 +166,10 @@ export function ShopPage() {
           <BrandLogo compact />
           <div className={styles.sideRule} />
           <a className={styles.activeNav} href="#/shop">SHOP</a>
-          <a href="#/shop">ORDERS</a>
-          <a href="#/shop">MESSAGE</a>
+          <a href="#/orders">ORDERS</a>
+          <a href="#/messages">MESSAGE</a>
         </div>
-        <a href="#/login">MY ACCOUNT</a>
+        <a href="#/account">MY ACCOUNT</a>
       </nav>
       <section className={styles.catalog}>
         <header className={styles.catalogHeader}>

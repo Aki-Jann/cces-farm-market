@@ -22,7 +22,8 @@
 }
 
 .compact {
-  width: 263px;
+  height: 34.833px;
+  width: 190px;
 }
 
 .compact span {
@@ -30,9 +31,12 @@
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
-  font-size: 45px;
+  font-size: 22.72px;
+  line-height: 30.337px;
 }
 
 .compact small {
-  display: none;
+  font-size: 4.28px;
+  line-height: normal;
+  margin-top: 0;
 }

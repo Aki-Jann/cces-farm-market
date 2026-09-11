@@ -1,0 +1,32 @@
+.page { background: #f4f4f4; color: #191919; display: flex; min-height: 100vh; }
+.content { flex: 1; min-width: 0; }
+.header { align-items: center; background: #fff; box-shadow: 0 3px 10px rgb(0 0 0 / 10%); display: flex; padding: 20px; }
+.header h1 { color: #017632; font-size: 48px; margin: 0; }
+.card { background: #fff; margin: 20px; min-height: calc(100vh - 137px); padding: 44px 30px; }
+.profileHeader { align-items: center; border-bottom: 1px solid #d9d9d9; display: flex; gap: 18px; padding-bottom: 30px; }
+.avatar { align-items: center; background: #017632; border-radius: 50%; color: #cce9d5; display: flex; font-size: 60px; height: 93px; justify-content: center; width: 93px; }
+.profileHeader h2 { font-size: 30px; margin: 0; }
+.profileHeader p { font-size: 13px; margin: 2px 0 0; }
+.logout { background: #017632; border-radius: 5px; color: #fff; font-size: 12px; font-weight: 700; margin-left: auto; padding: 9px 26px; text-decoration: none; }
+.sectionHeading { align-items: center; border-bottom: 1px solid #d9d9d9; display: flex; justify-content: space-between; padding: 18px 12px; }
+.sectionHeading button { background: transparent; border: 0; color: #017632; cursor: pointer; padding: 9px 12px; }
+.details { display: grid; gap: 18px; margin: 22px 34px; }
+.details div { display: grid; grid-template-columns: 145px 1fr; }
+.details dt { font-weight: 600; }
+.details dd { font-weight: 600; margin: 0; }
+.form { display: grid; gap: 16px; margin: 22px 34px; max-width: 600px; }
+.form label { display: grid; gap: 7px; font-weight: 600; }
+.form input { border: 1px solid #d9d9d9; border-radius: 5px; padding: 10px; }
+.actions { display: flex; gap: 10px; justify-content: flex-end; }
+.actions button { background: #017632; border: 0; border-radius: 5px; color: #fff; cursor: pointer; font-weight: 700; padding: 9px 20px; }
+.actions button:first-child { background: #eee; color: #191919; }
+@media (max-width: 700px) {
+  .page { display: block; }
+  .header { padding: 12px; }
+  .header h1 { font-size: 30px; }
+  .card { margin: 10px 6px; padding: 22px 14px; }
+  .profileHeader { align-items: flex-start; flex-wrap: wrap; }
+  .logout { margin-left: 0; }
+  .details, .form { margin-left: 8px; margin-right: 8px; }
+  .details div { grid-template-columns: 1fr; gap: 5px; }
+}
