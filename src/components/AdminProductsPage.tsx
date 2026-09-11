@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { AdminSidebar } from './AdminSidebar'
+import { Header } from './Header'
 import apple from '../assets/shop-apple.png'
 import banana from '../assets/shop-banana.png'
 import pepper from '../assets/shop-pepper.png'
@@ -141,7 +142,7 @@ export function AdminProductsPage() {
     <main className={styles.page}>
       <AdminSidebar active="products" />
       <section className={styles.content}>
-        <header className={styles.header}><h1>PRODUCTS</h1><label className={styles.search}><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" /></label></header>
+        <Header title="PRODUCTS" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
         <div className={styles.workspace}>
           <section className={styles.grid}>
             <button className={`${styles.addTile} ${!selectedId ? styles.activeTile : ''}`} type="button" onClick={startAdd}><span>+</span><strong>ADD NEW PRODUCT</strong></button>

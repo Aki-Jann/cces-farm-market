@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { CustomerSidebar } from './CustomerSidebar'
+import { Header } from './Header'
 import styles from './AccountPage.module.css'
 
 type AccountData = { name: string; email: string; contact: string; address: string }
@@ -31,7 +32,7 @@ export function AccountPage() {
     <main className={styles.page}>
       <CustomerSidebar active="account" />
       <section className={styles.content}>
-        <header className={styles.header}><h1>MY ACCOUNT</h1></header>
+        <Header title="MY ACCOUNT" />
         <section className={styles.card}>
           <div className={styles.profileHeader}>
             <div className={styles.avatar}>{account.name.charAt(0)}</div>

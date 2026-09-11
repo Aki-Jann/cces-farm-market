@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { BrandLogo } from './BrandLogo'
+import { Header } from './Header'
 import styles from './ShopPage.module.css'
 import apple from '../assets/shop-apple.png'
 import banana from '../assets/shop-banana.png'
@@ -80,9 +81,17 @@ function ProductCard({
 function Cart({
   items,
   onChange,
+  paymentMethod,
+  onPaymentChange,
+  onPlaceOrder,
+  orderMessage,
 }: {
   items: CartItem[]
   onChange: (id: string, quantity: number) => void
+  paymentMethod: 'COD' | 'GCASH' | 'MAYA'
+  onPaymentChange: (method: 'COD' | 'GCASH' | 'MAYA') => void
+  onPlaceOrder: () => void
+  orderMessage: string
 }) {
   const subtotal = items.reduce((sum, item) => sum + item.quantity * 100, 0)
   const delivery = subtotal > 0 ? 100 : 0
@@ -122,11 +131,10 @@ function Cart({
           <SummaryRow label="Total Amount" value={currency(total)} strong />
         </div>
         <div className={styles.paymentOptions}>
-          <button type="button" className={styles.activePayment}>COD</button>
-          <button type="button">GCASH</button>
-          <button type="button">MAYA</button>
+          {(['COD', 'GCASH', 'MAYA'] as const).map((method) => <button type="button" className={paymentMethod === method ? styles.activePayment : ''} key={method} onClick={() => onPaymentChange(method)}>{method}</button>)}
         </div>
-        <button type="button" className={styles.placeOrder}>PLACE ORDER</button>
+        <button type="button" className={styles.placeOrder} disabled={items.length === 0} onClick={onPlaceOrder}>PLACE ORDER</button>
+        {orderMessage && <p role="status">{orderMessage}</p>}
       </div>
     </aside>
   )
@@ -140,6 +148,8 @@ export function ShopPage() {
   const [category, setCategory] = useState<Category>('All')
   const [search, setSearch] = useState('')
   const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'GCASH' | 'MAYA'>('COD')
+  const [orderMessage, setOrderMessage] = useState('')
 
   const visibleProducts = useMemo(() => products.filter((product) => {
     const matchesCategory = category === 'All' || product.category === category
@@ -159,6 +169,12 @@ export function ShopPage() {
     })
   }
 
+  function placeOrder() {
+    if (cartItems.length === 0) return
+    setOrderMessage(`Order placed with ${paymentMethod}.`)
+    setQuantities({})
+  }
+
   return (
     <main className={styles.shop}>
       <nav className={styles.sidebar}>
@@ -172,19 +188,16 @@ export function ShopPage() {
         <a href="#/account">MY ACCOUNT</a>
       </nav>
       <section className={styles.catalog}>
-        <header className={styles.catalogHeader}>
-          <label className={styles.search}>
-            <span aria-hidden="true">⌕</span>
-            <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" />
-          </label>
-          <div className={styles.categories}>
-            {categories.map((item) => (
-              <button type="button" className={category === item ? styles.activeCategory : ''} key={item} onClick={() => setCategory(item)}>
-                {item.toUpperCase()}
-              </button>
-            ))}
-          </div>
-        </header>
+        <Header
+          className={styles.catalogHeader}
+          search={search}
+          onSearchChange={(event) => setSearch(event.target.value)}
+          secondary={<div className={styles.categories}>{categories.map((item) => (
+            <button type="button" className={category === item ? styles.activeCategory : ''} key={item} onClick={() => setCategory(item)}>
+              {item.toUpperCase()}
+            </button>
+          ))}</div>}
+        />
         <div className={styles.productGrid}>
           {visibleProducts.map((product) => (
             <ProductCard
@@ -198,7 +211,7 @@ export function ShopPage() {
           {visibleProducts.length === 0 && <p className={styles.noResults}>No products found.</p>}
         </div>
       </section>
-      <Cart items={cartItems} onChange={updateQuantity} />
+      <Cart items={cartItems} onChange={updateQuantity} paymentMethod={paymentMethod} onPaymentChange={setPaymentMethod} onPlaceOrder={placeOrder} orderMessage={orderMessage} />
     </main>
   )
 }

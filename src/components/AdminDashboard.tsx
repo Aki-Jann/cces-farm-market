@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { AdminSidebar } from './AdminSidebar'
+import { Header } from './Header'
 import styles from './AdminDashboard.module.css'
 
 type RevenuePoint = { day: string; amount: number; fill: 'green' | 'lime' | 'empty' }
@@ -47,7 +48,7 @@ function RevenueChart() {
   const maxAmount = Math.max(...revenue.map((point) => point.amount))
   return (
     <section className={styles.panel}>
-      <div className={styles.panelHeading}><h2>WEEKLY REVENUE</h2><button type="button">See more</button></div>
+      <div className={styles.panelHeading}><h2>WEEKLY REVENUE</h2><a href="#/admin/analytics">See more</a></div>
       <div className={styles.chart}>
         {revenue.map((point) => (
           <div className={styles.barColumn} key={point.day}>
@@ -66,7 +67,7 @@ function RevenueChart() {
 function RecentOrders({ orders }: { orders: RecentOrder[] }) {
   return (
     <section className={styles.bottomPanel}>
-      <div className={styles.panelHeading}><h2>RECENT ORDERS</h2><a href="#/orders">See more</a></div>
+      <div className={styles.panelHeading}><h2>RECENT ORDERS</h2><a href="#/admin/orders">See more</a></div>
       <div className={styles.orderList}>
         {orders.map((order) => (
           <div className={styles.orderRow} key={order.id}>
@@ -83,7 +84,7 @@ function RecentOrders({ orders }: { orders: RecentOrder[] }) {
 function ProductInventory({ items }: { items: InventoryItem[] }) {
   return (
     <section className={styles.bottomPanel}>
-      <div className={styles.panelHeading}><h2>PRODUCT INVENTORY</h2><a href="#/shop">See more</a></div>
+      <div className={styles.panelHeading}><h2>PRODUCT INVENTORY</h2><a href="#/admin/products">See more</a></div>
       <div className={styles.inventoryList}>
         {items.map((item) => (
           <div className={styles.inventoryRow} key={item.name}>
@@ -105,10 +106,7 @@ export function AdminDashboard() {
     <main className={styles.page}>
       <AdminSidebar active="dashboard" />
       <section className={styles.content}>
-        <header className={styles.header}>
-          <h1>DASHBOARD</h1>
-          <label className={styles.search}><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" /></label>
-        </header>
+        <Header title="DASHBOARD" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
         <div className={styles.dashboard}>
           <section className={styles.stats}>
             <StatCard label="REVENUE THIS WEEK" value="₱19,200.00" note="+18% vs last week" />

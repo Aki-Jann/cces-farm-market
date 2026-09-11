@@ -57,7 +57,7 @@ export function LandingPage() {
                 <div><strong>{product.name}</strong><small>{product.category}</small></div>
                 <div className={styles.price}><strong>₱100.00</strong><small>PER KG</small></div>
               </div>
-              <button type="button">ADD TO CART</button>
+              <button type="button" onClick={() => { window.location.hash = '/shop' }}>ADD TO CART</button>
             </article>
           ))}
         </div>
@@ -68,7 +68,7 @@ export function LandingPage() {
         <p className={styles.storyLabel}>OUR STORY</p>
         <img src={storyImage} alt="Agricultores de la Paz community" />
         <p className={styles.storyText}>We are the Agricultores De La Paz, a community of growers working together to bring our harvest directly to buyers. Farming is our livelihood, but selling our produce has always been a challenge. Through this platform, we can share our crops at fair prices, reduce waste, and reach more people who value fresh, local food.</p>
-        <button type="button">ORDER DIRECTLY FROM US</button>
+        <button type="button" onClick={() => { window.location.hash = '/shop' }}>ORDER DIRECTLY FROM US</button>
       </section>
 
       <footer><BrandLogo compact /><span>cces@adzu.edu.ph</span><span>+63 992 091 8674</span><span>Ateneo de Zamboanga University, La Purisima St., Zamboanga City 7000, Philippines</span></footer>

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { BrandLogo } from './BrandLogo'
+import { Header } from './Header'
 import styles from './OrdersPage.module.css'
 
 type OrderStatus = 'DELIVERED' | 'PENDING'
@@ -86,10 +87,7 @@ export function OrdersPage() {
     <main className={styles.ordersPage}>
       <Sidebar />
       <section className={styles.ordersContent}>
-        <header className={styles.header}>
-          <h1>ORDERS</h1>
-          <label className={styles.search}><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" /></label>
-        </header>
+        <Header title="ORDERS" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
         <section className={styles.orderPanel}>
           <div className={styles.tableHeader}><span>Order ID</span><span>Date</span><span>Total</span><span>Payment</span><span>Order Status</span></div>
           {emptyState || visibleOrders.length === 0 ? (

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { BrandLogo } from './BrandLogo'
 import { CustomerSidebar } from './CustomerSidebar'
+import { BrandLogo } from './BrandLogo'
+import { Header } from './Header'
 import styles from './MessagesPage.module.css'
 
 type Message = { id: string; text: string; timestamp: string; sender: 'customer' | 'market' }
@@ -47,10 +48,7 @@ export function MessagesPage() {
     <main className={styles.page}>
       <CustomerSidebar active="messages" />
       <section className={styles.content}>
-        <header className={styles.header}>
-          <h1>MESSAGE</h1>
-          <BrandLogo compact />
-        </header>
+        <Header title="MESSAGE" logo={<BrandLogo compact />} />
         <div className={styles.messaging}>
           <aside className={styles.conversations} aria-label="Conversations">
             <h2>Messages</h2>

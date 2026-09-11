@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { AdminSidebar } from './AdminSidebar'
+import { Header } from './Header'
 import styles from './AdminCustomersPage.module.css'
 
 type Message = { id: string; text: string; timestamp: string; sender: 'customer' | 'admin' }
@@ -132,5 +133,5 @@ export function AdminCustomersPage() {
     setCustomers((current) => current.map((customer) => customer.id === selected.id ? { ...customer, messages: [...customer.messages, { id: `message-${Date.now()}`, sender: 'admin', text, timestamp: '2026-09-11 08:40' }] } : customer))
   }
 
-  return <main className={styles.page}><AdminSidebar active="customers" /><section className={styles.content}><header className={styles.header}><h1>CUSTOMERS</h1><label className={styles.search}><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" /></label></header><div className={styles.workspace}><CustomerList customers={visibleCustomers} selectedId={selected.id} onSelect={(id) => { setSelectedId(id); setTab('profile') }} /><section className={styles.details}><CustomerHeader customer={selected} /><nav className={styles.tabs}><button className={tab === 'profile' ? styles.activeTab : ''} type="button" onClick={() => setTab('profile')}>PROFILE</button><button className={tab === 'messages' ? styles.activeTab : ''} type="button" onClick={() => setTab('messages')}>MESSAGES</button></nav>{tab === 'profile' ? <Profile customer={selected} /> : <Messages customer={selected} onSend={sendMessage} />}</section></div></section></main>
+  return <main className={styles.page}><AdminSidebar active="customers" /><section className={styles.content}><Header title="CUSTOMERS" search={search} onSearchChange={(event) => setSearch(event.target.value)} /><div className={styles.workspace}><CustomerList customers={visibleCustomers} selectedId={selected.id} onSelect={(id) => { setSelectedId(id); setTab('profile') }} /><section className={styles.details}><CustomerHeader customer={selected} /><nav className={styles.tabs}><button className={tab === 'profile' ? styles.activeTab : ''} type="button" onClick={() => setTab('profile')}>PROFILE</button><button className={tab === 'messages' ? styles.activeTab : ''} type="button" onClick={() => setTab('messages')}>MESSAGES</button></nav>{tab === 'profile' ? <Profile customer={selected} /> : <Messages customer={selected} onSend={sendMessage} />}</section></div></section></main>
 }

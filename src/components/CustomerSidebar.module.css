@@ -12,22 +12,41 @@
 }
 
 .top {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
   width: 100%;
 }
 
 .rule {
   border-top: 1px solid #017632;
-  margin: -7px -10px 20px;
+  flex: 0 0 1px;
+  margin: 0 -10px;
+  width: calc(100% + 20px);
 }
 
 .sidebar a {
   border-radius: 5px;
   color: #017632;
   display: block;
+  flex: 0 0 auto;
   font-size: 16px;
-  margin: 0 0 8px;
-  padding: 9px 26px;
+  font-weight: 500;
+  line-height: normal;
+  margin: 0;
+  padding: 9px 26px 8px;
   text-decoration: none;
+  width: 170px;
+}
+
+.sidebar a:hover {
+  background: #e9f5ec;
+}
+
+.sidebar a:focus-visible {
+  outline: 2px solid #017632;
+  outline-offset: 2px;
 }
 
 .sidebar .active {
@@ -46,6 +65,8 @@
   .top {
     align-items: center;
     display: flex;
+    flex-direction: row;
+    gap: 8px;
   }
 
   .sidebar :global(.logo),
@@ -55,8 +76,8 @@
 
   .sidebar a {
     font-size: 11px;
-    margin: 0;
     padding: 8px;
+    width: auto;
   }
 
   .sidebar > a {

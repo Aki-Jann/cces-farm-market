@@ -19,8 +19,9 @@ function Field({ label, placeholder, type = 'text' }: FieldProps) {
   )
 }
 
-function submitMock(event: FormEvent<HTMLFormElement>) {
+function submitMock(event: FormEvent<HTMLFormElement>, destination: string) {
   event.preventDefault()
+  window.location.hash = destination
 }
 
 export function AuthPage({ type }: { type: AuthType }) {
@@ -30,7 +31,7 @@ export function AuthPage({ type }: { type: AuthType }) {
   if (isRegister) {
     return (
       <main className={styles.authCanvas}>
-        <form className={`${styles.authCard} ${styles.registerCard}`} onSubmit={submitMock}>
+        <form className={`${styles.authCard} ${styles.registerCard}`} onSubmit={(event) => submitMock(event, '/login')}>
           <BrandLogo />
           <div className={styles.authHeading}>
             <h1>Register</h1>
@@ -57,7 +58,7 @@ export function AuthPage({ type }: { type: AuthType }) {
 
   return (
     <main className={styles.authCanvas}>
-      <form className={`${styles.authCard} ${isForgot ? styles.forgotCard : ''}`} onSubmit={submitMock}>
+      <form className={`${styles.authCard} ${isForgot ? styles.forgotCard : ''}`} onSubmit={(event) => submitMock(event, isForgot ? '/login' : '/shop')}>
         <BrandLogo />
         <div className={styles.authHeading}>
           <h1>{isForgot ? 'Forgot Password' : 'Welcome Back!'}</h1>

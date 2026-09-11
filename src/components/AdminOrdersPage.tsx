@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { AdminSidebar } from './AdminSidebar'
+import { Header } from './Header'
 import styles from './AdminOrdersPage.module.css'
 
 type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PACKED' | 'DELIVERED'
@@ -108,8 +109,8 @@ export function AdminOrdersPage() {
   const [selectedId, setSelectedId] = useState(mockOrders[0].id)
   const [archive, setArchive] = useState(false)
   const [search, setSearch] = useState('')
-  const selected = orders.find((order) => order.id === selectedId) ?? orders[0]
   const visibleOrders = useMemo(() => orders.filter((order) => (archive ? order.status === 'DELIVERED' : order.status !== 'DELIVERED') && `${order.id} ${order.customer}`.toLowerCase().includes(search.toLowerCase())), [archive, orders, search])
+  const selected = visibleOrders.find((order) => order.id === selectedId) ?? visibleOrders[0]
   const counts = statusOrder.reduce<Record<OrderStatus, number>>((result, status) => ({ ...result, [status]: orders.filter((order) => order.status === status).length }), {} as Record<OrderStatus, number>)
 
   function advanceSelected() {
@@ -123,7 +124,12 @@ export function AdminOrdersPage() {
     <main className={styles.page}>
       <AdminSidebar active="orders" />
       <section className={styles.content}>
-        <header className={styles.header}><h1>ORDERS</h1><label className={styles.search}><span>⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" /></label><button className={archive ? '' : styles.activeTab} type="button" onClick={() => setArchive(false)}>CURRENT ORDERS</button><button className={archive ? styles.activeTab : ''} type="button" onClick={() => setArchive(true)}>ARCHIVE</button><a href="#/admin/payment">PAYMENT</a></header>
+        <Header
+          title="ORDERS"
+          search={search}
+          onSearchChange={(event) => setSearch(event.target.value)}
+          actions={<><button aria-current={!archive ? 'page' : undefined} type="button" onClick={() => setArchive(false)}>CURRENT ORDERS</button><button aria-current={archive ? 'page' : undefined} type="button" onClick={() => setArchive(true)}>ARCHIVE</button><a href="#/admin/payment">PAYMENT</a></>}
+        />
         <div className={styles.dashboard}>
           <div className={styles.stats}>{statusOrder.map((status) => <div className={styles.stat} key={status}><strong>{counts[status]}</strong><span>{status}</span></div>)}</div>
           <div className={styles.ordersPanel}>

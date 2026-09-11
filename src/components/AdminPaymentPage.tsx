@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { AdminSidebar } from './AdminSidebar'
+import { Header } from './Header'
 import styles from './AdminPaymentPage.module.css'
 
 type PaymentRecord = {
@@ -76,13 +77,12 @@ export function AdminPaymentPage() {
     <main className={styles.page}>
       <AdminSidebar active="orders" />
       <section className={styles.content}>
-        <header className={styles.header}>
-          <h1>ORDERS</h1>
-          <label className={styles.search}><span aria-hidden="true">⌕</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search" /></label>
-          <a href="#/admin/orders">CURRENT ORDERS</a>
-          <a href="#/admin/orders">ARCHIVE</a>
-          <a className={styles.activeTab} href="#/admin/payment">PAYMENT</a>
-        </header>
+        <Header
+          title="ORDERS"
+          search={search}
+          onSearchChange={(event) => setSearch(event.target.value)}
+          actions={<><a href="#/admin/orders">CURRENT ORDERS</a><a href="#/admin/orders">ARCHIVE</a><a aria-current="page" href="#/admin/payment">PAYMENT</a></>}
+        />
         <div className={styles.dashboard}>
           <section className={styles.summary}>
             <SummaryCard label="TOTAL COLLECTED" value={currency(collected)} />
