@@ -1,0 +1,32 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isValidImage() {
+      return request.resource.contentType.matches('image/(jpeg|png|webp)') &&
+        request.resource.size <= 5 * 1024 * 1024; // 5 MB max
+    }
+
+    // Product Images: product-images/{productId}/{filename}
+    match /product-images/{productId}/{fileName} {
+      // Authenticated users and customers can read/download product images
+      allow read: if isAuthenticated();
+
+      // Only authenticated admins can upload, update, or delete product images
+      allow create, update: if isAdmin() && isValidImage();
+      allow delete: if isAdmin();
+    }
+  }
+}

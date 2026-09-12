@@ -26,6 +26,15 @@ export function productImageKey(value: string) {
 
 export function resolveProductImage(value: unknown, fallback = 'shop-apple.png') {
   if (typeof value === 'string' && value) {
+    if (
+      value.startsWith('http://') ||
+      value.startsWith('https://') ||
+      value.startsWith('blob:') ||
+      value.startsWith('data:')
+    ) {
+      return value
+    }
+
     const filename = value.split('/').pop() ?? ''
     const imageKey = Object.keys(productImages).find((key) => filename === key || filename.startsWith(`${key.replace('.png', '-')}`))
     const isLocalPath = value === filename || value.includes('/src/assets/') || value.startsWith('src/assets/') || value.startsWith('/assets/')

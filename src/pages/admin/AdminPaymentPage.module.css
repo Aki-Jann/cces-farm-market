@@ -14,7 +14,7 @@
 .summaryCard strong { color: #017632; font-size: 38px; line-height: 1; }
 .tablePanel { background: #cce9d5; min-height: 490px; padding: 15px; }
 .table { width: 100%; }
-.tableRowHeader, .tableRow { align-items: center; border-bottom: 1px solid #6d8f77; display: grid; gap: 15px; grid-template-columns: .7fr 1.1fr 1fr 2.4fr .7fr .8fr; min-height: 49px; padding: 0 10px; }
+.tableRowHeader, .tableRow { align-items: center; border-bottom: 1px solid #6d8f77; display: grid; gap: 15px; grid-template-columns: 1.2fr 1.2fr 1fr 1fr 1fr .8fr; min-height: 49px; padding: 0 10px; }
 .tableRowHeader { font-size: 12px; }
 .tableRow { font-size: 12px; }
 .tableRow span, .tableRow strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

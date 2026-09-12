@@ -1,0 +1,150 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // HELPER FUNCTIONS
+    // =========================================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        getUserData().get('role', '') == 'admin';
+    }
+
+    // =========================================================================
+    // 1. USERS COLLECTION
+    // Path: users/{userId}
+    // =========================================================================
+    match /users/{userId} {
+      // Admins can read all profiles; users can read their own profile
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+
+      // Creating a new user document (during registration):
+      // - Must be authenticated and creating their own document
+      // - Role must be "customer" (cannot self-assign "admin")
+      allow create: if isOwner(userId) &&
+        request.resource.data.get('role', '') == 'customer';
+
+      // Updating an existing user document:
+      // - Admins can update customer profiles (e.g., customerType, farmNotes) but cannot alter role
+      // - Customers can update their own personal info (firstName, lastName, email, contactNumber, address)
+      //   but cannot alter role, customerType, or farmNotes
+      allow update: if isAuthenticated() && (
+        (
+          isAdmin() &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])
+        ) ||
+        (
+          isOwner(userId) &&
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'customerType', 'farmNotes'])
+        )
+      );
+
+      // Only admins can delete user documents
+      allow delete: if isAdmin();
+    }
+
+    // =========================================================================
+    // 2. PRODUCTS COLLECTION
+    // Path: products/{productId}
+    // =========================================================================
+    match /products/{productId} {
+      // All authenticated users can read products
+      allow read: if isAuthenticated();
+
+      // Only admins can create or delete products
+      allow create, delete: if isAdmin();
+
+      // Product updates:
+      // - Admins have full update capabilities
+      // - Customers during checkout can ONLY decrement stock (stock <= current stock && stock >= 0)
+      //   and are forbidden from altering name, category, price, unit, imageUrl, isAvailable, createdAt, etc.
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']) &&
+        request.resource.data.stock is number &&
+        request.resource.data.stock <= resource.data.stock &&
+        request.resource.data.stock >= 0
+      );
+    }
+
+    // =========================================================================
+    // 3. ORDERS COLLECTION
+    // Path: orders/{orderId}
+    // =========================================================================
+    match /orders/{orderId} {
+      // Admins can read all orders; customers can only read their own orders
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid);
+
+      // Customers can create orders for themselves with initial status "pending"
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status in ['pending', 'PENDING'];
+
+      // Only admins can update orders (e.g. status changes: pending -> confirmed -> packed -> delivered).
+      // Customers cannot edit existing orders or manipulate financial values after creation.
+      allow update: if isAdmin();
+
+      // Deletions restricted to admins
+      allow delete: if isAdmin();
+    }
+
+    // =========================================================================
+    // 4. CONVERSATIONS COLLECTION & MESSAGES SUBCOLLECTION
+    // Path: conversations/{customerId}
+    // Path: conversations/{customerId}/messages/{messageId}
+    // =========================================================================
+    match /conversations/{customerId} {
+      // Admins can read any conversation; customers can read only their own
+      allow read: if isAuthenticated() && (isAdmin() || isOwner(customerId));
+
+      // Both customers (for their own conversation) and admins can create/update parent conversation metadata (lastMessage, updatedAt)
+      allow create, update: if isAuthenticated() && (
+        isAdmin() ||
+        (isOwner(customerId) && request.resource.data.get('customerId', '') == request.auth.uid)
+      );
+
+      allow delete: if isAdmin();
+
+      // Messages subcollection
+      match /messages/{messageId} {
+        // Admins can read all messages; customers can read only messages in their own conversation
+        allow read: if isAuthenticated() && (isAdmin() || isOwner(customerId));
+
+        // When creating a message:
+        // - Admins must have senderRole == 'admin' and senderId == request.auth.uid
+        // - Customers must have senderRole == 'customer' and senderId == request.auth.uid in their own conversation
+        allow create: if isAuthenticated() && (
+          (
+            isAdmin() &&
+            request.resource.data.senderId == request.auth.uid &&
+            request.resource.data.senderRole == 'admin'
+          ) ||
+          (
+            isOwner(customerId) &&
+            request.resource.data.senderId == request.auth.uid &&
+            request.resource.data.senderRole == 'customer'
+          )
+        );
+
+        // Messages are immutable after creation
+        allow update: if false;
+        allow delete: if isAdmin();
+      }
+    }
+  }
+}

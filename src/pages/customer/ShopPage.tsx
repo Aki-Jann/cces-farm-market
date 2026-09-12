@@ -267,7 +267,6 @@ export function ShopPage() {
           const remainingStock = stock - item.quantity
           transaction.update(ref, {
             stock: remainingStock,
-            isAvailable: remainingStock > 0,
           })
         })
 
