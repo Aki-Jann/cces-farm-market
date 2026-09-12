@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { collection, getDocs, updateDoc, doc } from 'firebase/firestore'
+import { collection, onSnapshot, updateDoc, doc } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { db } from '../../firebase/firestore'
@@ -13,6 +13,7 @@ type Order = {
   customer: string
   email: string
   date: string
+  createdAtTime: number
   status: OrderStatus
   payment: string
   deliveryFee: number
@@ -23,6 +24,23 @@ type Order = {
 }
 
 const statusOrder: OrderStatus[] = ['PENDING', 'CONFIRMED', 'PACKED', 'DELIVERED']
+
+function parseOrderDate(createdAt: unknown): Date | null {
+  if (!createdAt) return null
+  if (typeof createdAt === 'object' && createdAt !== null) {
+    if ('toDate' in createdAt && typeof (createdAt as { toDate: () => Date }).toDate === 'function') {
+      return (createdAt as { toDate: () => Date }).toDate()
+    }
+    if ('seconds' in createdAt && typeof (createdAt as { seconds: number }).seconds === 'number') {
+      return new Date((createdAt as { seconds: number }).seconds * 1000)
+    }
+  }
+  if (typeof createdAt === 'string' || typeof createdAt === 'number') {
+    const d = new Date(createdAt)
+    if (!isNaN(d.getTime())) return d
+  }
+  return null
+}
 
 function currency(value: number) {
   return `₱${value.toFixed(2)}`
@@ -108,17 +126,16 @@ export function AdminOrdersPage() {
     return () => window.removeEventListener('hashchange', syncArchiveState)
   }, [])
   useEffect(() => {
-    async function loadOrders() {
-      try {
-        const snapshot = await getDocs(collection(db, 'orders'))
+    const unsubscribe = onSnapshot(
+      collection(db, 'orders'),
+      (snapshot) => {
         const loadedOrders = snapshot.docs.map((orderDocument) => {
           const data = orderDocument.data()
           const rawStatus = typeof data.status === 'string' ? data.status.toUpperCase() : 'PENDING'
           const status = statusOrder.includes(rawStatus as OrderStatus) ? rawStatus as OrderStatus : 'PENDING'
-          const createdAt = data.createdAt
-          const date = createdAt && typeof createdAt === 'object' && 'toDate' in createdAt && typeof createdAt.toDate === 'function'
-            ? createdAt.toDate().toLocaleString('en-US')
-            : 'Pending'
+          const parsedDate = parseOrderDate(data.createdAt)
+          const date = parsedDate ? parsedDate.toLocaleString('en-US') : 'Pending'
+          const createdAtTime = parsedDate ? parsedDate.getTime() : 0
           const items = Array.isArray(data.items) ? data.items : []
 
           return {
@@ -127,6 +144,7 @@ export function AdminOrdersPage() {
             customer: typeof data.customerName === 'string' ? data.customerName : 'Unknown customer',
             email: typeof data.customerEmail === 'string' ? data.customerEmail : '',
             date,
+            createdAtTime,
             status,
             payment: typeof data.paymentMethod === 'string' ? data.paymentMethod : '',
             deliveryFee: typeof data.deliveryFee === 'number' ? data.deliveryFee : 0,
@@ -144,19 +162,34 @@ export function AdminOrdersPage() {
             }),
           }
         })
+        loadedOrders.sort((a, b) => b.createdAtTime - a.createdAtTime)
         setOrders(loadedOrders)
         setSelectedId((current) => current ?? loadedOrders[0]?.id ?? null)
-      } catch (loadError) {
+        setError('')
+        setIsLoading(false)
+      },
+      (loadError) => {
         console.error('Loading admin orders failed:', loadError)
         setError('Unable to load orders. Please try again.')
-      } finally {
         setIsLoading(false)
       }
-    }
+    )
 
-    void loadOrders()
+    return () => unsubscribe()
   }, [])
-  const visibleOrders = useMemo(() => orders.filter((order) => (archive ? order.status === 'DELIVERED' : order.status !== 'DELIVERED') && `${order.id} ${order.customer}`.toLowerCase().includes(search.toLowerCase())), [archive, orders, search])
+  const visibleOrders = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return orders.filter((order) => {
+      const matchesArchive = archive ? order.status === 'DELIVERED' : order.status !== 'DELIVERED'
+      if (!matchesArchive) return false
+      if (!query) return true
+      return (
+        order.id.toLowerCase().includes(query) ||
+        order.customer.toLowerCase().includes(query) ||
+        order.email.toLowerCase().includes(query)
+      )
+    })
+  }, [archive, orders, search])
   const selected = visibleOrders.find((order) => order.id === selectedId) ?? visibleOrders[0]
   const counts = statusOrder.reduce<Record<OrderStatus, number>>((result, status) => ({ ...result, [status]: orders.filter((order) => order.status === status).length }), {} as Record<OrderStatus, number>)
 
@@ -199,8 +232,36 @@ export function AdminOrdersPage() {
           <div className={styles.stats}>{statusOrder.map((status) => <div className={styles.stat} key={status}><strong>{counts[status]}</strong><span>{status}</span></div>)}</div>
           {error && orders.length > 0 && <p role="alert">{error}</p>}
           <div className={styles.ordersPanel}>
-            {isLoading ? <p>Loading orders...</p> : error && orders.length === 0 ? <p role="alert">{error}</p> : <><aside className={styles.orderList}>{visibleOrders.map((order) => <button className={selected?.id === order.id ? styles.selected : ''} type="button" key={order.id} onClick={() => setSelectedId(order.id)}><div><strong>{order.customer}</strong><small>{order.id}</small><small>{order.date}</small><u>{order.email}</u></div><StatusBadge status={order.status} /><b>{currency(totals(order).total)}</b></button>)}</aside>
-            {selected && <OrderDetails order={selected} onAdvance={advanceSelected} onBack={reverseSelected} isUpdating={isUpdating} />}</>}
+            {isLoading ? (
+              <p className={styles.empty}>Loading orders...</p>
+            ) : error && orders.length === 0 ? (
+              <p className={styles.empty} role="alert">{error}</p>
+            ) : visibleOrders.length === 0 ? (
+              <p className={styles.empty}>{search.trim() ? 'No orders match your search.' : 'No orders found.'}</p>
+            ) : (
+              <>
+                <aside className={styles.orderList}>
+                  {visibleOrders.map((order) => (
+                    <button
+                      className={selected?.id === order.id ? styles.selected : ''}
+                      type="button"
+                      key={order.id}
+                      onClick={() => setSelectedId(order.id)}
+                    >
+                      <div>
+                        <strong>{order.customer}</strong>
+                        <small>{order.id}</small>
+                        <small>{order.date}</small>
+                        <u>{order.email}</u>
+                      </div>
+                      <StatusBadge status={order.status} />
+                      <b>{currency(totals(order).total)}</b>
+                    </button>
+                  ))}
+                </aside>
+                {selected && <OrderDetails order={selected} onAdvance={advanceSelected} onBack={reverseSelected} isUpdating={isUpdating} />}
+              </>
+            )}
           </div>
         </div>
       </section>

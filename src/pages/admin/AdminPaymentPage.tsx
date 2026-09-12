@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { collection, getDocs } from 'firebase/firestore'
+import { collection, onSnapshot } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { db } from '../../firebase/firestore'
@@ -113,9 +113,9 @@ export function AdminPaymentPage() {
   const [search, setSearch] = useState('')
 
   useEffect(() => {
-    async function loadPayments() {
-      try {
-        const snapshot = await getDocs(collection(db, 'orders'))
+    const unsubscribe = onSnapshot(
+      collection(db, 'orders'),
+      (snapshot) => {
         const loadedPayments: PaymentRecord[] = snapshot.docs.map((orderDoc) => {
           const data = orderDoc.data()
           const parsedDate = parseOrderDate(data.createdAt)
@@ -157,24 +157,26 @@ export function AdminPaymentPage() {
         })
 
         setPayments(loadedPayments)
-      } catch (loadError) {
+        setError('')
+        setIsLoading(false)
+      },
+      (loadError) => {
         console.error('Loading payment orders failed:', loadError)
         setError('Unable to load payment records. Please try again.')
-      } finally {
         setIsLoading(false)
       }
-    }
+    )
 
-    void loadPayments()
+    return () => unsubscribe()
   }, [])
 
   const visiblePayments = useMemo(() => {
     const query = search.trim().toLowerCase()
     if (!query) return payments
     return payments.filter((payment) =>
-      `${payment.orderId} ${payment.customer} ${payment.customerEmail} ${payment.date} ${payment.items.join(' ')} ${payment.method}`
-        .toLowerCase()
-        .includes(query)
+      payment.orderId.toLowerCase().includes(query) ||
+      payment.customer.toLowerCase().includes(query) ||
+      payment.customerEmail.toLowerCase().includes(query)
     )
   }, [payments, search])
 

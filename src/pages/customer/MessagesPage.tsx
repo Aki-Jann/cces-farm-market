@@ -3,7 +3,6 @@ import type { FormEvent } from 'react'
 import { addDoc, collection, doc, onSnapshot, query, serverTimestamp, setDoc } from 'firebase/firestore'
 import { onAuthStateChanged } from 'firebase/auth'
 import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
-import { BrandLogo } from '../../components/common/BrandLogo'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
@@ -119,7 +118,7 @@ export function MessagesPage() {
     <main className={styles.page}>
       <CustomerSidebar active="messages" />
       <section className={styles.content}>
-        <Header title="MESSAGE" logo={<BrandLogo compact />} />
+        <Header title="MESSAGE" />
         <div className={styles.messaging}>
           <section className={styles.chat} aria-label="Conversation with GreenMarket">
             <div

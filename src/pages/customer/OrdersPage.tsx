@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { collection, getDocs, query, where } from 'firebase/firestore'
+import { onAuthStateChanged } from 'firebase/auth'
+import { collection, onSnapshot, query, where } from 'firebase/firestore'
 import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
@@ -11,12 +12,30 @@ type OrderStatus = 'DELIVERED' | 'PENDING' | 'CONFIRMED' | 'PACKED'
 type Order = {
   id: string
   date: string
+  createdAtTime: number
   total: number
   payment: string
   status: OrderStatus
   deliveryFee: number
   tax: number
   items: { name: string; quantity: number; price: number }[]
+}
+
+function parseOrderDate(createdAt: unknown): Date | null {
+  if (!createdAt) return null
+  if (typeof createdAt === 'object' && createdAt !== null) {
+    if ('toDate' in createdAt && typeof (createdAt as { toDate: () => Date }).toDate === 'function') {
+      return (createdAt as { toDate: () => Date }).toDate()
+    }
+    if ('seconds' in createdAt && typeof (createdAt as { seconds: number }).seconds === 'number') {
+      return new Date((createdAt as { seconds: number }).seconds * 1000)
+    }
+  }
+  if (typeof createdAt === 'string' || typeof createdAt === 'number') {
+    const d = new Date(createdAt)
+    if (!isNaN(d.getTime())) return d
+  }
+  return null
 }
 
 function currency(value: number) {
@@ -51,61 +70,96 @@ export function OrdersPage() {
   const [search, setSearch] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const emptyState = window.location.hash.includes('empty')
-  const visibleOrders = useMemo(() => orders.filter((order) => order.id.toLowerCase().includes(search.toLowerCase())), [orders, search])
+  const visibleOrders = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return orders
+    return orders.filter((order) =>
+      order.id.toLowerCase().includes(query) ||
+      order.items.some((item) => item.name.toLowerCase().includes(query)) ||
+      order.payment.toLowerCase().includes(query) ||
+      order.status.toLowerCase().includes(query)
+    )
+  }, [orders, search])
 
   useEffect(() => {
-    async function loadOrders() {
-      const user = auth.currentUser
+    let isMounted = true
+    let unsubscribeOrders: (() => void) | undefined
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      // Tear down any previous orders listener before attaching a new one.
+      if (unsubscribeOrders) {
+        unsubscribeOrders()
+        unsubscribeOrders = undefined
+      }
+
       if (!user) {
-        setIsLoading(false)
-        setError('Please log in to view your orders.')
+        if (isMounted) {
+          setIsLoading(false)
+          setError('Please log in to view your orders.')
+        }
         return
       }
 
-      try {
-        const snapshot = await getDocs(query(collection(db, 'orders'), where('userId', '==', user.uid)))
-        setOrders(snapshot.docs.map((orderDocument) => {
-          const data = orderDocument.data()
-          const createdAt = data.createdAt
-          const date = createdAt && typeof createdAt === 'object' && 'toDate' in createdAt && typeof createdAt.toDate === 'function'
-            ? createdAt.toDate().toLocaleDateString('en-US')
-            : 'Pending'
-          const items = Array.isArray(data.items) ? data.items : []
+      unsubscribeOrders = onSnapshot(
+        query(collection(db, 'orders'), where('userId', '==', user.uid)),
+        (snapshot) => {
+          if (!isMounted) return
+          const loadedOrders = snapshot.docs.map((orderDocument) => {
+            const data = orderDocument.data()
+            const parsedDate = parseOrderDate(data.createdAt)
+            const date = parsedDate ? parsedDate.toLocaleDateString('en-US') : 'Pending'
+            const createdAtTime = parsedDate ? parsedDate.getTime() : 0
+            const items = Array.isArray(data.items) ? data.items : []
 
-          return {
-            id: typeof data.orderNumber === 'string' ? data.orderNumber : orderDocument.id,
-            date,
-            total: typeof data.total === 'number' ? data.total : 0,
-            payment: typeof data.paymentMethod === 'string' ? data.paymentMethod : '',
-            status: data.status === 'delivered'
+            const status: OrderStatus = data.status === 'delivered'
               ? 'DELIVERED'
               : data.status === 'confirmed'
                 ? 'CONFIRMED'
                 : data.status === 'packed'
                   ? 'PACKED'
-                  : 'PENDING',
-            deliveryFee: typeof data.deliveryFee === 'number' ? data.deliveryFee : 0,
-            tax: typeof data.tax === 'number' ? data.tax : 0,
-            items: items.flatMap((item) => {
-              if (!item || typeof item !== 'object') return []
-              const itemData = item as Record<string, unknown>
-              return [{
-                name: typeof itemData.name === 'string' ? itemData.name : 'Product',
-                quantity: typeof itemData.quantity === 'number' ? itemData.quantity : 0,
-                price: typeof itemData.price === 'number' ? itemData.price : 0,
-              }]
-            }),
-          }
-        }))
-      } catch (loadError) {
-        console.error('Loading orders failed:', loadError)
-        setError('Unable to load your orders. Please try again.')
-      } finally {
-        setIsLoading(false)
-      }
-    }
+                  : 'PENDING'
 
-    void loadOrders()
+            return {
+              id: typeof data.orderNumber === 'string' ? data.orderNumber : orderDocument.id,
+              date,
+              createdAtTime,
+              total: typeof data.total === 'number' ? data.total : 0,
+              payment: typeof data.paymentMethod === 'string' ? data.paymentMethod : '',
+              status,
+              deliveryFee: typeof data.deliveryFee === 'number' ? data.deliveryFee : 0,
+              tax: typeof data.tax === 'number' ? data.tax : 0,
+              items: items.flatMap((item) => {
+                if (!item || typeof item !== 'object') return []
+                const itemData = item as Record<string, unknown>
+                return [{
+                  name: typeof itemData.name === 'string' ? itemData.name : 'Product',
+                  quantity: typeof itemData.quantity === 'number' ? itemData.quantity : 0,
+                  price: typeof itemData.price === 'number' ? itemData.price : 0,
+                }]
+              }),
+            }
+          })
+
+          loadedOrders.sort((a, b) => b.createdAtTime - a.createdAtTime)
+          setOrders(loadedOrders)
+          setError('')
+          setIsLoading(false)
+        },
+        (loadError) => {
+          console.error('Loading orders failed:', loadError)
+          if (isMounted) {
+            setError('Unable to load your orders. Please try again.')
+            setIsLoading(false)
+          }
+        }
+      )
+    })
+
+    return () => {
+      isMounted = false
+      unsubscribeAuth()
+      if (unsubscribeOrders) unsubscribeOrders()
+    }
   }, [])
 
   return (
@@ -121,8 +175,8 @@ export function OrdersPage() {
             <div className={styles.emptyState} role="alert">{error}</div>
           ) : emptyState || visibleOrders.length === 0 ? (
             <div className={styles.emptyState}>
-              <strong>No Orders Yet</strong>
-              <a href="#/shop">SHOP</a>
+              <strong>{search.trim() ? 'No Matching Orders' : 'No Orders Yet'}</strong>
+              {!search.trim() && <a href="#/shop">SHOP</a>}
             </div>
           ) : (
             <div className={styles.orderList}>

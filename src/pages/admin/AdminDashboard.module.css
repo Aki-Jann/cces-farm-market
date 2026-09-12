@@ -31,7 +31,7 @@
 .orderRow strong, .inventoryRow strong { font-size: 15px; }
 .orderRow small, .inventoryRow small { font-size: 10px; }
 .orderRow > strong:last-child, .inventoryRow > strong:last-child { white-space: nowrap; }
-.status { background: #aae044; border-radius: 5px; color: #fff; font-size: 12px; font-weight: 700; padding: 3px 5px; }
+.status { background: #aae044; border-radius: 5px; color: #fff; font-size: 12px; font-weight: 700; padding: 3px 5px;}
 @media (max-width: 1050px) {
   .dashboard { margin: 20px; }
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }

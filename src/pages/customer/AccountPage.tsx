@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
-import { doc, getDoc, updateDoc } from 'firebase/firestore'
+import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
@@ -41,7 +41,15 @@ export function AccountPage() {
 
   useEffect(() => {
     let isMounted = true
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    let unsubscribeProfile: (() => void) | undefined
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      // Tear down any previous profile listener before attaching a new one.
+      if (unsubscribeProfile) {
+        unsubscribeProfile()
+        unsubscribeProfile = undefined
+      }
+
       if (!user) {
         if (isMounted) {
           setError('Please log in to view your account.')
@@ -50,40 +58,53 @@ export function AccountPage() {
         return
       }
 
-      try {
-        const snapshot = await getDoc(doc(db, 'users', user.uid))
-        if (!isMounted) return
-        if (!snapshot.exists()) {
-          setError('Your account profile could not be found.')
-          setIsLoading(false)
-          return
-        }
+      unsubscribeProfile = onSnapshot(
+        doc(db, 'users', user.uid),
+        (snapshot) => {
+          if (!isMounted) return
+          if (!snapshot.exists()) {
+            setError('Your account profile could not be found.')
+            setIsLoading(false)
+            return
+          }
 
-        const data = snapshot.data()
-        const loadedAccount: AccountData = {
-          firstName: typeof data.firstName === 'string' ? data.firstName : '',
-          lastName: typeof data.lastName === 'string' ? data.lastName : '',
-          email: typeof data.email === 'string' ? data.email : user.email ?? '',
-          birthday: formatBirthday(data.birthday),
-          contact: typeof data.contactNumber === 'string' ? data.contactNumber : '',
-          address: typeof data.address === 'string' ? data.address : '',
-          customerType: typeof data.customerType === 'string' ? data.customerType : 'Not provided',
-          farmNotes: typeof data.farmNotes === 'string' ? data.farmNotes : '',
+          const data = snapshot.data()
+          const loadedAccount: AccountData = {
+            firstName: typeof data.firstName === 'string' ? data.firstName : '',
+            lastName: typeof data.lastName === 'string' ? data.lastName : '',
+            email: typeof data.email === 'string' ? data.email : user.email ?? '',
+            birthday: formatBirthday(data.birthday),
+            contact: typeof data.contactNumber === 'string' ? data.contactNumber : '',
+            address: typeof data.address === 'string' ? data.address : '',
+            customerType: typeof data.customerType === 'string' ? data.customerType : 'Not provided',
+            farmNotes: typeof data.farmNotes === 'string' ? data.farmNotes : '',
+          }
+          setAccount(loadedAccount)
+          // Only sync the edit draft when the user isn't actively editing,
+          // so a live update doesn't overwrite unsaved changes.
+          setEditing((currentlyEditing) => {
+            if (!currentlyEditing) {
+              setDraft(loadedAccount)
+            }
+            return currentlyEditing
+          })
+          setError('')
+          setIsLoading(false)
+        },
+        (loadError) => {
+          console.error('Loading account profile failed:', loadError)
+          if (isMounted) {
+            setError('Unable to load your account information.')
+            setIsLoading(false)
+          }
         }
-        setAccount(loadedAccount)
-        setDraft(loadedAccount)
-        setError('')
-      } catch (loadError) {
-        console.error('Loading account profile failed:', loadError)
-        if (isMounted) setError('Unable to load your account information.')
-      } finally {
-        if (isMounted) setIsLoading(false)
-      }
+      )
     })
 
     return () => {
       isMounted = false
-      unsubscribe()
+      unsubscribeAuth()
+      if (unsubscribeProfile) unsubscribeProfile()
     }
   }, [])
 
@@ -156,8 +177,6 @@ export function AccountPage() {
               <div><dt>Contact Number</dt><dd>{account.contact}</dd></div>
               <div><dt>Address</dt><dd>{account.address}</dd></div>
               <div><dt>Birthday</dt><dd>{account.birthday}</dd></div>
-              <div><dt>Customer Type</dt><dd>{account.customerType}</dd></div>
-              <div><dt>Farm Notes</dt><dd>{account.farmNotes || 'No farm notes.'}</dd></div>
             </dl>
           )}
         </section>

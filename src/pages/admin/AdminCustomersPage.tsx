@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { addDoc, collection, doc, getDocs, onSnapshot, query, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
+import { addDoc, collection, doc, onSnapshot, query, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
@@ -186,70 +186,104 @@ function Messages({ customer }: { customer: Customer }) {
   return <div className={styles.chat}><div className={styles.messageList} onScroll={(event) => { const element = event.currentTarget; shouldScrollToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24 }} ref={messageListRef}>{isLoading ? <p>Loading messages...</p> : error && messages.length === 0 ? <p role="alert">{error}</p> : messages.map((message) => <article className={`${styles.message} ${message.sender === 'admin' ? styles.outgoing : styles.incoming}`} key={message.id}><p>{message.text}</p><time>{message.timestamp}</time></article>)}</div><form className={styles.composer} onSubmit={submit}><input aria-label={`Message ${customer.name}`} placeholder={`Message ${customer.name}...`} value={draft} onChange={(event) => setDraft(event.target.value)} /><button disabled={isSending} type="submit">SEND</button></form>{error && messages.length > 0 && <p role="alert">{error}</p>}</div>
 }
 
+type RawUserRecord = { id: string; data: Record<string, unknown> }
+type RawOrderRecord = { id: string; data: Record<string, unknown> }
+
 export function AdminCustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>([])
+  const [rawUsers, setRawUsers] = useState<RawUserRecord[]>([])
+  const [rawOrders, setRawOrders] = useState<RawOrderRecord[]>([])
+  const [usersLoaded, setUsersLoaded] = useState(false)
+  const [ordersLoaded, setOrdersLoaded] = useState(false)
   const [selectedId, setSelectedId] = useState('')
   const [tab, setTab] = useState<'profile' | 'messages'>('profile')
   const [search, setSearch] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
-  const selected = customers.find((customer) => customer.id === selectedId) ?? customers[0]
-  const visibleCustomers = useMemo(() => customers.filter((customer) => `${customer.name} ${customer.email} ${customer.segment}`.toLowerCase().includes(search.toLowerCase())), [customers, search])
+  const isLoading = !usersLoaded || !ordersLoaded
 
+  const customers = useMemo<Customer[]>(() => {
+    return rawUsers.flatMap(({ id, data }) => {
+      if (data.role !== 'customer') return []
+
+      const firstName = typeof data.firstName === 'string' ? data.firstName.trim() : ''
+      const lastName = typeof data.lastName === 'string' ? data.lastName.trim() : ''
+      const name = `${firstName} ${lastName}`.trim() || 'Unnamed customer'
+      const customerType = normalizeCustomerType(data.customerType)
+      const farmNotes = typeof data.farmNotes === 'string' ? data.farmNotes.trim() : ''
+      const profileNotes = farmNotes
+      const orders = rawOrders.flatMap(({ id: orderId, data: orderData }) => {
+        if (orderData.userId !== id) return []
+        return [{
+          id: typeof orderData.orderNumber === 'string' ? orderData.orderNumber : orderId,
+          date: formatDate(orderData.createdAt, 'Pending'),
+          status: orderStatus(orderData.status),
+          total: typeof orderData.total === 'number' ? orderData.total : 0,
+        }]
+      })
+
+      return [{
+        id,
+        initials: name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase(),
+        name: name.toUpperCase(),
+        phone: typeof data.contactNumber === 'string' ? data.contactNumber : '',
+        email: typeof data.email === 'string' ? data.email : '',
+        segment: customerType.toUpperCase(),
+        joined: formatDate(data.createdAt),
+        farmNotes,
+        notes: profileNotes || 'No farm notes.',
+        orders,
+        messages: [],
+      }]
+    })
+  }, [rawUsers, rawOrders])
+
+  const visibleCustomers = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return customers
+    return customers.filter((customer) =>
+      customer.name.toLowerCase().includes(query) ||
+      customer.email.toLowerCase().includes(query) ||
+      customer.segment.toLowerCase().includes(query) ||
+      customer.phone.toLowerCase().includes(query)
+    )
+  }, [customers, search])
+
+  const selected = visibleCustomers.find((customer) => customer.id === selectedId) ?? visibleCustomers[0]
+
+  // Users and orders are independent collections, so each gets its own
+  // real-time listener; the customer list above is derived from both.
   useEffect(() => {
-    async function loadCustomers() {
-      try {
-        const [usersSnapshot, ordersSnapshot] = await Promise.all([
-          getDocs(collection(db, 'users')),
-          getDocs(collection(db, 'orders')),
-        ])
-        const loadedCustomers = usersSnapshot.docs.flatMap((customerDocument) => {
-          const data = customerDocument.data()
-          if (data.role !== 'customer') return []
-
-          const firstName = typeof data.firstName === 'string' ? data.firstName.trim() : ''
-          const lastName = typeof data.lastName === 'string' ? data.lastName.trim() : ''
-          const name = `${firstName} ${lastName}`.trim() || 'Unnamed customer'
-          const customerType = normalizeCustomerType(data.customerType)
-          const farmNotes = typeof data.farmNotes === 'string' ? data.farmNotes.trim() : ''
-          const profileNotes = farmNotes
-          const orders = ordersSnapshot.docs.flatMap((orderDocument) => {
-            const orderData = orderDocument.data()
-            if (orderData.userId !== customerDocument.id) return []
-            return [{
-              id: typeof orderData.orderNumber === 'string' ? orderData.orderNumber : orderDocument.id,
-              date: formatDate(orderData.createdAt, 'Pending'),
-              status: orderStatus(orderData.status),
-              total: typeof orderData.total === 'number' ? orderData.total : 0,
-            }]
-          })
-
-          return [{
-            id: customerDocument.id,
-            initials: name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase(),
-            name: name.toUpperCase(),
-            phone: typeof data.contactNumber === 'string' ? data.contactNumber : '',
-            email: typeof data.email === 'string' ? data.email : '',
-            segment: customerType.toUpperCase(),
-            joined: formatDate(data.createdAt),
-            farmNotes,
-            notes: profileNotes || 'No farm notes.',
-            orders,
-            messages: [],
-          }]
-        })
-        setCustomers(loadedCustomers)
-        setSelectedId((current) => current || loadedCustomers[0]?.id || '')
-      } catch (loadError) {
+    const unsubscribeUsers = onSnapshot(
+      collection(db, 'users'),
+      (snapshot) => {
+        setRawUsers(snapshot.docs.map((userDocument) => ({ id: userDocument.id, data: userDocument.data() })))
+        setUsersLoaded(true)
+        setError('')
+      },
+      (loadError) => {
         console.error('Loading customers failed:', loadError)
         setError('Unable to load customers. Please try again.')
-      } finally {
-        setIsLoading(false)
+        setUsersLoaded(true)
       }
-    }
+    )
 
-    void loadCustomers()
+    const unsubscribeOrders = onSnapshot(
+      collection(db, 'orders'),
+      (snapshot) => {
+        setRawOrders(snapshot.docs.map((orderDocument) => ({ id: orderDocument.id, data: orderDocument.data() })))
+        setOrdersLoaded(true)
+      },
+      (loadError) => {
+        console.error('Loading customer orders failed:', loadError)
+        setError('Unable to load customers. Please try again.')
+        setOrdersLoaded(true)
+      }
+    )
+
+    return () => {
+      unsubscribeUsers()
+      unsubscribeOrders()
+    }
   }, [])
 
   async function updateCustomerProfile(field: 'farmNotes' | 'customerType', value: string) {
@@ -258,13 +292,7 @@ export function AdminCustomersPage() {
     setIsSaving(true)
     try {
       await updateDoc(doc(db, 'users', selected.id), { [field]: value })
-      setCustomers((current) => current.map((customer) => {
-        if (customer.id !== selected.id) return customer
-        if (field === 'farmNotes') {
-          return { ...customer, farmNotes: value, notes: value.trim() || 'No farm notes.' }
-        }
-        return { ...customer, segment: value.toUpperCase() }
-      }))
+      // The users listener will refresh `customers` automatically once Firestore confirms the write.
     } catch (saveError) {
       console.error('Updating customer profile failed:', saveError)
       setError('Unable to save customer information. Please try again.')
@@ -273,5 +301,5 @@ export function AdminCustomersPage() {
     }
   }
 
-  return <main className={styles.page}><AdminSidebar active="customers" /><section className={styles.content}><Header title="CUSTOMERS" search={search} onSearchChange={(event) => setSearch(event.target.value)} />{isLoading ? <div className={styles.workspace}><p>Loading customers...</p></div> : error && customers.length === 0 ? <div className={styles.workspace}><p role="alert">{error}</p></div> : !selected ? <div className={styles.workspace}><p>No customer profiles found.</p></div> : <div className={styles.workspace}><CustomerList customers={visibleCustomers} selectedId={selected.id} onSelect={(id) => { setSelectedId(id); setTab('profile') }} /><section className={styles.details}><CustomerHeader customer={selected} onChangeCustomerType={(customerType) => void updateCustomerProfile('customerType', customerType)} /><nav className={styles.tabs}><button className={tab === 'profile' ? styles.activeTab : ''} type="button" onClick={() => setTab('profile')}>PROFILE</button><button className={tab === 'messages' ? styles.activeTab : ''} type="button" onClick={() => setTab('messages')}>MESSAGES</button></nav>{tab === 'profile' ? <Profile key={selected.id} customer={selected} isSaving={isSaving} onSaveNotes={(notes) => updateCustomerProfile('farmNotes', notes)} /> : <Messages key={selected.id} customer={selected} />}</section></div>}</section></main>
+  return <main className={styles.page}><AdminSidebar active="customers" /><section className={styles.content}><Header title="CUSTOMERS" search={search} onSearchChange={(event) => setSearch(event.target.value)} />{isLoading ? <div className={styles.workspace}><p>Loading customers...</p></div> : error && customers.length === 0 ? <div className={styles.workspace}><p role="alert">{error}</p></div> : !selected ? <div className={styles.workspace}><p>{search.trim() ? 'No customer profiles match your search.' : 'No customer profiles found.'}</p></div> : <div className={styles.workspace}><CustomerList customers={visibleCustomers} selectedId={selected.id} onSelect={(id) => { setSelectedId(id); setTab('profile') }} /><section className={styles.details}><CustomerHeader customer={selected} onChangeCustomerType={(customerType) => void updateCustomerProfile('customerType', customerType)} /><nav className={styles.tabs}><button className={tab === 'profile' ? styles.activeTab : ''} type="button" onClick={() => setTab('profile')}>PROFILE</button><button className={tab === 'messages' ? styles.activeTab : ''} type="button" onClick={() => setTab('messages')}>MESSAGES</button></nav>{tab === 'profile' ? <Profile key={selected.id} customer={selected} isSaving={isSaving} onSaveNotes={(notes) => updateCustomerProfile('farmNotes', notes)} /> : <Messages key={selected.id} customer={selected} />}</section></div>}</section></main>
 }

@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import { collection, doc, getDocs, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
+import { collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { db } from '../../firebase/firestore'
-import { storage } from '../../firebase/storage'
 import { productImageKey, productImages, resolveProductImage } from '../../utils/productImages'
 import styles from './AdminProductsPage.module.css'
 
@@ -57,6 +55,47 @@ function validateImageFile(file: File): string | null {
   return null
 }
 
+const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined
+const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET as string | undefined
+
+async function uploadImageToCloudinary(file: File): Promise<string> {
+  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+    throw new Error('Cloudinary is not configured. Please set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET.')
+  }
+
+  const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET)
+
+  let response: Response
+  try {
+    response = await fetch(uploadUrl, { method: 'POST', body: formData })
+  } catch {
+    throw new Error('Could not reach Cloudinary. Please check your internet connection and try again.')
+  }
+
+  if (!response.ok) {
+    let message = `Cloudinary upload failed (HTTP ${response.status}).`
+    try {
+      const errorBody = (await response.json()) as { error?: { message?: string } }
+      if (errorBody?.error?.message) {
+        message = `Cloudinary upload failed: ${errorBody.error.message}`
+      }
+    } catch {
+      // response body wasn't JSON; keep the generic message
+    }
+    throw new Error(message)
+  }
+
+  const data = (await response.json()) as { secure_url?: string }
+  if (!data.secure_url) {
+    throw new Error('Cloudinary upload succeeded but did not return an image URL.')
+  }
+
+  return data.secure_url
+}
+
 function currency(value: number) {
   return `₱${value.toFixed(2)}`
 }
@@ -66,6 +105,10 @@ function emptyDraft(): ProductDraft {
 }
 
 function ProductCard({ product, selected, onEdit }: { product: Product; selected: boolean; onEdit: () => void }) {
+  const isOutOfStock = product.stock <= 0
+  const availabilityClass = isOutOfStock || !product.available ? styles.unavailable : styles.available
+  const availabilityLabel = isOutOfStock ? 'OUT OF STOCK' : product.available ? 'AVAILABLE' : 'UNAVAILABLE'
+
   return (
     <article className={`${styles.productCard} ${selected ? styles.selectedCard : ''}`}>
       <img src={product.image} alt={product.name} />
@@ -73,7 +116,9 @@ function ProductCard({ product, selected, onEdit }: { product: Product; selected
         <div>
           <strong>{product.name}</strong>
           <small>{product.category}</small>
-          <small className={product.available ? styles.available : styles.unavailable}>{product.stock} {product.unit} {product.available ? 'AVAILABLE' : 'UNAVAILABLE'}</small>
+          <small className={availabilityClass}>
+            {product.stock} {product.unit} {availabilityLabel}
+          </small>
         </div>
         <div className={styles.price}><strong>{currency(product.price)}</strong><small>PER {product.unit}</small></div>
       </div>
@@ -165,12 +210,19 @@ export function AdminProductsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [search, setSearch] = useState('')
   const selectedProduct = products.find((product) => product.id === selectedId)
-  const visibleProducts = useMemo(() => products.filter((product) => `${product.name} ${product.category}`.toLowerCase().includes(search.toLowerCase())), [products, search])
+  const visibleProducts = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return products
+    return products.filter((product) =>
+      product.name.toLowerCase().includes(query) ||
+      product.category.toLowerCase().includes(query)
+    )
+  }, [products, search])
 
   useEffect(() => {
-    async function loadProducts() {
-      try {
-        const snapshot = await getDocs(collection(db, 'products'))
+    const unsubscribe = onSnapshot(
+      collection(db, 'products'),
+      (snapshot) => {
         setProducts(snapshot.docs.map((product) => {
           const data = product.data()
           const rawImageUrl = typeof data.imageUrl === 'string' ? data.imageUrl : ''
@@ -187,15 +239,17 @@ export function AdminProductsPage() {
             available: typeof data.isAvailable === 'boolean' ? data.isAvailable : true,
           }
         }))
-      } catch (loadError) {
+        setError('')
+        setIsLoading(false)
+      },
+      (loadError) => {
         console.error('Loading products failed:', loadError)
         setError('Unable to load products. Please try again.')
-      } finally {
         setIsLoading(false)
       }
-    }
+    )
 
-    void loadProducts()
+    return () => unsubscribe()
   }, [])
 
   function startAdd() {
@@ -243,10 +297,12 @@ export function AdminProductsPage() {
       let imageUrlToSave = draft.rawImageUrl || productImageKey(draft.image)
 
       if (selectedFile) {
-        const safeFilename = selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-        const storageRef = ref(storage, `product-images/${productId}/${safeFilename}`)
-        await uploadBytes(storageRef, selectedFile)
-        imageUrlToSave = await getDownloadURL(storageRef)
+        try {
+          imageUrlToSave = await uploadImageToCloudinary(selectedFile)
+        } catch (uploadError) {
+          console.error('Cloudinary upload failed:', uploadError)
+          throw uploadError
+        }
       }
 
       const productData = {
@@ -296,7 +352,11 @@ export function AdminProductsPage() {
       }))
     } catch (saveError) {
       console.error('Saving product failed:', saveError)
-      setError('Unable to save the product. Please try again.')
+      if (saveError instanceof Error && saveError.message) {
+        setError(saveError.message)
+      } else {
+        setError('Unable to save the product. Please try again.')
+      }
     } finally {
       setIsSaving(false)
     }
@@ -313,7 +373,7 @@ export function AdminProductsPage() {
             {visibleProducts.map((product) => <ProductCard key={product.id} product={product} selected={selectedId === product.id} onEdit={() => startEdit(product)} />)}
             {isLoading && <p className={styles.empty}>Loading products...</p>}
             {!isLoading && error && !isFormOpen && <p className={styles.empty} role="alert">{error}</p>}
-            {!isLoading && !error && visibleProducts.length === 0 && <p className={styles.empty}>No products found.</p>}
+            {!isLoading && !error && visibleProducts.length === 0 && <p className={styles.empty}>{search.trim() ? 'No products match your search.' : 'No products found.'}</p>}
           </section>
           {isFormOpen && (
             <ProductForm

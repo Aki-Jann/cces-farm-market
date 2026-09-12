@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { collection, doc, getDoc, getDocs, runTransaction, serverTimestamp } from 'firebase/firestore'
+import { onAuthStateChanged } from 'firebase/auth'
+import { collection, doc, getDoc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore'
 import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
@@ -17,6 +18,7 @@ type Product = {
   stock: number
   unit: string
   image: string
+  isAvailable: boolean
 }
 
 type CartItem = Product & { quantity: number }
@@ -70,6 +72,8 @@ function ProductCard({
         </div>
       ) : product.stock <= 0 ? (
         <button type="button" className={styles.addButton} disabled>OUT OF STOCK</button>
+      ) : !product.isAvailable ? (
+        <button type="button" className={styles.addButton} disabled>UNAVAILABLE</button>
       ) : (
         <button type="button" className={styles.addButton} onClick={onAdd}>ADD TO CART</button>
       )}
@@ -157,44 +161,75 @@ export function ShopPage() {
   const [isCheckingOut, setIsCheckingOut] = useState(false)
 
   useEffect(() => {
-    async function loadProducts() {
-      try {
-        const snapshot = await getDocs(collection(db, 'products'))
-        const loadedProducts = snapshot.docs.flatMap((product) => {
-          const data = product.data()
-          if (data.isAvailable !== true) return []
+    let isMounted = true
+    let unsubscribeProducts: (() => void) | undefined
 
-          const name = typeof data.name === 'string' ? data.name.toUpperCase() : ''
-          const rawCategory = typeof data.category === 'string' ? data.category.toLowerCase() : ''
-          const categoryName = rawCategory.charAt(0).toUpperCase() + rawCategory.slice(1)
-          if (!categories.includes(categoryName as Category) || categoryName === 'All') return []
-
-          return [{
-            id: product.id,
-            name,
-            category: categoryName as Exclude<Category, 'All'>,
-            price: typeof data.price === 'number' ? data.price : 0,
-            stock: typeof data.stock === 'number' ? data.stock : 0,
-            unit: typeof data.unit === 'string' ? data.unit : 'KG',
-            image: resolveProductImage(data.imageUrl, localImages[name] ?? 'shop-apple.png'),
-          }]
-        })
-        setProducts(loadedProducts)
-      } catch (loadError) {
-        console.error('Loading shop products failed:', loadError)
-        setError('Unable to load products. Please try again.')
-      } finally {
-        setIsLoading(false)
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      // Tear down any previous products listener before attaching a new one.
+      if (unsubscribeProducts) {
+        unsubscribeProducts()
+        unsubscribeProducts = undefined
       }
-    }
 
-    void loadProducts()
+      if (!user) {
+        if (isMounted) {
+          setIsLoading(false)
+          setError('Please log in to view the shop.')
+        }
+        return
+      }
+
+      unsubscribeProducts = onSnapshot(
+        collection(db, 'products'),
+        (snapshot) => {
+          if (!isMounted) return
+          const loadedProducts = snapshot.docs.flatMap((product) => {
+            const data = product.data()
+            const name = typeof data.name === 'string' ? data.name.toUpperCase() : ''
+            const rawCategory = typeof data.category === 'string' ? data.category.toLowerCase() : ''
+            const categoryName = rawCategory.charAt(0).toUpperCase() + rawCategory.slice(1)
+            if (!categories.includes(categoryName as Category) || categoryName === 'All') return []
+
+            return [{
+              id: product.id,
+              name,
+              category: categoryName as Exclude<Category, 'All'>,
+              price: typeof data.price === 'number' ? data.price : 0,
+              stock: typeof data.stock === 'number' ? data.stock : 0,
+              unit: typeof data.unit === 'string' ? data.unit : 'KG',
+              image: resolveProductImage(data.imageUrl, localImages[name] ?? 'shop-apple.png'),
+              isAvailable: typeof data.isAvailable === 'boolean' ? data.isAvailable : true,
+            }]
+          })
+          setProducts(loadedProducts)
+          setError('')
+          setIsLoading(false)
+        },
+        (loadError) => {
+          console.error('Loading shop products failed:', loadError)
+          if (isMounted) {
+            setError('Unable to load products. Please try again.')
+            setIsLoading(false)
+          }
+        }
+      )
+    })
+
+    return () => {
+      isMounted = false
+      unsubscribeAuth()
+      if (unsubscribeProducts) unsubscribeProducts()
+    }
   }, [])
 
-  const visibleProducts = useMemo(() => products.filter((product) => {
-    const matchesCategory = category === 'All' || product.category === category
-    return matchesCategory && product.name.toLowerCase().includes(search.toLowerCase())
-  }), [category, products, search])
+  const visibleProducts = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return products.filter((product) => {
+      const matchesCategory = category === 'All' || product.category === category
+      const matchesSearch = !query || product.name.toLowerCase().includes(query)
+      return matchesCategory && matchesSearch
+    })
+  }, [category, products, search])
 
   const cartItems = products
     .filter((product) => (quantities[product.id] ?? 0) > 0)
@@ -203,6 +238,7 @@ export function ShopPage() {
   function updateQuantity(id: string, quantity: number) {
     const product = products.find((item) => item.id === id)
     if (!product) return
+    if (quantity > 0 && (!product.isAvailable || product.stock <= 0)) return
 
     setQuantities((current) => {
       const next = { ...current }
@@ -329,7 +365,7 @@ export function ShopPage() {
               onChange={(quantity) => updateQuantity(product.id, quantity)}
             />
           ))}
-          {!isLoading && !error && visibleProducts.length === 0 && <p className={styles.noResults}>No products found.</p>}
+          {!isLoading && !error && visibleProducts.length === 0 && <p className={styles.noResults}>{search.trim() ? 'No products match your search.' : 'No products found.'}</p>}
         </div>
       </section>
       <Cart items={cartItems} onChange={updateQuantity} paymentMethod={paymentMethod} onPaymentChange={setPaymentMethod} onPlaceOrder={placeOrder} orderMessage={orderMessage} isCheckingOut={isCheckingOut} />

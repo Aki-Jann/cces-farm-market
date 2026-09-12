@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { collection, getDocs } from 'firebase/firestore'
+import { collection, onSnapshot } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { db } from '../../firebase/firestore'
@@ -162,13 +162,11 @@ export function AdminAnalyticsPage() {
   const [products, setProducts] = useState<FirestoreProduct[]>([])
 
   useEffect(() => {
-    async function loadData() {
-      try {
-        const [ordersSnapshot, productsSnapshot] = await Promise.all([
-          getDocs(collection(db, 'orders')),
-          getDocs(collection(db, 'products')),
-        ])
-
+    // Orders and products are independent collections, so each gets its own
+    // real-time listener rather than merging unrelated data into one.
+    const unsubscribeOrders = onSnapshot(
+      collection(db, 'orders'),
+      (ordersSnapshot) => {
         const loadedOrders: FirestoreOrder[] = ordersSnapshot.docs.map((docSnap) => {
           const data = docSnap.data()
           return {
@@ -189,7 +187,16 @@ export function AdminAnalyticsPage() {
               : [],
           }
         })
+        setOrders(loadedOrders)
+      },
+      (loadError) => {
+        console.error('Loading analytics orders failed:', loadError)
+      }
+    )
 
+    const unsubscribeProducts = onSnapshot(
+      collection(db, 'products'),
+      (productsSnapshot) => {
         const loadedProducts: FirestoreProduct[] = productsSnapshot.docs.map((docSnap) => {
           const data = docSnap.data()
           return {
@@ -199,15 +206,17 @@ export function AdminAnalyticsPage() {
             imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : undefined,
           }
         })
-
-        setOrders(loadedOrders)
         setProducts(loadedProducts)
-      } catch (loadError) {
-        console.error('Loading analytics data failed:', loadError)
+      },
+      (loadError) => {
+        console.error('Loading analytics products failed:', loadError)
       }
-    }
+    )
 
-    void loadData()
+    return () => {
+      unsubscribeOrders()
+      unsubscribeProducts()
+    }
   }, [])
 
   const analytics: AnalyticsData = useMemo(() => {
@@ -423,7 +432,14 @@ export function AdminAnalyticsPage() {
   }, [orders, products, period])
 
   const title = period === 'DAY' ? 'DAILY' : period === 'WEEK' ? 'WEEKLY' : 'MONTHLY'
-  const visibleTop = useMemo(() => analytics.top.filter((product) => product.name.toLowerCase().includes(search.toLowerCase())), [analytics.top, search])
+  const visibleTop = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return analytics.top
+    return analytics.top.filter((product) =>
+      product.name.toLowerCase().includes(query) ||
+      product.category.toLowerCase().includes(query)
+    )
+  }, [analytics.top, search])
 
   return (
     <main className={styles.page}>

@@ -15,7 +15,7 @@ service firebase.storage {
     }
 
     function isValidImage() {
-      return request.resource.contentType.matches('image/(jpeg|png|webp)') &&
+      return request.resource.contentType.matches('image/(jpeg|jpg|png|webp).*') &&
         request.resource.size <= 5 * 1024 * 1024; // 5 MB max
     }
 

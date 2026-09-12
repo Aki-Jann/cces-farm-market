@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { collection, getDocs } from 'firebase/firestore'
+import { collection, onSnapshot } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { db } from '../../firebase/firestore'
@@ -135,17 +135,17 @@ export function AdminDashboard() {
   const [search, setSearch] = useState('')
   const [orders, setOrders] = useState<FirestoreOrder[]>([])
   const [products, setProducts] = useState<FirestoreProduct[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [ordersLoaded, setOrdersLoaded] = useState(false)
+  const [productsLoaded, setProductsLoaded] = useState(false)
+  const isLoading = !ordersLoaded || !productsLoaded
 
+  // Orders and products are independent collections, so each gets its own
+  // real-time listener rather than merging unrelated data into one.
   useEffect(() => {
-    async function loadDashboardData() {
-      try {
-        const [ordersSnapshot, productsSnapshot] = await Promise.all([
-          getDocs(collection(db, 'orders')),
-          getDocs(collection(db, 'products')),
-        ])
-
-        const loadedOrders: FirestoreOrder[] = ordersSnapshot.docs.map((docSnap) => {
+    const unsubscribeOrders = onSnapshot(
+      collection(db, 'orders'),
+      (snapshot) => {
+        const loadedOrders: FirestoreOrder[] = snapshot.docs.map((docSnap) => {
           const data = docSnap.data()
           return {
             id: docSnap.id,
@@ -156,8 +156,19 @@ export function AdminDashboard() {
             createdAt: data.createdAt,
           }
         })
+        setOrders(loadedOrders)
+        setOrdersLoaded(true)
+      },
+      (loadError) => {
+        console.error('Loading dashboard orders failed:', loadError)
+        setOrdersLoaded(true)
+      }
+    )
 
-        const loadedProducts: FirestoreProduct[] = productsSnapshot.docs.map((docSnap) => {
+    const unsubscribeProducts = onSnapshot(
+      collection(db, 'products'),
+      (snapshot) => {
+        const loadedProducts: FirestoreProduct[] = snapshot.docs.map((docSnap) => {
           const data = docSnap.data()
           return {
             id: docSnap.id,
@@ -168,17 +179,19 @@ export function AdminDashboard() {
             isAvailable: typeof data.isAvailable === 'boolean' ? data.isAvailable : true,
           }
         })
-
-        setOrders(loadedOrders)
         setProducts(loadedProducts)
-      } catch (loadError) {
-        console.error('Loading dashboard data failed:', loadError)
-      } finally {
-        setIsLoading(false)
+        setProductsLoaded(true)
+      },
+      (loadError) => {
+        console.error('Loading dashboard products failed:', loadError)
+        setProductsLoaded(true)
       }
-    }
+    )
 
-    void loadDashboardData()
+    return () => {
+      unsubscribeOrders()
+      unsubscribeProducts()
+    }
   }, [])
 
   // Calculate stats and series
@@ -309,15 +322,24 @@ export function AdminDashboard() {
     }
   }, [orders, products])
 
-  const filteredOrders = useMemo(
-    () => recentOrdersList.filter((order) => `${order.customer} ${order.id}`.toLowerCase().includes(search.toLowerCase())),
-    [recentOrdersList, search]
-  )
+  const filteredOrders = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return recentOrdersList
+    return recentOrdersList.filter((order) =>
+      order.customer.toLowerCase().includes(query) ||
+      order.id.toLowerCase().includes(query) ||
+      order.status.toLowerCase().includes(query)
+    )
+  }, [recentOrdersList, search])
 
-  const filteredInventory = useMemo(
-    () => inventoryList.filter((item) => `${item.name} ${item.category}`.toLowerCase().includes(search.toLowerCase())),
-    [inventoryList, search]
-  )
+  const filteredInventory = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    if (!query) return inventoryList
+    return inventoryList.filter((item) =>
+      item.name.toLowerCase().includes(query) ||
+      item.category.toLowerCase().includes(query)
+    )
+  }, [inventoryList, search])
 
   return (
     <main className={styles.page}>
