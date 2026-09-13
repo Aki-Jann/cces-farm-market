@@ -55,18 +55,18 @@ function validateImageFile(file: File): string | null {
   return null
 }
 
-const CLOUDINARY_CLOUD_NAME = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined
-const CLOUDINARY_UPLOAD_PRESET = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET as string | undefined
+const wrndeogt = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME as string | undefined
+const cces_product_images = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET as string | undefined
 
 async function uploadImageToCloudinary(file: File): Promise<string> {
-  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
+  if (!wrndeogt || !cces_product_images) {
     throw new Error('Cloudinary is not configured. Please set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET.')
   }
 
-  const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`
+  const uploadUrl = `https://api.cloudinary.com/v1_1/${wrndeogt}/image/upload`
   const formData = new FormData()
   formData.append('file', file)
-  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET)
+  formData.append('upload_preset', cces_product_images)
 
   let response: Response
   try {
