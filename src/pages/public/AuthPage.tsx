@@ -18,6 +18,40 @@ type FieldProps = {
   error?: string
 }
 
+type RegistrationFields = {
+  firstName: string
+  lastName: string
+  email: string
+  password: string
+  birthday: string
+  contactNumber: string
+  confirmPassword: string
+  address: string
+}
+
+type RegistrationErrors = Partial<Record<keyof RegistrationFields, string>>
+
+function validateRegistrationFields(fields: RegistrationFields): RegistrationErrors {
+  const errors: RegistrationErrors = {}
+  const normalizedPhone = fields.contactNumber.replace(/[\s()-]/g, '')
+  const birthdayDate = fields.birthday ? new Date(`${fields.birthday}T00:00:00`) : null
+
+  if (!fields.firstName.trim()) errors.firstName = 'Enter your first name.'
+  if (!fields.lastName.trim()) errors.lastName = 'Enter your last name.'
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email)) errors.email = 'Enter a valid email address.'
+  if (!/^(09\d{9}|\+639\d{9})$/.test(normalizedPhone)) errors.contactNumber = 'Enter a valid Philippine phone number.'
+  if (!fields.address.trim()) errors.address = 'Enter your address.'
+  if (!birthdayDate || Number.isNaN(birthdayDate.getTime()) || birthdayDate > new Date()) {
+    errors.birthday = 'Select a valid birthday.'
+  }
+  if (fields.password.length < 6) errors.password = 'Password must be at least 6 characters.'
+  if (!fields.confirmPassword || fields.password !== fields.confirmPassword) {
+    errors.confirmPassword = 'Passwords must match.'
+  }
+
+  return errors
+}
+
 function Field({ label, placeholder, type = 'text', value, onChange, error }: FieldProps) {
   return (
     <label className={styles.field}>
@@ -39,8 +73,8 @@ export function AuthPage({ type }: { type: AuthType }) {
   const [registrationError, setRegistrationError] = useState('')
   const [loginError, setLoginError] = useState('')
   const [loginFields, setLoginFields] = useState({ email: '', password: '' })
-  const [birthdayError, setBirthdayError] = useState('')
-  const [registrationFields, setRegistrationFields] = useState({
+  const [showRegistrationErrors, setShowRegistrationErrors] = useState(false)
+  const [registrationFields, setRegistrationFields] = useState<RegistrationFields>({
     firstName: '',
     lastName: '',
     email: '',
@@ -50,6 +84,8 @@ export function AuthPage({ type }: { type: AuthType }) {
     confirmPassword: '',
     address: '',
   })
+  const registrationErrors = validateRegistrationFields(registrationFields)
+  const isRegistrationValid = Object.keys(registrationErrors).length === 0
 
   function updateRegistrationField(field: keyof typeof registrationFields) {
     return (event: ChangeEvent<HTMLInputElement>) => {
@@ -106,19 +142,9 @@ export function AuthPage({ type }: { type: AuthType }) {
   async function register(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setRegistrationError('')
-    setBirthdayError('')
-    if (registrationFields.password !== registrationFields.confirmPassword) {
-      setRegistrationError('Passwords do not match.')
-      return
-    }
-   const birthdayDate = registrationFields.birthday
-  ? new Date(`${registrationFields.birthday}T00:00:00`)
-  : null
-
-if (!birthdayDate || Number.isNaN(birthdayDate.getTime())) {
-  setBirthdayError('Please select a valid birthday.')
-  return
-}
+    setShowRegistrationErrors(true)
+    if (!isRegistrationValid) return
+    const birthdayDate = new Date(`${registrationFields.birthday}T00:00:00`)
 
     try {
       const credential = await createUserWithEmailAndPassword(auth, registrationFields.email, registrationFields.password)
@@ -151,25 +177,25 @@ if (!birthdayDate || Number.isNaN(birthdayDate.getTime())) {
   if (isRegister) {
     return (
       <main className={styles.authCanvas}>
-        <form className={`${styles.authCard} ${styles.registerCard}`} onSubmit={register}>
+        <form className={`${styles.authCard} ${styles.registerCard}`} onSubmit={register} noValidate>
           <div className={styles.authLogo}><BrandLogo compact /></div>
           <div className={styles.authHeading}>
             <h1>Register</h1>
             <p>Create your account</p>
           </div>
           <div className={styles.registerFields}>
-            <Field label="First Name" placeholder="Juan" value={registrationFields.firstName} onChange={updateRegistrationField('firstName')} />
-            <Field label="Email Address" placeholder="name@example.com" type="email" value={registrationFields.email} onChange={updateRegistrationField('email')} />
-            <Field label="Last Name" placeholder="Dela Cruz" value={registrationFields.lastName} onChange={updateRegistrationField('lastName')} />
-            <Field label="Password" placeholder="Enter Password" type="password" value={registrationFields.password} onChange={updateRegistrationField('password')} />
-            <Field label="Birthday" type="date" value={registrationFields.birthday} onChange={updateRegistrationField('birthday')} error={birthdayError} />
-            <Field label="Contact Number" placeholder="09XX XXX XXXX" value={registrationFields.contactNumber} onChange={updateRegistrationField('contactNumber')} />
-            <Field label="Confirm Password" placeholder="Re-enter Password" type="password" value={registrationFields.confirmPassword} onChange={updateRegistrationField('confirmPassword')} />
-            <Field label="Address" placeholder="Zone I, Zamboanga City, Philippines" value={registrationFields.address} onChange={updateRegistrationField('address')} />
+            <Field label="First Name" placeholder="Juan" value={registrationFields.firstName} onChange={updateRegistrationField('firstName')} error={showRegistrationErrors ? registrationErrors.firstName : undefined} />
+            <Field label="Last Name" placeholder="Dela Cruz" value={registrationFields.lastName} onChange={updateRegistrationField('lastName')} error={showRegistrationErrors ? registrationErrors.lastName : undefined} />
+            <Field label="Email Address" placeholder="name@example.com" type="email" value={registrationFields.email} onChange={updateRegistrationField('email')} error={showRegistrationErrors ? registrationErrors.email : undefined} />
+            <Field label="Contact Number" placeholder="09XX XXX XXXX" value={registrationFields.contactNumber} onChange={updateRegistrationField('contactNumber')} error={showRegistrationErrors ? registrationErrors.contactNumber : undefined} />
+            <Field label="Address" placeholder="Zone I, Zamboanga City, Philippines" value={registrationFields.address} onChange={updateRegistrationField('address')} error={showRegistrationErrors ? registrationErrors.address : undefined} />
+            <Field label="Birthday" type="date" value={registrationFields.birthday} onChange={updateRegistrationField('birthday')} error={showRegistrationErrors ? registrationErrors.birthday : undefined} />
+            <Field label="Password" placeholder="Enter Password" type="password" value={registrationFields.password} onChange={updateRegistrationField('password')} error={showRegistrationErrors ? registrationErrors.password : undefined} />
+            <Field label="Confirm Password" placeholder="Re-enter Password" type="password" value={registrationFields.confirmPassword} onChange={updateRegistrationField('confirmPassword')} error={showRegistrationErrors ? registrationErrors.confirmPassword : undefined} />
             <div className={styles.registerAction}>
               {registrationError && <p className={styles.registrationError} role="alert">{registrationError}</p>}
               <p>Already have an account? <a href="#/login">Login Here</a></p>
-              <button type="submit" className={styles.disabledButton}>Create Account</button>
+              <button type="submit" className={isRegistrationValid ? styles.submitButton : styles.disabledButton}>Create Account</button>
             </div>
           </div>
         </form>
