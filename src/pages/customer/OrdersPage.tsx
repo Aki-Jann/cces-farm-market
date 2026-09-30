@@ -15,10 +15,14 @@ type Order = {
   createdAtTime: number
   total: number
   payment: string
+  fulfillmentType: 'delivery' | 'pickup'
+  address: string
+  sellerNotes: string
+  paymentReceiptUrl: string
   status: OrderStatus
   deliveryFee: number
   tax: number
-  items: { name: string; quantity: number; price: number }[]
+  items: { name: string; quantity: number; price: number; unit: string }[]
 }
 
 function parseOrderDate(createdAt: unknown): Date | null {
@@ -48,16 +52,33 @@ export function OrderDetails({ order }: { order: Order }) {
 
   return (
     <div className={styles.details}>
+      <div className={styles.detailsHeading}>
+        <div>
+          <h2>Order details</h2>
+          <p>{order.items.length} {order.items.length === 1 ? 'item' : 'items'}</p>
+        </div>
+        <strong className={styles.detailsStatus}>{order.status}</strong>
+      </div>
+      <div className={styles.detailMeta}>
+        <div><span>FULFILLMENT</span><strong>{order.fulfillmentType === 'pickup' ? 'Pickup' : 'Delivery'}</strong></div>
+        <div><span>PAYMENT</span><strong>{order.payment || 'Not specified'}</strong></div>
+      </div>
+      <p className={styles.detailNote}>
+        <strong>{order.fulfillmentType === 'pickup' ? 'Pickup location' : 'Delivery address'}</strong>
+        <span>{order.address || 'Not provided'}</span>
+      </p>
+      {order.sellerNotes && <p className={styles.detailNote}><strong>Note to seller</strong><span>{order.sellerNotes}</span></p>}
+      {order.paymentReceiptUrl && <a className={styles.receiptLink} href={order.paymentReceiptUrl} target="_blank" rel="noreferrer">View payment receipt</a>}
       <div className={styles.detailTable}>
-        <div className={styles.detailHeader}><span>PRODUCT NAME</span><span>QTY</span><span>PRICE</span><span>TOTAL PRICE</span></div>
+        <div className={styles.detailHeader}><span>ITEM</span><span>QTY</span><span>PRICE</span><span>AMOUNT</span></div>
         {order.items.map((item) => (
-          <div className={styles.detailRow} key={item.name}>
-            <span>{item.name}</span><span>{item.quantity}</span><span>{currency(item.price)}</span><strong>{currency(item.price * item.quantity)}</strong>
+          <div className={styles.detailRow} key={`${item.name}-${item.unit}`}>
+            <span>{item.name}</span><span>{item.quantity} {item.unit}</span><span>{currency(item.price)}</span><strong>{currency(item.price * item.quantity)}</strong>
           </div>
         ))}
-        <div className={styles.detailRow}><span>Delivery Fee</span><span>-</span><span>{currency(delivery)}</span><strong>{currency(delivery)}</strong></div>
-        <div className={styles.detailRow}><span>Tax</span><span>5%</span><span>{currency(tax)}</span><strong>{currency(tax)}</strong></div>
-        <div className={styles.detailTotal}><strong>TOTAL</strong><strong>{currency(order.total)}</strong></div>
+        {delivery > 0 && <div className={styles.detailRow}><span>Delivery fee</span><span>-</span><span>-</span><strong>{currency(delivery)}</strong></div>}
+        <div className={styles.detailRow}><span>Tax</span><span>5%</span><span>-</span><strong>{currency(tax)}</strong></div>
+        <div className={styles.detailTotal}><span>Total</span><strong>{currency(order.total)}</strong></div>
       </div>
     </div>
   )
@@ -125,6 +146,10 @@ export function OrdersPage() {
               createdAtTime,
               total: typeof data.total === 'number' ? data.total : 0,
               payment: typeof data.paymentMethod === 'string' ? data.paymentMethod : '',
+              fulfillmentType: data.fulfillmentType === 'pickup' ? 'pickup' as const : 'delivery' as const,
+              address: typeof data.deliveryAddress === 'string' ? data.deliveryAddress : '',
+              sellerNotes: typeof data.sellerNotes === 'string' ? data.sellerNotes : '',
+              paymentReceiptUrl: typeof data.paymentReceiptUrl === 'string' ? data.paymentReceiptUrl : '',
               status,
               deliveryFee: typeof data.deliveryFee === 'number' ? data.deliveryFee : 0,
               tax: typeof data.tax === 'number' ? data.tax : 0,
@@ -135,6 +160,7 @@ export function OrdersPage() {
                   name: typeof itemData.name === 'string' ? itemData.name : 'Product',
                   quantity: typeof itemData.quantity === 'number' ? itemData.quantity : 0,
                   price: typeof itemData.price === 'number' ? itemData.price : 0,
+                  unit: typeof itemData.unit === 'string' ? itemData.unit : 'kg',
                 }]
               }),
             }
@@ -182,8 +208,12 @@ export function OrdersPage() {
             <div className={styles.orderList}>
               {visibleOrders.map((order) => (
                 <div className={styles.orderGroup} key={order.id}>
-                  <button className={styles.orderRow} type="button" onClick={() => setSelectedId(selectedId === order.id ? null : order.id)}>
-                    <strong>{order.id}</strong><span>{order.date}</span><strong className={styles.green}>{currency(order.total)}</strong><strong>{order.payment}</strong><span className={`${styles.status} ${order.status === 'DELIVERED' ? styles.delivered : styles.pending}`}>{order.status}</span>
+                  <button className={styles.orderRow} type="button" aria-expanded={selectedId === order.id} onClick={() => setSelectedId(selectedId === order.id ? null : order.id)}>
+                    <strong className={styles.orderId}>{order.id}</strong>
+                    <span className={styles.orderDate}>{order.date}</span>
+                    <strong className={`${styles.green} ${styles.orderTotal}`}>{currency(order.total)}</strong>
+                    <span className={styles.orderPayment}>{order.payment || 'Not specified'}</span>
+                    <span className={`${styles.status} ${styles[order.status.toLowerCase()]}`}>{order.status}</span>
                   </button>
                   {selectedId === order.id && <OrderDetails order={order} />}
                 </div>

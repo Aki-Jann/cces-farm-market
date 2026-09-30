@@ -1,0 +1,322 @@
+[33mcommit f59e3a2c7c596c8f34281d6fc8c03531052d7a11[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mJASMIEN-NEW[m[33m, [m[1;31morigin/JASMIEN-NEW[m[33m)[m
+Author: Jasmien <jasmien.pajiji9@gmail.com>
+Commit: Jasmien <jasmien.pajiji9@gmail.com>
+
+    improved customer products page UI , added pop-up for qr code and user interactions
+
+[33mcommit d0c445875bde5339e9be555033afa312cab3cf85[m
+Author: Jasmien <jasmien.pajiji9@gmail.com>
+Commit: Jasmien <jasmien.pajiji9@gmail.com>
+
+    improved registration page
+
+[33mcommit 8c828adc7811621a41d26a33a760e698a4a671be[m
+Author: Jasmien <jasmien.pajiji9@gmail.com>
+Commit: Jasmien <jasmien.pajiji9@gmail.com>
+
+    improved login page
+
+[33mcommit a385795b354473a234975913ee52b6b205ea52b2[m
+Author: Jasmien <jasmien.pajiji9@gmail.com>
+Commit: Jasmien <jasmien.pajiji9@gmail.com>
+
+    improved landing page UI/UX
+
+[33mcommit 37fcded68a8be4b6f4f239ece9b2faf4cd2e78ae[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m
+Author: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+Commit: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+
+     Changes to be committed:
+            modified:   src/pages/admin/AdminProductsPage.tsx
+
+[33mcommit 64d39b88978ed03e4afe760e1db4ed365544ee7f[m
+Author: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+Commit: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+
+     Changes to be committed:
+            modified:   src/pages/admin/AdminProductsPage.tsx
+
+[33mcommit 1b6202121b77b7720b6b9304eb5a1bdde9ba849a[m
+Author: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+Commit: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+
+     Changes to be committed:
+            modified:   .gitignore
+            modified:   src/firebase/storage.ts
+            modified:   src/pages/admin/AdminAnalyticsPage.tsx
+            modified:   src/pages/admin/AdminCustomersPage.tsx
+            modified:   src/pages/admin/AdminDashboard.module.css
+            modified:   src/pages/admin/AdminDashboard.tsx
+            modified:   src/pages/admin/AdminOrdersPage.module.css
+            modified:   src/pages/admin/AdminOrdersPage.tsx
+            modified:   src/pages/admin/AdminPaymentPage.tsx
+            modified:   src/pages/admin/AdminProductsPage.tsx
+            modified:   src/pages/customer/AccountPage.module.css
+            modified:   src/pages/customer/AccountPage.tsx
+            modified:   src/pages/customer/MessagesPage.tsx
+            modified:   src/pages/customer/OrdersPage.tsx
+            modified:   src/pages/customer/ShopPage.tsx
+            modified:   storage.rules
+
+[33mcommit 78b98a0854fc595e824f30d7ea4753289b6a8c48[m
+Author: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+Commit: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+
+     Changes to be committed:
+            new file:   firestore.rules
+            new file:   src/firebase/storage.ts
+            modified:   src/pages/admin/AdminAnalyticsPage.tsx
+            modified:   src/pages/admin/AdminDashboard.tsx
+            modified:   src/pages/admin/AdminPaymentPage.module.css
+            modified:   src/pages/admin/AdminPaymentPage.tsx
+            modified:   src/pages/admin/AdminProductsPage.module.css
+            modified:   src/pages/admin/AdminProductsPage.tsx
+            modified:   src/pages/customer/ShopPage.tsx
+            modified:   src/utils/productImages.ts
+            new file:   storage.rules
+
+[33mcommit 179c597b077ab99f080e51b3aa3a5a64fa545dff[m
+Merge: 77acc8f 3d29a8e
+Author: Aki-Jann <aaron.jann.enriquez07@gmail.com>
+Commit: GitHub <noreply@github.com>
+
+    Merge pull request #6 from Aki-Jann/Push6
+    
+     Changes to be committed:
+
+[33mcommit 3d29a8eae22cbd376628fb5944d2d52bd8ff1f75[m[33m ([m[1;31morigin/Push6[m[33m)[m
+Author: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+Commit: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+
+     Changes to be committed:
+            modified:   src/pages/customer/AccountPage.tsx
+
+[33mcommit 77acc8f0b62447cfead3b2977a0814cf13039f80[m
+Merge: f3a5b57 dc19a84
+Author: Aki-Jann <aaron.jann.enriquez07@gmail.com>
+Commit: GitHub <noreply@github.com>
+
+    Merge pull request #5 from Aki-Jann/Push6
+    
+     Changes to be committed:
+
+[33mcommit dc19a84d3d443035e525b9f7221e03176fdb7c24[m
+Author: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+Commit: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+
+     Changes to be committed:
+            modified:   src/pages/admin/AdminProductsPage.tsx
+            modified:   src/utils/productImages.ts
+
+[33mcommit f3a5b576549c8f955349b926fc8368517dddaf41[m
+Merge: 7aa5fd2 4feca72
+Author: Aki-Jann <aaron.jann.enriquez07@gmail.com>
+Commit: GitHub <noreply@github.com>
+
+    Merge pull request #4 from Aki-Jann/Push6
+    
+     Changes to be committed:
+
+[33mcommit 4feca72930e567e1001ea8ee1903c20bf9aa550d[m
+Author: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+Commit: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+
+     Changes to be committed:
+            modified:   src/pages/admin/AdminProductsPage.tsx
+            modified:   src/pages/customer/ShopPage.tsx
+            new file:   src/utils/productImages.ts
+
+[33mcommit 7aa5fd2d232691f4cb14a5a61be542c90a6e7766[m
+Merge: 6debedc d84b69d
+Author: Aki-Jann <aaron.jann.enriquez07@gmail.com>
+Commit: GitHub <noreply@github.com>
+
+    Merge pull request #3 from Aki-Jann/Push6
+    
+     Changes to be committed:
+
+[33mcommit d84b69d6986026053c846625c3941a57faf85d4e[m
+Author: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+Commit: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+
+     Changes to be committed:
+            modified:   src/pages/public/AuthPage.tsx
+
+[33mcommit 6debedca437c5a4d70a7d9039d7447c56c9d8b29[m
+Merge: afcf378 46d1f44
+Author: Aki-Jann <aaron.jann.enriquez07@gmail.com>
+Commit: GitHub <noreply@github.com>
+
+    Merge pull request #2 from Aki-Jann/Push6
+    
+    Push6
+
+[33mcommit 46d1f44124e5cb60caae1b2bfb3c3289a338be9c[m
+Author: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+Commit: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+
+     On branch Push6
+     Changes to be committed:
+            modified:   package-lock.json
+            modified:   package.json
+            new file:   src/firebase/auth.ts
+            new file:   src/firebase/firebaseConfig.ts
+            new file:   src/firebase/firestore.ts
+            modified:   src/pages/admin/AdminCustomersPage.module.css
+            modified:   src/pages/admin/AdminCustomersPage.tsx
+            modified:   src/pages/admin/AdminOrdersPage.module.css
+            modified:   src/pages/admin/AdminOrdersPage.tsx
+            modified:   src/pages/admin/AdminProductsPage.tsx
+            modified:   src/pages/customer/MessagesPage.module.css
+            modified:   src/pages/customer/MessagesPage.tsx
+            modified:   src/pages/customer/OrdersPage.tsx
+            modified:   src/pages/customer/ShopPage.tsx
+            modified:   src/pages/public/AuthPage.module.css
+            modified:   src/pages/public/AuthPage.tsx
+
+[33mcommit ec2268c767c2d9e594e3d00a01bbaa66339ffedb[m[33m ([m[1;31morigin/Push5[m[33m)[m
+Author: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+Commit: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+
+     On branch Push5
+     Changes to be committed:
+            modified:   src/App.tsx
+            deleted:    src/components/AdminAnalyticsPage.module.css
+            deleted:    src/components/MessagesPage.tsx
+            renamed:    src/components/BrandLogo.module.css -> src/components/common/BrandLogo.module.css
+            renamed:    src/components/BrandLogo.tsx -> src/components/common/BrandLogo.tsx
+            renamed:    src/components/AdminSidebar.module.css -> src/components/layout/AdminSidebar.module.css
+            renamed:    src/components/AdminSidebar.tsx -> src/components/layout/AdminSidebar.tsx
+            renamed:    src/components/CustomerSidebar.module.css -> src/components/layout/CustomerSidebar.module.css
+            renamed:    src/components/CustomerSidebar.tsx -> src/components/layout/CustomerSidebar.tsx
+            renamed:    src/components/Header.module.css -> src/components/layout/Header.module.css
+            renamed:    src/components/Header.tsx -> src/components/layout/Header.tsx
+            new file:   src/pages/admin/AdminAnalyticsPage.module.css
+            renamed:    src/components/AdminAnalyticsPage.tsx -> src/pages/admin/AdminAnalyticsPage.tsx
+            renamed:    src/components/AdminCustomersPage.module.css -> src/pages/admin/AdminCustomersPage.module.css
+            renamed:    src/components/AdminCustomersPage.tsx -> src/pages/admin/AdminCustomersPage.tsx
+            renamed:    src/components/AdminDashboard.module.css -> src/pages/admin/AdminDashboard.module.css
+            renamed:    src/components/AdminDashboard.tsx -> src/pages/admin/AdminDashboard.tsx
+            renamed:    src/components/AdminOrdersPage.module.css -> src/pages/admin/AdminOrdersPage.module.css
+            renamed:    src/components/AdminOrdersPage.tsx -> src/pages/admin/AdminOrdersPage.tsx
+            renamed:    src/components/AdminPaymentPage.module.css -> src/pages/admin/AdminPaymentPage.module.css
+            renamed:    src/components/AdminPaymentPage.tsx -> src/pages/admin/AdminPaymentPage.tsx
+            renamed:    src/components/AdminProductsPage.module.css -> src/pages/admin/AdminProductsPage.module.css
+            renamed:    src/components/AdminProductsPage.tsx -> src/pages/admin/AdminProductsPage.tsx
+            renamed:    src/components/AccountPage.module.css -> src/pages/customer/AccountPage.module.css
+            renamed:    src/components/AccountPage.tsx -> src/pages/customer/AccountPage.tsx
+            renamed:    src/components/MessagesPage.module.css -> src/pages/customer/MessagesPage.module.css
+            new file:   src/pages/customer/MessagesPage.tsx
+            renamed:    src/components/OrdersPage.module.css -> src/pages/customer/OrdersPage.module.css
+            renamed:    src/components/OrdersPage.tsx -> src/pages/customer/OrdersPage.tsx
+            renamed:    src/components/ShopPage.module.css -> src/pages/customer/ShopPage.module.css
+            renamed:    src/components/ShopPage.tsx -> src/pages/customer/ShopPage.tsx
+            renamed:    src/components/AuthPage.module.css -> src/pages/public/AuthPage.module.css
+            renamed:    src/components/AuthPage.tsx -> src/pages/public/AuthPage.tsx
+            renamed:    src/components/LandingPage.module.css -> src/pages/public/LandingPage.module.css
+        renamed:    src/components/LandingPage.tsx -> src/pages/public/LandingPage.tsx
+
+[33mcommit efbe1a99b5763fe8bfec3bbba423327feeda83de[m[33m ([m[1;31morigin/Push4[m[33m)[m
+Author: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+Commit: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+
+     On branch Push4
+     Changes to be committed:
+            modified:   src/components/AccountPage.tsx
+            modified:   src/components/AdminAnalyticsPage.tsx
+            modified:   src/components/AdminCustomersPage.tsx
+            modified:   src/components/AdminDashboard.tsx
+            modified:   src/components/AdminOrdersPage.tsx
+            modified:   src/components/AdminPaymentPage.tsx
+            modified:   src/components/AdminProductsPage.tsx
+            modified:   src/components/AdminSidebar.module.css
+            modified:   src/components/AuthPage.tsx
+            modified:   src/components/CustomerSidebar.module.css
+            new file:   src/components/Header.module.css
+            new file:   src/components/Header.tsx
+            modified:   src/components/LandingPage.tsx
+            modified:   src/components/MessagesPage.tsx
+            modified:   src/components/OrdersPage.tsx
+            modified:   src/components/ShopPage.tsx
+
+[33mcommit bafb1234d06c3a83eb727015a4f7de76d41481bb[m[33m ([m[1;31morigin/Push3[m[33m)[m
+Author: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+Commit: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+
+     On branch Push3
+     Changes to be committed:
+            modified:   src/App.tsx
+            new file:   src/components/AccountPage.module.css
+            new file:   src/components/AccountPage.tsx
+            new file:   src/components/AdminAnalyticsPage.module.css
+            new file:   src/components/AdminAnalyticsPage.tsx
+            new file:   src/components/AdminCustomersPage.module.css
+            new file:   src/components/AdminCustomersPage.tsx
+            new file:   src/components/AdminDashboard.module.css
+            new file:   src/components/AdminDashboard.tsx
+            new file:   src/components/AdminOrdersPage.module.css
+            new file:   src/components/AdminOrdersPage.tsx
+            new file:   src/components/AdminPaymentPage.module.css
+            new file:   src/components/AdminPaymentPage.tsx
+            new file:   src/components/AdminProductsPage.module.css
+            new file:   src/components/AdminProductsPage.tsx
+        new file:   src/components/AdminSidebar.module.css
+            new file:   src/components/AdminSidebar.tsx
+            modified:   src/components/AuthPage.module.css
+            modified:   src/components/BrandLogo.module.css
+            new file:   src/components/CustomerSidebar.module.css
+            new file:   src/components/CustomerSidebar.tsx
+            new file:   src/components/MessagesPage.module.css
+            new file:   src/components/MessagesPage.tsx
+            new file:   src/components/OrdersPage.module.css
+            new file:   src/components/OrdersPage.tsx
+            modified:   src/components/ShopPage.module.css
+            modified:   src/components/ShopPage.tsx
+
+[33mcommit ba92195c027724c311df52dc531d51572dcd633e[m[33m ([m[1;31morigin/Push2[m[33m)[m
+Author: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+Commit: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+
+     On branch Push2
+     Changes to be committed:
+            modified:   src/App.tsx
+            new file:   src/assets/shop-apple.png
+            new file:   src/assets/shop-banana.png
+            new file:   src/assets/shop-cabbage.png
+            new file:   src/assets/shop-carrot.png
+            new file:   src/assets/shop-corn.png
+            new file:   src/assets/shop-cucumber.png
+            new file:   src/assets/shop-guava.png
+            new file:   src/assets/shop-gumamela.png
+            new file:   src/assets/shop-pepper.png
+            new file:   src/components/ShopPage.module.css
+            new file:   src/components/ShopPage.tsx
+
+[33mcommit bb41d4e09b18862760a2546125f1dd3a606219c3[m[33m ([m[1;31morigin/Push1[m[33m)[m
+Author: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+Commit: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+
+    Please enter the commit message for your changes. Lines starting
+     On branch Push1
+     Changes to be committed:
+            deleted:    src/App.css
+            modified:   src/App.tsx
+            new file:   src/assets/apple.png
+            new file:   src/assets/bell-pepper.png
+            new file:   src/assets/corn.png
+            new file:   src/assets/gumamela.png
+            new file:   src/assets/landing-hero.png
+            new file:   src/assets/our-story.png
+            new file:   src/components/AuthPage.module.css
+            new file:   src/components/AuthPage.tsx
+            new file:   src/components/BrandLogo.module.css
+            new file:   src/components/BrandLogo.tsx
+            new file:   src/components/LandingPage.module.css
+            new file:   src/components/LandingPage.tsx
+            modified:   src/index.css
+
+[33mcommit afcf3786eda809f375d67b36e9948f29f82f66d6[m
+Author: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+Commit: Aki7-beep <c87c8hcgmv@privaterelay.appleid.com>
+
+    Initial commit
