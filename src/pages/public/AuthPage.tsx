@@ -152,7 +152,7 @@ if (!birthdayDate || Number.isNaN(birthdayDate.getTime())) {
     return (
       <main className={styles.authCanvas}>
         <form className={`${styles.authCard} ${styles.registerCard}`} onSubmit={register}>
-          <div className={styles.authLogo}><BrandLogo /></div>
+          <div className={styles.authLogo}><BrandLogo compact /></div>
           <div className={styles.authHeading}>
             <h1>Register</h1>
             <p>Create your account</p>
@@ -180,7 +180,7 @@ if (!birthdayDate || Number.isNaN(birthdayDate.getTime())) {
   return (
     <main className={styles.authCanvas}>
       <form className={`${styles.authCard} ${isForgot ? styles.forgotCard : ''}`} onSubmit={isForgot ? (event) => submitMock(event, '/login') : login}>
-        <div className={styles.authLogo}><BrandLogo /></div>
+        <div className={styles.authLogo}><BrandLogo compact /></div>
         <div className={styles.authHeading}>
           <h1>{isForgot ? 'Forgot Password' : 'Welcome Back!'}</h1>
           <p>{isForgot ? 'We’ll email you a reset link' : 'Sign in to your account'}</p>

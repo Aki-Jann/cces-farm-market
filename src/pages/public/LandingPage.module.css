@@ -252,7 +252,7 @@
 
 .story img {
   display: block;
-  height: auto%;
+  height: auto;
   max-height: 380px;
   object-fit: cover;
   width: 100%;

@@ -13,9 +13,9 @@
   box-shadow: 0 3px 5px rgb(0 0 0 / 10%);
   display: flex;
   flex-direction: column;
-  gap: 25px;
+  gap: 15px;
   padding: 30px;
-  width: min(640px, 100%);
+  width: 28em;
 }
 
 .authLogo {
@@ -31,21 +31,21 @@
 
 .authHeading h1 {
   color: #017632;
-  font-size: 44px;
+  font-size: 1.75rem;
   line-height: 1.05;
   margin: 0;
 }
 
 .authHeading p {
-  font-size: 20px;
-  margin: 4px 0 0;
+  font-size: 1rem;
+  margin: 0.25rem 0 0;
 }
 
 .authFields,
 .passwordGroup {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
 }
 
 .passwordGroup {
@@ -55,13 +55,13 @@
 .field {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 10px;
   width: 100%;
 }
 
 .field > span {
   color: #017632;
-  font-size: 25px;
+  font-size: 0.875rem;
   font-weight: 600;
 }
 
@@ -70,10 +70,10 @@
   border: 0;
   border-radius: 5px;
   color: #191919;
-  font-size: 24px;
-  min-height: 49px;
-  outline: 2px solid transparent;
-  padding: 14px 20px;
+  font-size: 1rem;
+  min-height: 30px;
+  outline: 1px solid transparent;
+  padding: 10px;
   width: 100%;
 }
 
@@ -83,17 +83,25 @@
 }
 
 .field input:focus {
-  outline-color: #8ccca1;
+  outline-color: #017632;
 }
 
 .fieldError,
 .registrationError {
   color: #b42318;
-  font-size: 14px;
+  font-size: 0.875rem;
+  line-height: 1.25;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .fieldError {
-  margin: -3px 0 0;
+  margin: -6px 0 0;
+}
+
+.registrationError {
+  margin: 0;
+  width: 100%;
 }
 
 .inlineLink,
@@ -101,27 +109,31 @@
 .switchPrompt a,
 .registerAction a {
   color: #017632;
-  font-size: 16px;
+  font-size: 0.875rem;
   text-decoration: none;
 }
 
 .inlineLink {
-  padding: 0 9px;
+  padding: 0 10px;
 }
 
 .submitButton {
-  background: #cce9d5;
+  background: #017632;
   border: 0;
   border-radius: 5px;
-  color: #017632;
+  color: #fff;
   cursor: pointer;
-  font-size: 16px;
-  padding: 10px 20px;
+  font-size: 1rem;
+  padding: 10px;
 }
 
-.submitButton:hover,
+.submitButton:hover {
+  background-color: #015c27;
+}
+
 .registerAction a:hover,
 .backLink:hover,
+.switchPrompt a:hover,
 .inlineLink:hover {
   text-decoration: underline;
 }
@@ -129,7 +141,7 @@
 .switchPrompt,
 .backLink {
   align-self: center;
-  font-size: 16px;
+  font-size: 0.875rem;
   margin: -2px 0 0;
 }
 
@@ -249,7 +261,7 @@
 }
 
 .registerAction .registrationError {
-  margin: 0 0 8px;
+  margin: 0;
   position: static;
   text-align: center;
   white-space: normal;
