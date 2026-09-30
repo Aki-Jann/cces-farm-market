@@ -118,9 +118,17 @@ export function MessagesPage() {
     <main className={styles.page}>
       <CustomerSidebar active="messages" />
       <section className={styles.content}>
-        <Header title="MESSAGE" />
+        <Header title="MESSAGE" className={styles.pageHeader} />
         <div className={styles.messaging}>
           <section className={styles.chat} aria-label="Conversation with GreenMarket">
+            <div className={styles.conversationHeader}>
+              <div className={styles.conversationAvatar} aria-hidden="true">G</div>
+              <div className={styles.conversationIdentity}>
+                <strong>GreenMarket</strong>
+                <span>Seller conversation</span>
+              </div>
+              <span className={styles.sellerBadge}>SELLER</span>
+            </div>
             <div
               className={styles.messageList}
               onScroll={(event) => {
@@ -129,18 +137,31 @@ export function MessagesPage() {
               }}
               ref={messageListRef}
             >
-              {isLoading ? <p>Loading messages...</p> : error && messages.length === 0 ? <p role="alert">{error}</p> : messages.map((message) => (
+              {isLoading ? (
+                <p className={styles.listNotice}>Loading messages...</p>
+              ) : error && messages.length === 0 ? (
+                <p className={styles.listNotice} role="alert">{error}</p>
+              ) : messages.length === 0 ? (
+                <div className={styles.emptyConversation}>
+                  <strong>No messages yet</strong>
+                  <span>Your conversation with GreenMarket will appear here.</span>
+                </div>
+              ) : messages.map((message) => (
                 <article className={`${styles.message} ${message.sender === 'customer' ? styles.outgoing : styles.incoming}`} key={message.id}>
+                  <span className={styles.senderLabel}>{message.sender === 'customer' ? 'You' : 'GreenMarket'}</span>
                   <p>{message.text}</p>
                   <time>{message.timestamp}</time>
                 </article>
               ))}
             </div>
+            {error && messages.length > 0 && <p className={styles.sendError} role="alert">{error}</p>}
             <form className={styles.composer} onSubmit={sendMessage}>
-              <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Message..." aria-label="Message" />
-              <button disabled={isSending} type="submit">SEND</button>
+              <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Write a message..." aria-label="Message" />
+              <button disabled={isSending || !draft.trim()} type="submit">
+                <span>{isSending ? 'SENDING' : 'SEND'}</span>
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
+              </button>
             </form>
-            {error && messages.length > 0 && <p role="alert">{error}</p>}
           </section>
         </div>
       </section>
