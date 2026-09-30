@@ -1,6 +1,6 @@
 import { BrandLogo } from '../../components/common/BrandLogo'
 import styles from './LandingPage.module.css'
-import heroImage from '../../assets/landing-hero.png'
+import heroImage from '../../assets/landing-temp.png'
 import appleImage from '../../assets/apple.png'
 import pepperImage from '../../assets/bell-pepper.png'
 import cornImage from '../../assets/corn.png'
@@ -16,9 +16,9 @@ const products = [
 
 export function LandingPage() {
   return (
-    <main className={styles.landing}>
+    <main className={styles.landing} id="top">
       <header className={styles.header}>
-        <a href="#/" aria-label="GreenMarket home"><BrandLogo compact /></a>
+        <a href="#top" aria-label="GreenMarket home"><BrandLogo compact /></a>
         <nav>
           <a href="#shops">SHOP</a>
           <a href="#about">ABOUT</a>
@@ -71,7 +71,16 @@ export function LandingPage() {
         <button type="button" onClick={() => { window.location.hash = '/login' }}>ORDER DIRECTLY FROM US</button>
       </section>
 
-      <footer><BrandLogo compact /><span>cces@adzu.edu.ph</span><span>+63 992 091 8674</span><span>Ateneo de Zamboanga University, La Purisima St., Zamboanga City 7000, Philippines</span></footer>
-    </main>
+      <footer>
+        <div className={styles.logo}>
+          <BrandLogo compact />
+        </div>
+        <div className={styles.details}>
+          <span>cces@adzu.edu.ph</span>
+          <span>+63 992 091 8674</span>
+          <span>Ateneo de Zamboanga University, La Purisima St., Zamboanga City 7000, Philippines</span>
+        </div>
+      </footer>
+    </main> 
   )
 }

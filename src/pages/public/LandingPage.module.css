@@ -1,14 +1,23 @@
 .landing {
   color: #191919;
-  overflow: hidden;
+  overflow-x: clip;
+}
+
+:global(html) {
+  scroll-behavior: smooth;
 }
 
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   align-items: center;
   display: flex;
-  height: 120px;
+  height: auto;
   justify-content: space-between;
-  padding: 0 30px;
+  padding: 15px;
+  background: #fff;
+  box-shadow: 0 3px 5px rgb(0 0 0 / 10%);
 }
 
 .header a {
@@ -18,13 +27,19 @@
 .header nav {
   align-items: center;
   display: flex;
-  gap: 20px;
+  gap: clamp(0.125rem, 1.5vw, 0.5rem);
 }
 
 .header nav a {
+  border-radius: 5px;
   color: #017632;
-  font-size: 12px;
-  padding: 9px 14px;
+  font-size: 0.75rem;
+  padding: 10px 20px;
+  transition: background-color 160ms ease;
+}
+
+.header nav a:hover {
+  background-color: #cce9d5;
 }
 
 .header .loginLink {
@@ -34,8 +49,12 @@
   font-weight: 700;
 }
 
+.header .loginLink:hover {
+  background-color: #015c27;
+}
+
 .hero {
-  height: 904px;
+  height: calc(100vh - 70px);
   position: relative;
 }
 
@@ -47,34 +66,34 @@
 
 .hero h1 {
   color: #fff;
-  font-size: clamp(44px, 6.25vw, 90px);
-  left: 30px;
+  font-size: clamp(2.75rem, 6vw, 5.625rem);
+  left: 4vw;
   line-height: 1.05;
   margin: 0;
   position: absolute;
-  text-shadow: 0 3px 10px rgb(0 0 0 / 10%);
-  top: 140px;
+  text-shadow: 0 3px 10px rgb(0 0 0 / 80%);
+  top: 4vw;
 }
 
 .heroCard {
   background: #fff;
   border-radius: 10px;
-  bottom: 45px;
+  bottom: 4vw;
   box-shadow: 0 3px 5px rgb(0 0 0 / 10%);
-  max-width: 650px;
+  max-width: 500px;
   padding: 20px;
   position: absolute;
-  right: 5.5%;
+  right: 4vw;
 }
 
 .heroCard p {
-  font-size: 25px;
-  margin: 0 0 22px;
+  font-size: 1.25rem;
+  margin: 0 0 10px;
 }
 
 .heroBenefits {
   display: flex;
-  font-size: 20px;
+  font-size: 0.875rem;
   justify-content: space-between;
   margin-bottom: 18px;
 }
@@ -90,11 +109,15 @@
   border-radius: 5px;
   color: #fff;
   display: block;
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 700;
-  padding: 9px 20px;
+  padding: 10px;
   text-align: center;
   text-decoration: none;
+}
+
+.heroCard a:hover, .story button:hover {
+  background-color: #015c27;
 }
 
 .promise {
@@ -105,65 +128,75 @@
 }
 
 .promise span {
-  font-size: 16px;
+  font-size: 1rem;
   font-weight: 600;
 }
 
 .promise small {
-  font-size: 14px;
+  font-size: 0.75rem;
   font-weight: 400;
 }
 
 .products {
   background: #cce9d5;
-  padding: 70px 20px 40px;
+  padding: 70px 8% 70px;
+  height: auto;
+  scroll-margin-top: 5rem;
 }
 
 .products h2,
 .story h2 {
   color: #017632;
-  font-size: clamp(30px, 4.1vw, 60px);
+  font-size: clamp(30px, 4.1vw, 50px);
   line-height: 1.2;
-  margin: -18px auto 58px;
+  margin: 20px 0 40px;
   text-align: center;
 }
 
 .productGrid {
   display: grid;
-  gap: 17px;
-  grid-template-columns: repeat(4, minmax(0, 260px));
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   justify-content: center;
 }
 
 .productCard {
   background: #fff;
-  border-radius: 9px;
+  border-radius: 10px;
   box-shadow: 0 2px 5px rgb(0 0 0 / 10%);
   display: flex;
   flex-direction: column;
-  gap: 9px;
-  padding: 17px;
+  gap: 1em;
+  min-width: 0;
+  padding: 1em;
 }
 
 .productCard > img {
-  border-radius: 4px;
-  height: 174px;
+  align-self: center;
+  aspect-ratio: 1;
+  border-radius: 5px;
+  height: auto;
+  max-width: 15rem;
   object-fit: cover;
   width: 100%;
 }
 
 .productInfo {
   display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
   justify-content: space-between;
 }
 
 .productInfo div {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .productInfo strong {
-  font-size: 17px;
+  font-size: 16px;
 }
 
 .productInfo small {
@@ -177,7 +210,7 @@
 
 .productInfo .price strong {
   color: #017632;
-  font-size: 28px;
+  font-size: 1.75rem;
 }
 
 .productInfo .price small {
@@ -191,12 +224,20 @@
   color: #017632;
   cursor: pointer;
   font-size: 14px;
-  padding: 9px;
+  overflow-wrap: anywhere;
+  padding: 0.5625rem;
+  white-space: normal;
+}
+
+.productCard button:hover {
+  background-color: #b3e0c7;
+  font-weight: 700;
 }
 
 .story {
-  padding: 75px 0 35px;
+  padding: 4.6875rem 0;
   text-align: center;
+  scroll-margin-top: 5rem;
 }
 
 .story h2 {
@@ -211,36 +252,48 @@
 
 .story img {
   display: block;
-  height: auto;
+  height: auto%;
   max-height: 380px;
   object-fit: cover;
   width: 100%;
 }
 
 .storyText {
-  font-size: 16px;
+  font-size: 1rem;
   line-height: 1.35;
-  margin: 18px auto 14px;
-  max-width: 900px;
+  margin: 20px auto;
+  max-width: 90%;
+  
 }
 
 .story button {
   cursor: pointer;
   display: inline-block;
-  font-size: 13px;
+  font-size: 16px;
 }
 
 footer {
-  align-items: center;
-  color: #017632;
   display: flex;
-  font-size: 11px;
-  gap: 20px;
-  padding: 20px;
+  align-items: center;
+  padding: clamp(1rem, 2vw, 2rem);
 }
 
 footer .logo {
   margin-right: auto;
+}
+
+footer .details {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+  gap: 1rem;
+  text-align: right;
+}
+
+footer span {
+  color: #017632;
+  font-size: 0.875rem;
 }
 
 @media (max-width: 760px) {
@@ -252,10 +305,6 @@ footer .logo {
   .header .logo {
     transform: scale(.72);
     transform-origin: left center;
-  }
-
-  .header nav {
-    gap: 0;
   }
 
   .header nav a {
@@ -313,16 +362,12 @@ footer .logo {
     margin-bottom: 30px;
   }
 
-  .productGrid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .productCard {
     padding: 9px;
   }
 
   .productCard > img {
-    height: 120px;
+    height: auto;
   }
 
   .productInfo strong {
@@ -353,5 +398,10 @@ footer .logo {
     align-items: flex-start;
     flex-direction: column;
     gap: 8px;
+  }
+
+  footer .details {
+    align-self: flex-end;
+    flex-direction: column;
   }
 }
