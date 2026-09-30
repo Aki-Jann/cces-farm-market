@@ -145,16 +145,6 @@
   margin: -2px 0 0;
 }
 
-.forgotCard {
-  gap: 20px;
-  min-height: 320px;
-  padding: 40px 45px 48px;
-}
-
-.forgotCard .authHeading h1 {
-  font-size: 44px;
-}
-
 .backLink {
   margin-top: 6px;
 }
@@ -221,13 +211,11 @@
   }
 
   .authCard,
-  .forgotCard,
   .registerCard {
     padding: 28px 20px;
   }
 
-  .authHeading h1,
-  .forgotCard .authHeading h1 {
+  .authHeading h1 {
     font-size: 34px;
   }
 
