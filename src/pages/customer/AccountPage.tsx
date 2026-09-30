@@ -138,18 +138,18 @@ export function AccountPage() {
   }
 
   if (isLoading) {
-    return <main className={styles.page}><CustomerSidebar active="account" /><section className={styles.content}><Header title="MY ACCOUNT" /><section className={styles.card}><p>Loading account information...</p></section></section></main>
+    return <main className={styles.page}><CustomerSidebar active="account" /><section className={styles.content}><Header title="MY ACCOUNT" className={styles.pageHeader} /><section className={styles.card}><p>Loading account information...</p></section></section></main>
   }
 
   if (!account || error) {
-    return <main className={styles.page}><CustomerSidebar active="account" /><section className={styles.content}><Header title="MY ACCOUNT" /><section className={styles.card}><p role="alert">{error || 'Account information is unavailable.'}</p></section></section></main>
+    return <main className={styles.page}><CustomerSidebar active="account" /><section className={styles.content}><Header title="MY ACCOUNT" className={styles.pageHeader} /><section className={styles.card}><p role="alert">{error || 'Account information is unavailable.'}</p></section></section></main>
   }
 
   return (
     <main className={styles.page}>
       <CustomerSidebar active="account" />
       <section className={styles.content}>
-        <Header title="MY ACCOUNT" />
+        <Header title="MY ACCOUNT" className={styles.pageHeader} />
         <section className={styles.card}>
           <div className={styles.profileHeader}>
             <div className={styles.avatar}>{accountName(account).charAt(0)}</div>
@@ -157,8 +157,11 @@ export function AccountPage() {
             <a href="#/" className={styles.logout}>LOG OUT</a>
           </div>
           <div className={styles.sectionHeading}>
-            <strong>Personal Information</strong>
-            {!editing && <button type="button" onClick={() => { setDraft(account); setEditing(true) }}>EDIT INFO</button>}
+            <div>
+              <h3>Personal information</h3>
+              <p>Manage the details associated with your account.</p>
+            </div>
+            {!editing && <button type="button" onClick={() => { setDraft(account); setEditing(true) }}>EDIT PROFILE</button>}
           </div>
           {editing ? (
             <form className={styles.form} onSubmit={save}>
@@ -167,7 +170,7 @@ export function AccountPage() {
               <label>Email Address<input type="email" value={draft?.email ?? ''} onChange={(event) => updateField('email', event.target.value)} /></label>
               <label>Contact Number<input value={draft?.contact ?? ''} onChange={(event) => updateField('contact', event.target.value)} /></label>
               <label>Address<input value={draft?.address ?? ''} onChange={(event) => updateField('address', event.target.value)} /></label>
-              <div className={styles.actions}><button disabled={isSaving} type="button" onClick={() => setEditing(false)}>CANCEL</button><button disabled={isSaving} type="submit">{isSaving ? 'SAVING...' : 'SAVE'}</button></div>
+              <div className={styles.actions}><button disabled={isSaving} type="button" onClick={() => setEditing(false)}>CANCEL</button><button disabled={isSaving} type="submit">{isSaving ? 'SAVING...' : 'SAVE CHANGES'}</button></div>
             </form>
           ) : (
             <dl className={styles.details}>
