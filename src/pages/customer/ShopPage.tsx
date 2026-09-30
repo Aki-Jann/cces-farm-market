@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { collection, doc, getDoc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore'
+import { deleteObject, getDownloadURL, ref, uploadBytes, type StorageReference } from 'firebase/storage'
 import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
+import { storage } from '../../firebase/storage'
 import { productImages, resolveProductImage } from '../../utils/productImages'
 import styles from './ShopPage.module.css'
 
@@ -22,8 +24,15 @@ type Product = {
 }
 
 type CartItem = Product & { quantity: number }
+type FulfillmentType = 'delivery' | 'pickup'
+type CheckoutDetails = {
+  fulfillmentType: FulfillmentType
+  sellerNotes: string
+  receiptFile: File | null
+}
 
 const categories: Category[] = ['All', 'Vegetables', 'Fruits', 'Grains', 'Flowers']
+const temporaryPickupAddress = 'Temporary farmer pickup address - exact location to be confirmed with the seller.'
 const localImages: Record<string, string> = {
   APPLE: productImages['shop-apple.png'],
   BANANA: productImages['shop-banana.png'],
@@ -40,6 +49,24 @@ function currency(value: number) {
   return `₱${value.toFixed(2)}`
 }
 
+function readSavedCart(userId: string): Record<string, number> {
+  try {
+    const storedCart = localStorage.getItem(`cces-farm-market-cart:${userId}`)
+    if (!storedCart) return {}
+
+    const parsedCart: unknown = JSON.parse(storedCart)
+    if (typeof parsedCart !== 'object' || parsedCart === null || Array.isArray(parsedCart)) return {}
+
+    return Object.fromEntries(
+      Object.entries(parsedCart).filter(([, quantity]) =>
+        typeof quantity === 'number' && Number.isInteger(quantity) && quantity > 0
+      )
+    )
+  } catch {
+    return {}
+  }
+}
+
 function ProductCard({
   product,
   quantity,
@@ -51,8 +78,33 @@ function ProductCard({
   onAdd: () => void
   onChange: (quantity: number) => void
 }) {
+  const [quantityInput, setQuantityInput] = useState(String(quantity))
+  const canAddProduct = product.isAvailable && product.stock > 0
+
+  useEffect(() => {
+    setQuantityInput(String(quantity))
+  }, [quantity])
+
+  function commitQuantity() {
+    const parsedQuantity = Number(quantityInput)
+    if (quantityInput.trim() === '' || !Number.isFinite(parsedQuantity)) {
+      setQuantityInput(String(quantity))
+      return
+    }
+
+    const nextQuantity = Math.max(Math.floor(parsedQuantity), 0)
+    onChange(nextQuantity)
+    setQuantityInput(String(Math.min(nextQuantity, product.stock)))
+  }
+
   return (
-    <article className={`${styles.productCard} ${quantity > 0 ? styles.selected : ''}`}>
+    <article
+      className={`${styles.productCard} ${quantity > 0 ? styles.selected : ''} ${canAddProduct ? styles.clickable : ''}`}
+      onClick={(event) => {
+        if (event.target instanceof Element && event.target.closest('button, input')) return
+        if (canAddProduct) onChange(Math.min(quantity + 1, product.stock))
+      }}
+    >
       <img src={product.image} alt={product.name} />
       <div className={styles.productMeta}>
         <div>
@@ -67,8 +119,29 @@ function ProductCard({
       {quantity > 0 ? (
         <div className={styles.quantityControl}>
           <button type="button" aria-label={`Remove one ${product.name}`} onClick={() => onChange(quantity - 1)}>-</button>
-          <span>{quantity}</span>
-          <button type="button" aria-label={`Add one ${product.name}`} onClick={() => onChange(quantity + 1)}>+</button>
+          <input
+            type="number"
+            aria-label={`${product.name} quantity`}
+            min={0}
+            max={product.stock}
+            step={1}
+            inputMode="numeric"
+            value={quantityInput}
+            onChange={(event) => setQuantityInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                event.currentTarget.blur()
+              }
+            }}
+            onBlur={commitQuantity}
+          />
+          <button
+            type="button"
+            aria-label={`Add one ${product.name}`}
+            disabled={quantity >= product.stock}
+            onClick={() => onChange(quantity + 1)}
+          >+</button>
         </div>
       ) : product.stock <= 0 ? (
         <button type="button" className={styles.addButton} disabled>OUT OF STOCK</button>
@@ -84,45 +157,178 @@ function ProductCard({
 function Cart({
   items,
   onChange,
+  onClearAll,
+  address,
+  onAddressChange,
   paymentMethod,
   onPaymentChange,
   onPlaceOrder,
+  onEmptyCartAttempt,
+  onAddressError,
   orderMessage,
+  addressError,
   isCheckingOut,
 }: {
   items: CartItem[]
   onChange: (id: string, quantity: number) => void
+  onClearAll: () => void
+  address: string
+  onAddressChange: (address: string) => void
   paymentMethod: 'COD' | 'GCASH' | 'MAYA'
   onPaymentChange: (method: 'COD' | 'GCASH' | 'MAYA') => void
-  onPlaceOrder: () => void
+  onPlaceOrder: (details: CheckoutDetails) => void
+  onEmptyCartAttempt: () => void
+  onAddressError: (message: string) => void
   orderMessage: string
+  addressError: string
   isCheckingOut: boolean
 }) {
+  const [isEditingAddress, setIsEditingAddress] = useState(false)
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
+  const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>('delivery')
+  const [sellerNotes, setSellerNotes] = useState('')
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [receiptError, setReceiptError] = useState('')
+  const [revealedItemId, setRevealedItemId] = useState<string | null>(null)
+  const cartItemPointerStart = useRef<{ x: number; y: number } | null>(null)
+  const didSwipeCartItem = useRef(false)
   const subtotal = items.reduce((sum, item) => sum + item.quantity * item.price, 0)
   const delivery = subtotal > 0 ? 100 : 0
   const tax = subtotal * 0.05
   const total = subtotal + delivery + tax
 
+  function openCheckout() {
+    if (fulfillmentType === 'delivery' && !address.trim()) {
+      onAddressError('Delivery address is required.')
+      setIsEditingAddress(true)
+      return
+    }
+    onAddressError('')
+    setReceiptError('')
+    setIsCheckoutOpen(true)
+  }
+
+  function submitCheckout() {
+    if (fulfillmentType === 'delivery' && !address.trim()) {
+      onAddressError('Delivery address is required.')
+      setIsCheckoutOpen(false)
+      setIsEditingAddress(true)
+      return
+    }
+    if (paymentMethod !== 'COD' && !receiptFile) {
+      setReceiptError('Upload a screenshot of your payment receipt to continue.')
+      return
+    }
+    onPlaceOrder({ fulfillmentType, sellerNotes: sellerNotes.trim(), receiptFile })
+  }
+
   return (
     <aside className={styles.cart}>
       <div className={styles.cartHeading}>
-        <h1>Cart</h1>
-        <p>Address Here</p>
+        <div className={styles.cartHeadingTitle}>
+          <h1>My Cart</h1>
+          {items.length > 0 && <button type="button" className={styles.clearCartButton} onClick={onClearAll}>CLEAR CART</button>}
+        </div>
+        <div className={styles.deliveryAddress}>
+          {isEditingAddress ? (
+            <div className={styles.addressEditGroup}>
+              <div className={styles.addressEditor}>
+                <input
+                  autoFocus
+                  type="text"
+                  aria-label="Delivery address"
+                  aria-invalid={Boolean(addressError)}
+                  aria-describedby={addressError ? 'delivery-address-error' : undefined}
+                  value={address}
+                  onChange={(event) => onAddressChange(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      if (address.trim()) setIsEditingAddress(false)
+                    }
+                  }}
+                  placeholder="Enter delivery address"
+                />
+                <button type="button" aria-label="Save delivery address" onClick={() => {
+                  if (address.trim()) setIsEditingAddress(false)
+                }}>
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6" /></svg>
+                </button>
+              </div>
+              {addressError && <p className={styles.addressError} id="delivery-address-error" role="alert">{addressError}</p>}
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={styles.addressText}
+                aria-label="Edit delivery address"
+                onClick={() => setIsEditingAddress(true)}
+              >
+                {address || 'Add delivery address'}
+              </button>
+              <button type="button" aria-label="Edit delivery address" onClick={() => setIsEditingAddress(true)}>
+                <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z" /></svg>
+              </button>
+            </>
+          )}
+        </div>
       </div>
       <div className={styles.cartItems}>
         {items.length === 0 ? (
           <p className={styles.emptyCart}>Your cart is empty.</p>
         ) : items.map((item) => (
-          <div className={styles.cartItem} key={item.id}>
-            <img src={item.image} alt="" />
-            <div>
-              <strong>{item.name}</strong>
-              <span>{currency(item.price)}<small>{item.quantity}x</small></span>
-            </div>
-            <strong>{currency(item.quantity * item.price)}</strong>
-            <div className={styles.cartQuantity}>
-              <button type="button" aria-label={`Remove one ${item.name}`} onClick={() => onChange(item.id, item.quantity - 1)}>-</button>
-              <button type="button" aria-label={`Add one ${item.name}`} onClick={() => onChange(item.id, item.quantity + 1)}>+</button>
+          <div
+            className={`${styles.cartItemShell} ${revealedItemId === item.id ? styles.cartItemShellRevealed : ''}`}
+            key={item.id}
+            onPointerDown={(event) => {
+              cartItemPointerStart.current = { x: event.clientX, y: event.clientY }
+              didSwipeCartItem.current = false
+            }}
+            onPointerUp={(event) => {
+              const start = cartItemPointerStart.current
+              cartItemPointerStart.current = null
+              if (!start) return
+
+              const deltaX = event.clientX - start.x
+              const deltaY = event.clientY - start.y
+              if (Math.abs(deltaX) < 40 || Math.abs(deltaX) < Math.abs(deltaY)) return
+
+              didSwipeCartItem.current = true
+              setRevealedItemId(deltaX < 0 ? item.id : null)
+              window.setTimeout(() => { didSwipeCartItem.current = false }, 0)
+            }}
+            onPointerCancel={() => { cartItemPointerStart.current = null }}
+            onClick={(event) => {
+              if (didSwipeCartItem.current) return
+              if (event.target instanceof Element && event.target.closest('button')) return
+              setRevealedItemId((current) => current === item.id ? null : item.id)
+            }}
+          >
+            <button
+              type="button"
+              className={styles.cartItemDelete}
+              aria-label={`Remove ${item.name} from cart`}
+              aria-hidden={revealedItemId !== item.id}
+              disabled={revealedItemId !== item.id}
+              onClick={() => {
+                onChange(item.id, 0)
+                setRevealedItemId(null)
+              }}
+            >
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="m19 6-1 14H6L5 6" /><path d="M10 11v5M14 11v5" /></svg>
+            </button>
+            <div className={`${styles.cartItem} ${revealedItemId === item.id ? styles.cartItemPriceShift : ''}`}>
+              <img src={item.image} alt="" />
+              <div>
+                <strong>{item.name}</strong>
+                <span>{currency(item.price)}<small>{item.quantity}x</small></span>
+              </div>
+              <strong>{currency(item.quantity * item.price)}</strong>
+              <div className={styles.cartQuantity}>
+                <button type="button" aria-label={`Remove one ${item.name}`} onClick={() => onChange(item.id, item.quantity - 1)}>-</button>
+                <button type="button" aria-label={`Add one ${item.name}`} onClick={() => onChange(item.id, item.quantity + 1)}>+</button>
+              </div>
             </div>
           </div>
         ))}
@@ -138,9 +344,82 @@ function Cart({
         <div className={styles.paymentOptions}>
           {(['COD', 'GCASH', 'MAYA'] as const).map((method) => <button type="button" className={paymentMethod === method ? styles.activePayment : ''} key={method} onClick={() => onPaymentChange(method)}>{method}</button>)}
         </div>
-        <button type="button" className={styles.placeOrder} disabled={items.length === 0 || isCheckingOut} onClick={onPlaceOrder}>{isCheckingOut ? 'PLACING ORDER...' : 'PLACE ORDER'}</button>
+        <button type="button" className={styles.placeOrder} disabled={isCheckingOut} onClick={() => {
+          if (items.length === 0) {
+            onEmptyCartAttempt()
+            return
+          }
+          openCheckout()
+        }}>PLACE ORDER</button>
         {orderMessage && <p role="status">{orderMessage}</p>}
       </div>
+      {isCheckoutOpen && (
+        <div className={styles.checkoutOverlay} onClick={(event) => {
+          if (event.target === event.currentTarget && !isCheckingOut) setIsCheckoutOpen(false)
+        }}>
+          <section className={styles.checkoutModal} role="dialog" aria-modal="true" aria-labelledby="checkout-title">
+            <div className={styles.checkoutHeader}>
+              <h2 id="checkout-title">Complete your order</h2>
+              <button type="button" aria-label="Close checkout" disabled={isCheckingOut} onClick={() => setIsCheckoutOpen(false)}>×</button>
+            </div>
+            <fieldset className={styles.fulfillmentOptions}>
+              <legend>How would you like to receive your order?</legend>
+              <label className={fulfillmentType === 'delivery' ? styles.optionSelected : ''}>
+                <input type="radio" name="fulfillment" checked={fulfillmentType === 'delivery'} onChange={() => setFulfillmentType('delivery')} />
+                Delivery
+              </label>
+              <label className={fulfillmentType === 'pickup' ? styles.optionSelected : ''}>
+                <input type="radio" name="fulfillment" checked={fulfillmentType === 'pickup'} onChange={() => setFulfillmentType('pickup')} />
+                Pickup
+              </label>
+            </fieldset>
+            <p className={styles.checkoutAddress}>
+              {fulfillmentType === 'delivery' ? `Delivering to: ${address}` : `Pickup at: ${temporaryPickupAddress}`}
+            </p>
+            <label className={styles.sellerNotes}>
+              <span>Note to seller <small>(optional)</small></span>
+              <textarea value={sellerNotes} onChange={(event) => setSellerNotes(event.target.value)} placeholder="Add instructions for the seller" rows={3} />
+            </label>
+            <p className={styles.messagePrompt}>Need to discuss your order? <a href="#/messages">Message the seller</a></p>
+            {paymentMethod !== 'COD' && (
+              <div className={styles.onlinePayment}>
+                <h3>Pay with {paymentMethod === 'GCASH' ? 'GCash' : 'Maya'}</h3>
+                <div className={styles.qrPlaceholder}>
+                  <span>QR</span>
+                  <strong>{paymentMethod === 'GCASH' ? 'GCash' : 'Maya'} QR not configured</strong>
+                  <small>Contact the seller for payment details before paying.</small>
+                </div>
+                <label className={styles.receiptUpload}>
+                  <span>Payment receipt screenshot</span>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null
+                      if (file && file.size > 5 * 1024 * 1024) {
+                        setReceiptFile(null)
+                        setReceiptError('Receipt images must be 5 MB or smaller.')
+                        return
+                      }
+                      setReceiptFile(file)
+                      setReceiptError('')
+                    }}
+                  />
+                </label>
+                {receiptFile && <p className={styles.receiptName}>{receiptFile.name}</p>}
+                {receiptError && <p className={styles.checkoutError} role="alert">{receiptError}</p>}
+              </div>
+            )}
+            {orderMessage && <p className={styles.checkoutError} role="alert">{orderMessage}</p>}
+            <div className={styles.checkoutActions}>
+              <button type="button" disabled={isCheckingOut} onClick={() => setIsCheckoutOpen(false)}>Cancel</button>
+              <button type="button" disabled={isCheckingOut} onClick={submitCheckout}>
+                {isCheckingOut ? 'PLACING ORDER...' : paymentMethod === 'COD' ? 'PLACE ORDER' : 'UPLOAD RECEIPT & PLACE ORDER'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </aside>
   )
 }
@@ -156,9 +435,31 @@ export function ShopPage() {
   const [category, setCategory] = useState<Category>('All')
   const [search, setSearch] = useState('')
   const [quantities, setQuantities] = useState<Record<string, number>>({})
+  const [deliveryAddress, setDeliveryAddress] = useState('')
+  const [addressError, setAddressError] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'GCASH' | 'MAYA'>('COD')
   const [orderMessage, setOrderMessage] = useState('')
+  const [quantityNotice, setQuantityNotice] = useState<{ message: string } | null>(null)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
+  const cartOwnerId = useRef<string | null>(null)
+
+  useEffect(() => {
+    const userId = cartOwnerId.current
+    if (!userId) return
+
+    try {
+      localStorage.setItem(`cces-farm-market-cart:${userId}`, JSON.stringify(quantities))
+    } catch (storageError) {
+      console.error('Saving cart failed:', storageError)
+    }
+  }, [quantities])
+
+  useEffect(() => {
+    if (!quantityNotice) return
+
+    const timeoutId = window.setTimeout(() => setQuantityNotice(null), 2800)
+    return () => window.clearTimeout(timeoutId)
+  }, [quantityNotice])
 
   useEffect(() => {
     let isMounted = true
@@ -173,11 +474,30 @@ export function ShopPage() {
 
       if (!user) {
         if (isMounted) {
+          cartOwnerId.current = null
+          setQuantities({})
+          setDeliveryAddress('')
           setIsLoading(false)
           setError('Please log in to view the shop.')
         }
         return
       }
+
+      cartOwnerId.current = user.uid
+      setQuantities(readSavedCart(user.uid))
+
+      void getDoc(doc(db, 'users', user.uid))
+        .then((profileSnapshot) => {
+          if (!isMounted || auth.currentUser?.uid !== user.uid) return
+          setDeliveryAddress(
+            profileSnapshot.exists() && typeof profileSnapshot.data().address === 'string'
+              ? profileSnapshot.data().address
+              : ''
+          )
+        })
+        .catch((profileError) => {
+          console.error('Loading delivery address failed:', profileError)
+        })
 
       unsubscribeProducts = onSnapshot(
         collection(db, 'products'),
@@ -238,6 +558,15 @@ export function ShopPage() {
   function updateQuantity(id: string, quantity: number) {
     const product = products.find((item) => item.id === id)
     if (!product) return
+    const currentQuantity = quantities[id] ?? 0
+    if (
+      product.isAvailable &&
+      product.stock > 0 &&
+      quantity >= product.stock &&
+      (currentQuantity < product.stock || quantity > product.stock)
+    ) {
+      setQuantityNotice({ message: `Maximum quantity reached for ${product.name}.` })
+    }
     if (quantity > 0 && (!product.isAvailable || product.stock <= 0)) return
 
     setQuantities((current) => {
@@ -248,8 +577,26 @@ export function ShopPage() {
     })
   }
 
-  async function placeOrder() {
+  async function placeOrder({ fulfillmentType, sellerNotes, receiptFile }: CheckoutDetails) {
     if (cartItems.length === 0) return
+    const addressForOrder = fulfillmentType === 'delivery' ? deliveryAddress.trim() : ''
+    if (fulfillmentType === 'delivery' && !addressForOrder) {
+      setAddressError('Delivery address is required.')
+      return
+    }
+    setAddressError('')
+    if (paymentMethod !== 'COD' && !receiptFile) {
+      setOrderMessage('Upload a screenshot of your payment receipt to continue.')
+      return
+    }
+    if (receiptFile && !['image/jpeg', 'image/png', 'image/webp'].includes(receiptFile.type)) {
+      setOrderMessage('Upload a JPG, PNG, or WebP receipt image.')
+      return
+    }
+    if (receiptFile && receiptFile.size > 5 * 1024 * 1024) {
+      setOrderMessage('Receipt images must be 5 MB or smaller.')
+      return
+    }
     const user = auth.currentUser
     if (!user) {
       setOrderMessage('Please log in before placing an order.')
@@ -258,6 +605,7 @@ export function ShopPage() {
 
     setIsCheckingOut(true)
     setOrderMessage('')
+    let uploadedReceiptRef: StorageReference | null = null
 
     try {
       const profileSnapshot = await getDoc(doc(db, 'users', user.uid))
@@ -268,7 +616,7 @@ export function ShopPage() {
 
       const profile = profileSnapshot.data()
       const subtotal = cartItems.reduce((sum, item) => sum + item.quantity * item.price, 0)
-      const deliveryFee = subtotal > 0 ? 100 : 0
+      const deliveryFee = fulfillmentType === 'delivery' && subtotal > 0 ? 100 : 0
       const tax = subtotal * 0.05
       const total = subtotal + deliveryFee + tax
       const items = cartItems.map((item) => ({
@@ -280,6 +628,12 @@ export function ShopPage() {
       }))
 
       const orderRef = doc(collection(db, 'orders'))
+      let paymentReceiptUrl = ''
+      if (receiptFile) {
+        uploadedReceiptRef = ref(storage, `payment-receipts/${user.uid}/${orderRef.id}/${Date.now()}-${receiptFile.name}`)
+        const uploadedReceipt = await uploadBytes(uploadedReceiptRef, receiptFile, { contentType: receiptFile.type })
+        paymentReceiptUrl = await getDownloadURL(uploadedReceipt.ref)
+      }
       const productRefs = cartItems.map((item) => ({
         item,
         ref: doc(db, 'products', item.id),
@@ -317,8 +671,12 @@ export function ShopPage() {
           tax: Number(tax),
           total: Number(total),
           paymentMethod,
+          paymentStatus: paymentMethod === 'COD' ? 'unpaid' : 'awaiting_verification',
           status: 'pending',
-          deliveryAddress: typeof profile.address === 'string' ? profile.address : '',
+          fulfillmentType,
+          deliveryAddress: fulfillmentType === 'pickup' ? temporaryPickupAddress : addressForOrder,
+          sellerNotes,
+          paymentReceiptUrl,
           createdAt: serverTimestamp(),
         })
       })
@@ -327,6 +685,13 @@ export function ShopPage() {
       window.location.hash = '/orders'
     } catch (checkoutError) {
       console.error('Checkout failed:', checkoutError)
+      if (uploadedReceiptRef) {
+        try {
+          await deleteObject(uploadedReceiptRef)
+        } catch (cleanupError) {
+          console.error('Cleaning up unused payment receipt failed:', cleanupError)
+        }
+      }
       if (checkoutError instanceof Error && checkoutError.message === 'PRODUCT_NOT_FOUND') {
         setOrderMessage('One or more products are no longer available.')
       } else if (checkoutError instanceof Error && checkoutError.message === 'INSUFFICIENT_STOCK') {
@@ -368,7 +733,13 @@ export function ShopPage() {
           {!isLoading && !error && visibleProducts.length === 0 && <p className={styles.noResults}>{search.trim() ? 'No products match your search.' : 'No products found.'}</p>}
         </div>
       </section>
-      <Cart items={cartItems} onChange={updateQuantity} paymentMethod={paymentMethod} onPaymentChange={setPaymentMethod} onPlaceOrder={placeOrder} orderMessage={orderMessage} isCheckingOut={isCheckingOut} />
+      <Cart items={cartItems} onChange={updateQuantity} onClearAll={() => setQuantities({})} address={deliveryAddress} onAddressChange={(value) => {
+        setDeliveryAddress(value)
+        if (value.trim()) setAddressError('')
+      }} paymentMethod={paymentMethod} onPaymentChange={setPaymentMethod} onPlaceOrder={placeOrder} onEmptyCartAttempt={() => {
+        setQuantityNotice({ message: 'Add products to your cart before placing an order.' })
+      }} onAddressError={setAddressError} orderMessage={orderMessage} addressError={addressError} isCheckingOut={isCheckingOut} />
+      {quantityNotice && <div className={styles.quantityToast} role="status" aria-live="polite">{quantityNotice.message}</div>}
     </main>
   )
 }

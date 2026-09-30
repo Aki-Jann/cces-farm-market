@@ -3,8 +3,7 @@
   background: #fff;
   box-shadow: 0 3px 5px rgb(0 0 0 / 10%);
   display: flex;
-  gap: 20px;
-  min-height: 90px;
+  gap: 5px;
   padding: 20px;
 }
 
@@ -22,24 +21,23 @@
   border-radius: 53px;
   display: flex;
   flex: 1 1 260px;
-  gap: 8px;
-  height: 50px;
+  gap: 5px;
+  height: auto;
   min-width: 0;
-  padding: 0 20px;
+  padding: 10px 20px;
 }
 
-.search span {
+.search svg {
   color: #6c7175;
   flex: 0 0 auto;
-  font-size: 28px;
-  line-height: 1;
+  font-size: 2rem;
 }
 
 .search input {
   background: transparent;
   border: 0;
   color: #191919;
-  font-size: 20px;
+  font-size: 1rem;
   min-width: 0;
   outline: 0;
   width: 100%;
@@ -67,6 +65,7 @@
   font-size: 16px;
   padding: 9px 12px;
   text-decoration: none;
+  transition: background-color 160ms ease, color 160ms ease;
   white-space: nowrap;
 }
 
@@ -81,6 +80,12 @@
   background: #017632;
   color: #fff;
   font-weight: 700;
+}
+
+.actions :where(button, a)[aria-current='page']:hover,
+.actions :where(button, a).active:hover {
+  background: #015c27;
+  color: #fff;
 }
 
 .stacked {

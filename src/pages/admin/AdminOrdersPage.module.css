@@ -35,6 +35,11 @@
 .timelineStep.reached { color: #017632; }
 .timelineStep.reached span { background: #017632; color: #fff; }
 .timelineStep.reached i { border-color: #017632; }
+.orderExtras { display: flex; flex-direction: column; gap: 7px; padding: 0 14px 16px; }
+.orderExtras p { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; }
+.orderExtras p strong { flex: 0 0 125px; font-size: 13px; }
+.orderExtras p span { color: #6c7175; flex: 1; font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
+.orderExtras a { align-self: flex-start; color: #017632; font-size: 13px; font-weight: 700; }
 .items { background: #cce9d5; padding: 10px 14px; }
 .itemRow { border-bottom: 1px solid #6c7175; display: grid; gap: 10px; grid-template-columns: 2fr 1fr 1fr 1.2fr; padding: 9px 0; }
 .itemRow span:nth-child(n+2), .itemRow strong:last-child { text-align: right; }

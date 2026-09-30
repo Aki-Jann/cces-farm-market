@@ -19,7 +19,10 @@ type Order = {
   deliveryFee: number
   tax: number
   total: number
+  fulfillmentType: 'delivery' | 'pickup'
   address: string
+  sellerNotes: string
+  paymentReceiptUrl: string
   items: OrderItem[]
 }
 
@@ -79,6 +82,15 @@ function OrderDetails({ order, onAdvance, onBack, isUpdating }: { order: Order; 
         <StatusBadge status={order.status} />
       </div>
       <StatusTimeline status={order.status} />
+      <div className={styles.orderExtras}>
+        <p><strong>Fulfillment</strong><span>{order.fulfillmentType === 'pickup' ? 'Pickup' : 'Delivery'}</span></p>
+          <p>
+            <strong>{order.fulfillmentType === 'pickup' ? 'Pickup location' : 'Address'}</strong>
+            <span>{order.address || (order.fulfillmentType === 'pickup' ? 'Temporary farmer pickup address - exact location to be confirmed with the seller.' : 'Not provided')}</span>
+          </p>
+        {order.sellerNotes && <p><strong>Note to seller</strong><span>{order.sellerNotes}</span></p>}
+        {order.paymentReceiptUrl && <a href={order.paymentReceiptUrl} target="_blank" rel="noreferrer">View payment receipt</a>}
+      </div>
       <div className={styles.items}>
         {order.items.map((item) => <div className={styles.itemRow} key={item.name}><span>{item.name}</span><span>{item.quantity}kg</span><span>{currency(item.price)}</span><strong>{currency(item.quantity * item.price)}</strong></div>)}
         <div className={styles.itemRow}><span>DELIVERY FEE</span><span>-</span><span>{currency(delivery)}</span><strong>{currency(delivery)}</strong></div>
@@ -150,7 +162,10 @@ export function AdminOrdersPage() {
             deliveryFee: typeof data.deliveryFee === 'number' ? data.deliveryFee : 0,
             tax: typeof data.tax === 'number' ? data.tax : 0,
             total: typeof data.total === 'number' ? data.total : 0,
+            fulfillmentType: data.fulfillmentType === 'pickup' ? 'pickup' : 'delivery',
             address: typeof data.deliveryAddress === 'string' ? data.deliveryAddress : '',
+            sellerNotes: typeof data.sellerNotes === 'string' ? data.sellerNotes : '',
+            paymentReceiptUrl: typeof data.paymentReceiptUrl === 'string' ? data.paymentReceiptUrl : '',
             items: items.flatMap((item) => {
               if (!item || typeof item !== 'object') return []
               const itemData = item as Record<string, unknown>
