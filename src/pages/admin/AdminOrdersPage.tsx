@@ -141,7 +141,7 @@ export function AdminOrdersPage() {
     const unsubscribe = onSnapshot(
       collection(db, 'orders'),
       (snapshot) => {
-        const loadedOrders = snapshot.docs.map((orderDocument) => {
+        const loadedOrders: Order[] = snapshot.docs.map((orderDocument) => {
           const data = orderDocument.data()
           const rawStatus = typeof data.status === 'string' ? data.status.toUpperCase() : 'PENDING'
           const status = statusOrder.includes(rawStatus as OrderStatus) ? rawStatus as OrderStatus : 'PENDING'
