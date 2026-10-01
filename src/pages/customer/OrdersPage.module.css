@@ -24,12 +24,6 @@
 .sidebar .activeNav { background: #017632; color: #fff; font-weight: 700; }
 
 .ordersContent { flex: 1; min-width: 0; }
-.header { align-items: center; background: #fff; box-shadow: 0 3px 5px rgb(0 0 0 / 10%); display: flex; gap: 20px; padding: 20px; }
-.header h1 { color: #017632; font-size: 48px; margin: 0; }
-.search { align-items: center; background: #f5f5f5; border-radius: 53px; display: flex; flex: 1; gap: 10px; height: 50px; padding: 0 20px; }
-.search span { color: #6c7175; font-size: 28px; }
-.search input { background: transparent; border: 0; font-size: 24px; outline: 0; width: 100%; }
-
 .orderPanel { background: #fff; margin: 31px 30px; min-height: calc(100vh - 150px); padding: 31px 14px; }
 .tableHeader, .orderRow { align-items: center; display: grid; gap: 12px; grid-template-columns: 1.4fr 1fr 1fr 1fr 1.2fr; text-align: center; }
 .tableHeader { border-bottom: 1px solid #d9d9d9; color: #6c7175; font-size: 12px; font-weight: 700; padding: 0 16px 14px; text-transform: uppercase; }
@@ -46,6 +40,14 @@
 .emptyState { align-items: center; background: #cce9d5; border-radius: 10px; box-shadow: 0 3px 5px rgb(0 0 0 / 10%); display: flex; flex-direction: column; gap: 20px; margin: 200px auto; padding: 50px; width: 210px; }
 .emptyState strong { font-size: 22px; white-space: nowrap; }
 .emptyState a { background: #017632; border-radius: 5px; color: #fff; font-size: 14px; font-weight: 700; padding: 9px 25px; text-decoration: none; }
+.noMatches { background: transparent; border-radius: 0; box-shadow: none; gap: 14px; margin: 32px auto; max-width: 460px; min-height: 280px; padding: 28px 20px; text-align: center; width: 100%; }
+.noMatches strong { color: #191919; font-size: 20px; white-space: normal; }
+.emptyIcon { align-items: center; background: #eaf5ed; border-radius: 50%; color: #017632; display: flex; flex: 0 0 56px; height: 56px; justify-content: center; width: 56px; }
+.emptyIcon svg { fill: none; height: 25px; stroke: currentColor; stroke-linecap: round; stroke-width: 1.8; width: 25px; }
+.emptyCopy p { color: #6c7175; font-size: 14px; line-height: 1.5; margin: 0; overflow-wrap: anywhere; }
+.clearSearchButton { background: #017632; border: 0; border-radius: 5px; color: #fff; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; min-height: 40px; padding: 9px 16px; }
+.clearSearchButton:hover { background: #015c27; }
+.clearSearchButton:focus-visible { outline: 2px solid #017632; outline-offset: 3px; }
 
 .details { background: #f7faf8; border-top: 1px solid #e2e7e3; padding: 18px; }
 .detailsHeading { align-items: center; display: flex; justify-content: space-between; margin-bottom: 14px; }
@@ -77,9 +79,6 @@
   .sidebar .logo, .rule { display: none; }
   .sidebar a { font-size: 11px; margin: 0; padding: 8px; }
   .sidebar > a { margin-left: auto; }
-  .header h1 { font-size: 30px; }
-  .header { padding: 12px; }
-  .search input { font-size: 16px; }
   .orderPanel { margin: 12px 6px; padding: 16px 8px; }
   .tableHeader { display: none; }
   .orderRow { gap: 8px 10px; grid-template-areas: 'id status total' 'date payment payment'; grid-template-columns: minmax(0, 1fr) auto auto; padding: 12px; text-align: left; }
@@ -92,4 +91,5 @@
   .detailHeader, .detailRow { gap: 6px; grid-template-columns: minmax(0, 1.5fr) minmax(42px, .8fr) minmax(65px, 1fr) minmax(72px, 1.1fr); font-size: 11px; }
   .detailHeader { font-size: 9px; }
   .emptyState { margin: 150px auto; }
+  .noMatches { margin: 12px auto; min-height: 260px; padding: 24px 12px; width: 100%; }
 }

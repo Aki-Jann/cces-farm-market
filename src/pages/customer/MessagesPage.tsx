@@ -118,7 +118,7 @@ export function MessagesPage() {
     <main className={styles.page}>
       <CustomerSidebar active="messages" />
       <section className={styles.content}>
-        <Header title="MESSAGE" className={styles.pageHeader} />
+        <Header title="MESSAGE" />
         <div className={styles.messaging}>
           <section className={styles.chat} aria-label="Conversation with GreenMarket">
             <div className={styles.conversationHeader}>

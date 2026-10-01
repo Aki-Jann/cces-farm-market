@@ -48,43 +48,10 @@
   min-width: 0;
 }
 
-.catalogHeader {
-  background: #fff;
-  box-shadow: 0 2px 5px rgb(0 0 0 / 10%);
-  padding: 20px 30px;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-.search {
-  align-items: center;
-  background: #f5f5f5;
-  border-radius: 53px;
-  display: flex;
-  gap: 10px;
-  height: auto;
-  padding: 0 17px;
-}
-
-.search span {
-  color: #6c7175;
-  font-size: 25px;
-}
-
-.search input {
-  background: transparent;
-  border: 0;
-  color: #191919;
-  font-size: 20px;
-  outline: 0;
-  width: 100%;
-}
-
 .categories {
   display: flex;
-  gap: 17px;
-  margin-top: 13px;
+  gap: 5px;
+  margin-top: 5px;
 }
 
 .categories button{
@@ -148,6 +115,16 @@
 
 .productCard.clickable:hover {
   border-color: #017632;
+}
+
+.productCard.outOfStock {
+  cursor: not-allowed;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.productCard.outOfStock:hover {
+  background: #fff7f6;
+  border-color: #b42318;
 }
 
 .productCard > img {
@@ -230,6 +207,13 @@
   background: #b3e0c4;
 }
 
+.outOfStockButton,
+.outOfStockButton:hover {
+  background: #e5e7eb;
+  color: #6c7175;
+  cursor: not-allowed;
+}
+
 .cartQuantity button {
   background: #cce9d5;
   border: 0;
@@ -289,13 +273,13 @@
 
 .cartHeading {
   border-bottom: 2px solid #017632;
-  padding: 20px;
+  padding: 14px 20px;
 }
 
 .cartHeadingTitle {
   align-items: center;
   display: flex;
-  gap: 10px;
+  gap: 5px;
   justify-content: space-between;
 }
 
@@ -412,9 +396,51 @@
 }
 
 .emptyCart {
+  align-items: center;
   color: #6c7175;
+  display: flex;
+  flex-direction: column;
   font-size: 14px;
+  gap: 8px;
+  justify-content: center;
+  margin: 0;
+  min-height: 100%;
   text-align: center;
+}
+
+.emptyCartIcon {
+  align-items: center;
+  background: #eaf5ed;
+  border-radius: 50%;
+  color: #017632;
+  display: flex;
+  flex: 0 0 52px;
+  height: 52px;
+  justify-content: center;
+  margin-bottom: 4px;
+  width: 52px;
+}
+
+.emptyCartIcon svg {
+  fill: none;
+  height: 24px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+  width: 24px;
+}
+
+.emptyCart strong {
+  color: #191919;
+  font-size: 15px;
+}
+
+.emptyCart p {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+  max-width: 230px;
 }
 
 .cartItemShell {
@@ -774,6 +800,77 @@
   text-align: center;
 }
 
+.searchEmptyState {
+  align-items: center;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  grid-column: 1 / -1;
+  margin: 32px auto;
+  max-width: 460px;
+  min-height: 280px;
+  padding: 28px 20px;
+  text-align: center;
+  width: 100%;
+}
+
+.searchEmptyIcon {
+  align-items: center;
+  background: #eaf5ed;
+  border-radius: 50%;
+  color: #017632;
+  display: flex;
+  flex: 0 0 56px;
+  height: 56px;
+  justify-content: center;
+  width: 56px;
+}
+
+.searchEmptyIcon svg {
+  fill: none;
+  height: 25px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.8;
+  width: 25px;
+}
+
+.searchEmptyCopy strong {
+  color: #191919;
+  font-size: 20px;
+}
+
+.searchEmptyCopy p {
+  color: #6c7175;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.clearProductSearch {
+  background: #017632;
+  border: 0;
+  border-radius: 5px;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 40px;
+  padding: 9px 16px;
+}
+
+.clearProductSearch:hover {
+  background: #015c27;
+}
+
+.clearProductSearch:focus-visible {
+  outline: 2px solid #017632;
+  outline-offset: 3px;
+}
+
 .quantityToast {
   background: #191919;
   border-radius: 6px;
@@ -802,6 +899,33 @@
 
   .productGrid {
     grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .categories {
+    gap: 4px;
+    margin-top: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .categories::-webkit-scrollbar {
+    display: none;
+  }
+
+  .categories button {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 8px 10px;
+    white-space: nowrap;
+  }
+
+  .searchEmptyState {
+    margin: 12px auto;
+    min-height: 260px;
+    padding: 24px 12px;
   }
 }
 
@@ -834,19 +958,6 @@
 
   .sidebar > a {
     margin-left: auto;
-  }
-
-  .catalogHeader {
-    position: static;
-  }
-
-  .categories {
-    gap: 2px;
-  }
-
-  .categories button {
-    font-size: 10px;
-    padding: 8px 3px;
   }
 
   .productGrid {

@@ -80,6 +80,7 @@ function ProductCard({
 }) {
   const [quantityInput, setQuantityInput] = useState(String(quantity))
   const canAddProduct = product.isAvailable && product.stock > 0
+  const isOutOfStock = product.stock <= 0
 
   useEffect(() => {
     setQuantityInput(String(quantity))
@@ -99,7 +100,7 @@ function ProductCard({
 
   return (
     <article
-      className={`${styles.productCard} ${quantity > 0 ? styles.selected : ''} ${canAddProduct ? styles.clickable : ''}`}
+      className={`${styles.productCard} ${quantity > 0 ? styles.selected : ''} ${canAddProduct ? styles.clickable : ''} ${isOutOfStock ? styles.outOfStock : ''}`}
       onClick={(event) => {
         if (event.target instanceof Element && event.target.closest('button, input')) return
         if (canAddProduct) onChange(Math.min(quantity + 1, product.stock))
@@ -144,7 +145,7 @@ function ProductCard({
           >+</button>
         </div>
       ) : product.stock <= 0 ? (
-        <button type="button" className={styles.addButton} disabled>OUT OF STOCK</button>
+        <button type="button" className={`${styles.addButton} ${styles.outOfStockButton}`} disabled>OUT OF STOCK</button>
       ) : !product.isAvailable ? (
         <button type="button" className={styles.addButton} disabled>UNAVAILABLE</button>
       ) : (
@@ -276,7 +277,13 @@ function Cart({
       </div>
       <div className={styles.cartItems}>
         {items.length === 0 ? (
-          <p className={styles.emptyCart}>Your cart is empty.</p>
+          <div className={styles.emptyCart} role="status">
+            <span className={styles.emptyCartIcon} aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="m5 10 1 10h12l1-10M3 10h18l-2-6H5zM9 14v2m6-2v2" /></svg>
+            </span>
+            <strong>Your cart is empty</strong>
+            <p>Fresh finds are waiting. Add a few favorites to get started.</p>
+          </div>
         ) : items.map((item) => (
           <div
             className={`${styles.cartItemShell} ${revealedItemId === item.id ? styles.cartItemShellRevealed : ''}`}
@@ -681,6 +688,11 @@ export function ShopPage() {
         })
       })
 
+      try {
+        localStorage.removeItem(`cces-farm-market-cart:${user.uid}`)
+      } catch (storageError) {
+        console.error('Clearing saved cart failed:', storageError)
+      }
       setQuantities({})
       window.location.hash = '/orders'
     } catch (checkoutError) {
@@ -709,7 +721,7 @@ export function ShopPage() {
       <CustomerSidebar active="shop" />
       <section className={styles.catalog}>
         <Header
-          className={styles.catalogHeader}
+          title="SHOP"
           search={search}
           onSearchChange={(event) => setSearch(event.target.value)}
           secondary={<div className={styles.categories}>{categories.map((item) => (
@@ -730,7 +742,26 @@ export function ShopPage() {
               onChange={(quantity) => updateQuantity(product.id, quantity)}
             />
           ))}
-          {!isLoading && !error && visibleProducts.length === 0 && <p className={styles.noResults}>{search.trim() ? 'No products match your search.' : 'No products found.'}</p>}
+          {!isLoading && !error && visibleProducts.length === 0 && (
+            <div className={styles.searchEmptyState} role="status" aria-live="polite">
+              <span className={styles.searchEmptyIcon} aria-hidden="true">
+                <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m16 16 4 4" /></svg>
+              </span>
+              <div className={styles.searchEmptyCopy}>
+                <strong>{search.trim() ? 'No matching products' : category === 'All' ? 'No products found' : `No products in ${category.toLowerCase()}`}</strong>
+                <p>{search.trim()
+                  ? `No products match “${search.trim()}”. Try another search or clear it.`
+                  : category === 'All'
+                    ? 'There are no products available right now.'
+                    : `There are no products in ${category.toLowerCase()} right now. Browse all products instead.`}</p>
+              </div>
+              {search.trim() ? (
+                <button className={styles.clearProductSearch} type="button" onClick={() => setSearch('')}>Clear search</button>
+              ) : category !== 'All' ? (
+                <button className={styles.clearProductSearch} type="button" onClick={() => setCategory('All')}>View all products</button>
+              ) : null}
+            </div>
+          )}
         </div>
       </section>
       <Cart items={cartItems} onChange={updateQuantity} onClearAll={() => setQuantities({})} address={deliveryAddress} onAddressChange={(value) => {

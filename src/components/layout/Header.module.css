@@ -1,16 +1,22 @@
 .header {
   align-items: center;
   background: #fff;
+  box-sizing: border-box;
   box-shadow: 0 3px 5px rgb(0 0 0 / 10%);
   display: flex;
-  gap: 5px;
-  padding: 20px;
+  flex: 0 0 auto;
+  gap: 10px;
+  min-height: 4.5em;
+  padding: 20px 30px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .header h1 {
   color: #017632;
   flex: 0 0 auto;
-  font-size: 48px;
+  font-size: 2rem;
   line-height: 1;
   margin: 0;
 }
@@ -21,16 +27,16 @@
   border-radius: 53px;
   display: flex;
   flex: 1 1 260px;
-  gap: 5px;
+  gap: 0.5rem;
   height: auto;
   min-width: 0;
-  padding: 10px 20px;
+  padding: 5px 10px;
 }
 
 .search svg {
   color: #6c7175;
   flex: 0 0 auto;
-  font-size: 2rem;
+  font-size: 1rem;
 }
 
 .search input {
@@ -90,15 +96,17 @@
 
 .stacked {
   align-items: stretch;
-  flex-direction: column;
+  flex-direction: row;
+  flex-wrap: wrap;
 }
 
 .stacked .search {
-  flex: 0 0 auto;
-  width: 100%;
+  flex: 1 1 0;
+  width: auto;
 }
 
 .stacked > :last-child {
+  flex-basis: 100%;
   width: 100%;
 }
 
@@ -108,35 +116,52 @@
   }
 
   .search {
-    order: 3;
-    flex-basis: 100%;
+    flex: 1 1 0;
+    order: 0;
   }
 
-  .stacked .search {
-    order: initial;
+  .actions {
+    flex-basis: 100%;
+    order: 2;
   }
 }
 
 @media (max-width: 700px) {
   .header {
+    box-sizing: border-box;
     gap: 12px;
-    min-height: 0;
+    min-height: 70px;
     padding: 12px;
+    top: 48px;
   }
 
   .header h1 {
-    font-size: 30px;
+    font-size: 24px;
+  }
+
+  .search {
+    flex: 1 1 0;
+    order: 0;
+    width: auto;
   }
 
   .actions {
     gap: 4px;
+    max-width: 100%;
+    min-width: 0;
     overflow-x: auto;
+    scrollbar-width: none;
     width: 100%;
   }
 
   .actions :where(button, a) {
+    flex: 0 0 auto;
     font-size: 12px;
     padding: 8px 4px;
+  }
+
+  .actions::-webkit-scrollbar {
+    display: none;
   }
 
   .search {

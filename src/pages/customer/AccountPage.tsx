@@ -138,18 +138,18 @@ export function AccountPage() {
   }
 
   if (isLoading) {
-    return <main className={styles.page}><CustomerSidebar active="account" /><section className={styles.content}><Header title="MY ACCOUNT" className={styles.pageHeader} /><section className={styles.card}><p>Loading account information...</p></section></section></main>
+    return <main className={styles.page}><CustomerSidebar active="account" /><section className={styles.content}><Header title="MY ACCOUNT" /><section className={styles.card}><p>Loading account information...</p></section></section></main>
   }
 
   if (!account || error) {
-    return <main className={styles.page}><CustomerSidebar active="account" /><section className={styles.content}><Header title="MY ACCOUNT" className={styles.pageHeader} /><section className={styles.card}><p role="alert">{error || 'Account information is unavailable.'}</p></section></section></main>
+    return <main className={styles.page}><CustomerSidebar active="account" /><section className={styles.content}><Header title="MY ACCOUNT" /><section className={styles.card}><p role="alert">{error || 'Account information is unavailable.'}</p></section></section></main>
   }
 
   return (
     <main className={styles.page}>
       <CustomerSidebar active="account" />
       <section className={styles.content}>
-        <Header title="MY ACCOUNT" className={styles.pageHeader} />
+        <Header title="MY ACCOUNT" />
         <section className={styles.card}>
           <div className={styles.profileHeader}>
             <div className={styles.avatar}>{accountName(account).charAt(0)}</div>

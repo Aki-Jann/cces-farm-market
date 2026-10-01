@@ -10,17 +10,6 @@
   min-width: 0;
 }
 
-.pageHeader {
-  align-items: center;
-  flex: 0 0 auto;
-  min-height: 72px;
-  padding: 16px 24px;
-}
-
-.pageHeader.pageHeader h1 {
-  font-size: 32px;
-}
-
 .card {
   background: #fff;
   border: 1px solid #e2e7e3;
@@ -229,15 +218,6 @@
 @media (max-width: 700px) {
   .page {
     display: block;
-  }
-
-  .pageHeader {
-    min-height: 0;
-    padding: 12px;
-  }
-
-  .pageHeader.pageHeader h1 {
-    font-size: 24px;
   }
 
   .card {

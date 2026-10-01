@@ -200,10 +200,23 @@ export function OrdersPage() {
           ) : error ? (
             <div className={styles.emptyState} role="alert">{error}</div>
           ) : emptyState || visibleOrders.length === 0 ? (
-            <div className={styles.emptyState}>
-              <strong>{search.trim() ? 'No Matching Orders' : 'No Orders Yet'}</strong>
-              {!search.trim() && <a href="#/shop">SHOP</a>}
-            </div>
+            search.trim() ? (
+              <div className={`${styles.emptyState} ${styles.noMatches}`} role="status" aria-live="polite">
+                <span className={styles.emptyIcon} aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m16 16 4 4" /></svg>
+                </span>
+                <div className={styles.emptyCopy}>
+                  <strong>No matching orders</strong>
+                  <p>No orders match “{search.trim()}”. Try another search or clear it.</p>
+                </div>
+                <button className={styles.clearSearchButton} type="button" onClick={() => setSearch('')}>Clear search</button>
+              </div>
+            ) : (
+              <div className={styles.emptyState}>
+                <strong>No Orders Yet</strong>
+                <a href="#/shop">SHOP</a>
+              </div>
+            )
           ) : (
             <div className={styles.orderList}>
               {visibleOrders.map((order) => (

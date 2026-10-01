@@ -15,10 +15,6 @@
   min-width: 0;
 }
 
-.pageHeader {
-  flex: 0 0 auto;
-}
-
 .messaging {
   background: #fff;
   border: 1px solid #e2e7e3;
