@@ -1,9 +1,125 @@
 import { useEffect, useMemo, useState } from 'react'
-import { collection, onSnapshot } from 'firebase/firestore'
+import { collection, doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { db } from '../../firebase/firestore'
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
+import { storage } from '../../firebase/storage'
 import styles from './AdminPaymentPage.module.css'
+
+type CheckoutSettings = {
+  pickupAddress: string
+  gcashQrUrl: string
+  mayaQrUrl: string
+}
+
+const checkoutSettingsRef = doc(db, 'storeSettings', 'checkout')
+
+function CheckoutSettingsPanel() {
+  const [settings, setSettings] = useState<CheckoutSettings>({ pickupAddress: '', gcashQrUrl: '', mayaQrUrl: '' })
+  const [pickupAddress, setPickupAddress] = useState('')
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSavingPickup, setIsSavingPickup] = useState(false)
+  const [uploadingMethod, setUploadingMethod] = useState<'GCASH' | 'MAYA' | null>(null)
+  const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
+
+  useEffect(() => onSnapshot(checkoutSettingsRef, (snapshot) => {
+    const data = snapshot.data()
+    const loadedSettings = {
+      pickupAddress: typeof data?.pickupAddress === 'string' ? data.pickupAddress : '',
+      gcashQrUrl: typeof data?.gcashQrUrl === 'string' ? data.gcashQrUrl : '',
+      mayaQrUrl: typeof data?.mayaQrUrl === 'string' ? data.mayaQrUrl : '',
+    }
+    setSettings(loadedSettings)
+    setPickupAddress(loadedSettings.pickupAddress)
+    setIsLoading(false)
+  }, (loadError) => {
+    console.error('Loading checkout settings failed:', loadError)
+    setError('Unable to load pickup and payment settings.')
+    setIsLoading(false)
+  }), [])
+
+  async function savePickupAddress(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const value = pickupAddress.trim()
+    if (!value) {
+      setError('Enter a pickup location before saving.')
+      return
+    }
+
+    setIsSavingPickup(true)
+    setError('')
+    setNotice('')
+    try {
+      await setDoc(checkoutSettingsRef, { pickupAddress: value, updatedAt: serverTimestamp() }, { merge: true })
+      setNotice('Pickup location saved.')
+    } catch (saveError) {
+      console.error('Saving pickup location failed:', saveError)
+      setError('Unable to save the pickup location.')
+    } finally {
+      setIsSavingPickup(false)
+    }
+  }
+
+  async function uploadQrCode(method: 'GCASH' | 'MAYA', file: File | undefined) {
+    if (!file) return
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setError('QR codes must be JPG, PNG, or WebP images.')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('QR code images must be 5 MB or smaller.')
+      return
+    }
+
+    setUploadingMethod(method)
+    setError('')
+    setNotice('')
+    try {
+      const extension = file.type.slice('image/'.length)
+      const imageRef = ref(storage, `payment-qr-codes/${method.toLowerCase()}/current.${extension}`)
+      const uploadedImage = await uploadBytes(imageRef, file, { contentType: file.type })
+      const imageUrl = await getDownloadURL(uploadedImage.ref)
+      const field = method === 'GCASH' ? 'gcashQrUrl' : 'mayaQrUrl'
+      await setDoc(checkoutSettingsRef, { [field]: imageUrl, updatedAt: serverTimestamp() }, { merge: true })
+      setNotice(`${method === 'GCASH' ? 'GCash' : 'Maya'} QR code uploaded.`)
+    } catch (uploadError) {
+      console.error('Uploading payment QR code failed:', uploadError)
+      setError('Unable to upload the QR code. Please try again.')
+    } finally {
+      setUploadingMethod(null)
+    }
+  }
+
+  return (
+    <section className={styles.settingsPanel} aria-labelledby="checkout-settings-title">
+      <div className={styles.settingsHeading}>
+        <div><h2 id="checkout-settings-title">CUSTOMER CHECKOUT DETAILS</h2><p>Set the pickup location and payment QR codes shown during checkout.</p></div>
+      </div>
+      {isLoading ? <p className={styles.settingsMessage}>Loading checkout settings...</p> : (
+        <>
+          <form className={styles.pickupForm} onSubmit={savePickupAddress}>
+            <label htmlFor="pickup-address">Pickup location</label>
+            <div><input id="pickup-address" value={pickupAddress} onChange={(event) => setPickupAddress(event.target.value)} placeholder="Enter farm address or pickup instructions" /><button type="submit" disabled={isSavingPickup}>{isSavingPickup ? 'SAVING...' : 'SAVE LOCATION'}</button></div>
+          </form>
+          <div className={styles.qrSettings}>
+            {(['GCASH', 'MAYA'] as const).map((method) => {
+              const url = method === 'GCASH' ? settings.gcashQrUrl : settings.mayaQrUrl
+              const title = method === 'GCASH' ? 'GCash QR code' : 'Maya QR code'
+              return <div className={styles.qrSetting} key={method}>
+                <div className={styles.qrPreview}>{url ? <img src={url} alt={`${title} preview`} /> : <span>No QR uploaded</span>}</div>
+                <div><strong>{title}</strong><label className={styles.uploadButton}>{uploadingMethod === method ? 'UPLOADING...' : url ? 'REPLACE IMAGE' : 'UPLOAD IMAGE'}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploadingMethod !== null} onChange={(event) => { void uploadQrCode(method, event.target.files?.[0]); event.currentTarget.value = '' }} /></label><small>JPG, PNG, or WebP, up to 5 MB.</small></div>
+              </div>
+            })}
+          </div>
+        </>
+      )}
+      {error && <p className={styles.settingsError} role="alert">{error}</p>}
+      {notice && <p className={styles.settingsNotice} role="status">{notice}</p>}
+    </section>
+  )
+}
 
 type PaymentRecord = {
   firestoreId: string
@@ -206,6 +322,7 @@ export function AdminPaymentPage() {
           actions={<><a href="#/admin/orders">CURRENT ORDERS</a><a href="#/admin/orders/archive">ARCHIVE</a><a aria-current="page" href="#/admin/payment">PAYMENT</a></>}
         />
         <div className={styles.dashboard}>
+          <CheckoutSettingsPanel />
           <section className={styles.summary}>
             <SummaryCard label="TOTAL COLLECTED" value={currency(collected)} />
             <SummaryCard label="AVG TRANSACTION" value={currency(average)} />

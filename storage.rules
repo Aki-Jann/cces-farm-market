@@ -29,6 +29,12 @@ service firebase.storage {
       allow delete: if isAdmin();
     }
 
+    match /payment-qr-codes/{allPaths=**} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidImage();
+      allow delete: if isAdmin();
+    }
+
     match /payment-receipts/{userId}/{orderId}/{fileName} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       allow create, update: if isAuthenticated() && request.auth.uid == userId && isValidImage();

@@ -103,6 +103,12 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /storeSettings/{settingsId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin();
+      allow delete: if false;
+    }
+
     // =========================================================================
     // 4. CONVERSATIONS COLLECTION & MESSAGES SUBCOLLECTION
     // Path: conversations/{customerId}

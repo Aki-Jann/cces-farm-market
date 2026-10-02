@@ -31,8 +31,13 @@ type CheckoutDetails = {
   receiptFile: File | null
 }
 
+type CheckoutSettings = {
+  pickupAddress: string
+  gcashQrUrl: string
+  mayaQrUrl: string
+}
+
 const categories: Category[] = ['All', 'Vegetables', 'Fruits', 'Grains', 'Flowers']
-const temporaryPickupAddress = 'Temporary farmer pickup address - exact location to be confirmed with the seller.'
 const localImages: Record<string, string> = {
   APPLE: productImages['shop-apple.png'],
   BANANA: productImages['shop-banana.png'],
@@ -161,6 +166,8 @@ function Cart({
   onClearAll,
   address,
   onAddressChange,
+  pickupAddress,
+  paymentQrUrl,
   paymentMethod,
   onPaymentChange,
   onPlaceOrder,
@@ -175,6 +182,8 @@ function Cart({
   onClearAll: () => void
   address: string
   onAddressChange: (address: string) => void
+  pickupAddress: string
+  paymentQrUrl: string
   paymentMethod: 'COD' | 'GCASH' | 'MAYA'
   onPaymentChange: (method: 'COD' | 'GCASH' | 'MAYA') => void
   onPlaceOrder: (details: CheckoutDetails) => void
@@ -381,7 +390,7 @@ function Cart({
               </label>
             </fieldset>
             <p className={styles.checkoutAddress}>
-              {fulfillmentType === 'delivery' ? `Delivering to: ${address}` : `Pickup at: ${temporaryPickupAddress}`}
+              {fulfillmentType === 'delivery' ? `Delivering to: ${address}` : `Pickup at: ${pickupAddress || 'Location not configured. Please contact the seller.'}`}
             </p>
             <label className={styles.sellerNotes}>
               <span>Note to seller <small>(optional)</small></span>
@@ -392,9 +401,7 @@ function Cart({
               <div className={styles.onlinePayment}>
                 <h3>Pay with {paymentMethod === 'GCASH' ? 'GCash' : 'Maya'}</h3>
                 <div className={styles.qrPlaceholder}>
-                  <span>QR</span>
-                  <strong>{paymentMethod === 'GCASH' ? 'GCash' : 'Maya'} QR not configured</strong>
-                  <small>Contact the seller for payment details before paying.</small>
+                  {paymentQrUrl ? <img className={styles.paymentQrImage} src={paymentQrUrl} alt={`${paymentMethod === 'GCASH' ? 'GCash' : 'Maya'} payment QR code`} /> : <><span>QR</span><strong>{paymentMethod === 'GCASH' ? 'GCash' : 'Maya'} QR not configured</strong><small>Contact the seller for payment details before paying.</small></>}
                 </div>
                 <label className={styles.receiptUpload}>
                   <span>Payment receipt screenshot</span>
@@ -445,6 +452,7 @@ export function ShopPage() {
   const [deliveryAddress, setDeliveryAddress] = useState('')
   const [addressError, setAddressError] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'GCASH' | 'MAYA'>('COD')
+  const [checkoutSettings, setCheckoutSettings] = useState<CheckoutSettings>({ pickupAddress: '', gcashQrUrl: '', mayaQrUrl: '' })
   const [orderMessage, setOrderMessage] = useState('')
   const [quantityNotice, setQuantityNotice] = useState<{ message: string } | null>(null)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
@@ -471,6 +479,7 @@ export function ShopPage() {
   useEffect(() => {
     let isMounted = true
     let unsubscribeProducts: (() => void) | undefined
+    let unsubscribeCheckoutSettings: (() => void) | undefined
 
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       // Tear down any previous products listener before attaching a new one.
@@ -478,6 +487,8 @@ export function ShopPage() {
         unsubscribeProducts()
         unsubscribeProducts = undefined
       }
+      unsubscribeCheckoutSettings?.()
+      unsubscribeCheckoutSettings = undefined
 
       if (!user) {
         if (isMounted) {
@@ -492,6 +503,19 @@ export function ShopPage() {
 
       cartOwnerId.current = user.uid
       setQuantities(readSavedCart(user.uid))
+
+      unsubscribeCheckoutSettings = onSnapshot(
+        doc(db, 'storeSettings', 'checkout'),
+        (snapshot) => {
+          const data = snapshot.data()
+          setCheckoutSettings({
+            pickupAddress: typeof data?.pickupAddress === 'string' ? data.pickupAddress : '',
+            gcashQrUrl: typeof data?.gcashQrUrl === 'string' ? data.gcashQrUrl : '',
+            mayaQrUrl: typeof data?.mayaQrUrl === 'string' ? data.mayaQrUrl : '',
+          })
+        },
+        (settingsError) => console.error('Loading checkout settings failed:', settingsError)
+      )
 
       void getDoc(doc(db, 'users', user.uid))
         .then((profileSnapshot) => {
@@ -546,6 +570,7 @@ export function ShopPage() {
       isMounted = false
       unsubscribeAuth()
       if (unsubscribeProducts) unsubscribeProducts()
+      unsubscribeCheckoutSettings?.()
     }
   }, [])
 
@@ -586,6 +611,15 @@ export function ShopPage() {
 
   async function placeOrder({ fulfillmentType, sellerNotes, receiptFile }: CheckoutDetails) {
     if (cartItems.length === 0) return
+    if (fulfillmentType === 'pickup' && !checkoutSettings.pickupAddress.trim()) {
+      setOrderMessage('Pickup location is not configured yet. Please contact the seller.')
+      return
+    }
+    const paymentQrUrl = paymentMethod === 'GCASH' ? checkoutSettings.gcashQrUrl : checkoutSettings.mayaQrUrl
+    if (paymentMethod !== 'COD' && !paymentQrUrl) {
+      setOrderMessage('The selected payment QR code is not configured yet. Please contact the seller.')
+      return
+    }
     const addressForOrder = fulfillmentType === 'delivery' ? deliveryAddress.trim() : ''
     if (fulfillmentType === 'delivery' && !addressForOrder) {
       setAddressError('Delivery address is required.')
@@ -681,7 +715,7 @@ export function ShopPage() {
           paymentStatus: paymentMethod === 'COD' ? 'unpaid' : 'awaiting_verification',
           status: 'pending',
           fulfillmentType,
-          deliveryAddress: fulfillmentType === 'pickup' ? temporaryPickupAddress : addressForOrder,
+          deliveryAddress: fulfillmentType === 'pickup' ? checkoutSettings.pickupAddress.trim() : addressForOrder,
           sellerNotes,
           paymentReceiptUrl,
           createdAt: serverTimestamp(),
@@ -767,7 +801,7 @@ export function ShopPage() {
       <Cart items={cartItems} onChange={updateQuantity} onClearAll={() => setQuantities({})} address={deliveryAddress} onAddressChange={(value) => {
         setDeliveryAddress(value)
         if (value.trim()) setAddressError('')
-      }} paymentMethod={paymentMethod} onPaymentChange={setPaymentMethod} onPlaceOrder={placeOrder} onEmptyCartAttempt={() => {
+      }} pickupAddress={checkoutSettings.pickupAddress} paymentQrUrl={paymentMethod === 'GCASH' ? checkoutSettings.gcashQrUrl : checkoutSettings.mayaQrUrl} paymentMethod={paymentMethod} onPaymentChange={setPaymentMethod} onPlaceOrder={placeOrder} onEmptyCartAttempt={() => {
         setQuantityNotice({ message: 'Add products to your cart before placing an order.' })
       }} onAddressError={setAddressError} orderMessage={orderMessage} addressError={addressError} isCheckingOut={isCheckingOut} />
       {quantityNotice && <div className={styles.quantityToast} role="status" aria-live="polite">{quantityNotice.message}</div>}

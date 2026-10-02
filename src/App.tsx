@@ -5,6 +5,7 @@ import { ShopPage } from './pages/customer/ShopPage'
 import { OrdersPage } from './pages/customer/OrdersPage'
 import { MessagesPage } from './pages/customer/MessagesPage'
 import { AccountPage } from './pages/customer/AccountPage'
+import { AdminAccountPage } from './pages/admin/AdminAccountPage'
 import { AdminDashboard } from './pages/admin/AdminDashboard'
 import { AdminOrdersPage } from './pages/admin/AdminOrdersPage'
 import { AdminPaymentPage } from './pages/admin/AdminPaymentPage'
@@ -12,11 +13,12 @@ import { AdminProductsPage } from './pages/admin/AdminProductsPage'
 import { AdminCustomersPage } from './pages/admin/AdminCustomersPage'
 import { AdminAnalyticsPage } from './pages/admin/AdminAnalyticsPage'
 
-export type Route = 'landing' | 'shop' | 'orders' | 'messages' | 'account' | 'admin' | 'admin-orders' | 'admin-payment' | 'admin-products' | 'admin-customers' | 'admin-analytics' | 'login' | 'register' | 'forgot-password'
+export type Route = 'landing' | 'shop' | 'orders' | 'messages' | 'account' | 'admin' | 'admin-account' | 'admin-orders' | 'admin-payment' | 'admin-products' | 'admin-customers' | 'admin-analytics' | 'login' | 'register' | 'forgot-password'
 
 function getRoute(): Route {
   const path = window.location.hash.replace(/^#\/?/, '')
   if (path.startsWith('orders')) return 'orders'
+  if (path === 'admin/account') return 'admin-account'
   if (path === 'admin/orders' || path === 'admin/orders/archive') return 'admin-orders'
   if (path === 'admin/payment') return 'admin-payment'
   if (path === 'admin/products') return 'admin-products'
@@ -59,6 +61,10 @@ function App() {
 
   if (route === 'account') {
     return <AccountPage />
+  }
+
+  if (route === 'admin-account') {
+    return <AdminAccountPage />
   }
 
   if (route === 'admin') {
