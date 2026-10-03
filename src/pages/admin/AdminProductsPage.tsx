@@ -111,18 +111,19 @@ function ProductCard({ product, selected, onEdit }: { product: Product; selected
 
   return (
     <article className={`${styles.productCard} ${selected ? styles.selectedCard : ''}`}>
-      <img src={product.image} alt={product.name} />
+      <div className={styles.productImage}>
+        <img src={product.image} alt={product.name} />
+        <span className={`${styles.stockBadge} ${availabilityClass}`}>{availabilityLabel}</span>
+      </div>
       <div className={styles.productInfo}>
-        <div>
+        <div className={styles.productDetails}>
+          <span className={styles.categoryLabel}>{product.category}</span>
           <strong>{product.name}</strong>
-          <small>{product.category}</small>
-          <small className={availabilityClass}>
-            {product.stock} {product.unit} {availabilityLabel}
-          </small>
+          <small className={styles.stockText}>{product.stock} {product.unit} in stock</small>
         </div>
         <div className={styles.price}><strong>{currency(product.price)}</strong><small>PER {product.unit}</small></div>
       </div>
-      <button type="button" onClick={onEdit}>EDIT</button>
+      <button className={styles.editButton} type="button" onClick={onEdit}>EDIT PRODUCT</button>
     </article>
   )
 }
@@ -130,19 +131,23 @@ function ProductCard({ product, selected, onEdit }: { product: Product; selected
 function ProductForm({
   draft,
   editing,
+  hasSelectedPhoto,
   isSaving,
   error,
   onChange,
   onFileSelect,
   onSubmit,
+  onCancel,
 }: {
   draft: ProductDraft
   editing: boolean
+  hasSelectedPhoto: boolean
   isSaving: boolean
   error: string
   onChange: (draft: ProductDraft) => void
   onFileSelect: (file: File) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
+  onCancel: () => void
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -156,29 +161,36 @@ function ProductForm({
 
   return (
     <form className={styles.form} onSubmit={onSubmit}>
-      <div
-        className={styles.imagePreview}
-        role="button"
-        tabIndex={0}
-        title="Click to choose a product image"
-        aria-label="Upload product image"
-        onClick={() => fileInputRef.current?.click()}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            fileInputRef.current?.click()
-          }
-        }}
-      >
-        <img src={draft.image} alt="Product preview" />
+      <div className={styles.formHeader}>
+        <div>
+          <span>{editing ? 'PRODUCT DETAILS' : 'INVENTORY'}</span>
+          <h2>{editing ? 'Edit product' : 'Add a product'}</h2>
+        </div>
+        <button className={styles.closeForm} type="button" aria-label="Close product form" onClick={onCancel}>×</button>
+      </div>
+      <section className={styles.photoSection} aria-label="Product photo">
+        <div className={styles.photoSectionHeading}>
+          <div><h3>Product photo</h3><p>Add a clear photo to help customers recognize this product.</p></div>
+          <span className={styles.photoStatus}>{hasSelectedPhoto ? 'NEW PHOTO' : editing ? 'CURRENT PHOTO' : 'PREVIEW'}</span>
+        </div>
+        <div className={styles.imagePreview}>
+          <img src={draft.image} alt={`${draft.name || 'Product'} photo preview`} />
+        </div>
         <input
           ref={fileInputRef}
           type="file"
           accept="image/png,image/jpeg,image/webp"
-          style={{ display: 'none' }}
+          className={styles.fileInput}
+          aria-label="Choose product photo"
           onChange={handleFileChange}
         />
-      </div>
+        <div className={styles.photoActions}>
+          <button className={styles.uploadButton} type="button" onClick={() => fileInputRef.current?.click()}>
+            <span aria-hidden="true">↑</span>{editing || hasSelectedPhoto ? 'CHANGE PHOTO' : 'UPLOAD PHOTO'}
+          </button>
+          <span className={styles.photoHelp}>JPG, PNG, or WEBP · up to 5 MB</span>
+        </div>
+      </section>
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <label>PRODUCT NAME
         <input required value={draft.name} placeholder="e.g. TOMATO" onChange={(event) => onChange({ ...draft, name: event.target.value.toUpperCase() })} />
@@ -268,6 +280,13 @@ export function AdminProductsPage() {
     setIsFormOpen(true)
   }
 
+  function closeForm() {
+    setIsFormOpen(false)
+    setSelectedId(null)
+    setSelectedFile(null)
+    setError('')
+  }
+
   function handleFileSelect(file: File) {
     const validationError = validateImageFile(file)
     if (validationError) {
@@ -350,6 +369,7 @@ export function AdminProductsPage() {
         image: resolveProductImage(imageUrlToSave, 'shop-apple.png'),
         rawImageUrl: imageUrlToSave,
       }))
+      setIsFormOpen(false)
     } catch (saveError) {
       console.error('Saving product failed:', saveError)
       if (saveError instanceof Error && saveError.message) {
@@ -369,7 +389,10 @@ export function AdminProductsPage() {
         <Header title="PRODUCTS" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
         <div className={`${styles.workspace} ${isFormOpen ? styles.workspaceWithForm : ''}`}>
           <section className={`${styles.grid} ${isFormOpen ? styles.gridWithForm : styles.gridList}`}>
-            <button className={`${styles.addTile} ${isFormOpen && !selectedId ? styles.activeTile : ''}`} type="button" onClick={startAdd}><span>+</span><strong>ADD NEW PRODUCT</strong></button>
+            <div className={styles.catalogHeader}>
+              <div><span>MARKET INVENTORY</span><h2>Products</h2><p>{products.length} product{products.length === 1 ? '' : 's'} in your catalog</p></div>
+              <button className={styles.addButton} type="button" onClick={startAdd}><span aria-hidden="true">+</span> ADD PRODUCT</button>
+            </div>
             {visibleProducts.map((product) => <ProductCard key={product.id} product={product} selected={selectedId === product.id} onEdit={() => startEdit(product)} />)}
             {isLoading && <p className={styles.empty}>Loading products...</p>}
             {!isLoading && error && !isFormOpen && <p className={styles.empty} role="alert">{error}</p>}
@@ -379,11 +402,13 @@ export function AdminProductsPage() {
             <ProductForm
               draft={draft}
               editing={Boolean(selectedId)}
+              hasSelectedPhoto={Boolean(selectedFile)}
               isSaving={isSaving}
               error={error}
               onChange={setDraft}
               onFileSelect={handleFileSelect}
               onSubmit={saveProduct}
+              onCancel={closeForm}
             />
           )}
         </div>
