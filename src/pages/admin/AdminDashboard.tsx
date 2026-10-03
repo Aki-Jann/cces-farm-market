@@ -61,13 +61,14 @@ function formatCategory(category?: string): string {
   return category.charAt(0).toUpperCase() + category.slice(1).toLowerCase()
 }
 
-function StatCard({ label, value, note }: { label: string; value: string; note: string }) {
+function StatCard({ label, value, note, href }: { label: string; value: string; note: string; href: string }) {
   return (
-    <article className={styles.statCard}>
+    <a className={styles.statCard} href={href}>
       <h2>{label}</h2>
       <strong>{value}</strong>
       <p>{note}</p>
-    </article>
+      <span className={styles.cardArrow} aria-hidden="true">→</span>
+    </a>
   )
 }
 
@@ -101,11 +102,11 @@ function RecentOrders({ orders }: { orders: RecentOrder[] }) {
           <p style={{ color: '#6c7175', fontSize: '13px', margin: '16px 0' }}>No orders found.</p>
         ) : (
           orders.slice(0, 4).map((order) => (
-            <div className={styles.orderRow} key={order.id}>
+            <a className={styles.orderRow} href="#/admin/orders" key={order.id} aria-label={`Open orders to view ${order.id}, ${order.status}`}>
               <div><strong>{order.customer}</strong><small>{order.id}</small></div>
               <span className={`${styles.status} ${styles[order.status.toLowerCase()]}`}>{order.status}</span>
               <strong>{currency(order.total)}</strong>
-            </div>
+            </a>
           ))
         )}
       </div>
@@ -122,10 +123,10 @@ function ProductInventory({ items }: { items: InventoryItem[] }) {
           <p style={{ color: '#6c7175', fontSize: '13px', margin: '16px 0' }}>No products found.</p>
         ) : (
           items.slice(0, 4).map((item) => (
-            <div className={styles.inventoryRow} key={item.name}>
+            <a className={styles.inventoryRow} href="#/admin/products" key={item.name} aria-label={`Open product inventory to manage ${item.name}`}>
               <div><strong>{item.name}</strong><small>{item.category}</small></div>
               <strong>{item.stock}</strong>
-            </div>
+            </a>
           ))
         )}
       </div>
@@ -412,21 +413,25 @@ export function AdminDashboard() {
               label="REVENUE THIS WEEK"
               value={isLoading ? '...' : currency(weeklyRevenue)}
               note={isLoading ? 'Calculating...' : revenueGrowthText}
+              href="#/admin/analytics"
             />
             <StatCard
               label="ACTIVE ORDERS"
               value={isLoading ? '...' : activeOrdersCount.toLocaleString()}
               note={isLoading ? 'Loading...' : `${activeOrdersCount} need attention`}
+              href="#/admin/orders"
             />
             <StatCard
               label="FRESH INVENTORY"
               value={isLoading ? '...' : `${totalFreshStock.toLocaleString()}kg`}
               note="Across all crops"
+              href="#/admin/products"
             />
             <StatCard
               label="LISTED PRODUCTS"
               value={isLoading ? '...' : availableProductsCount.toLocaleString()}
               note={`of ${totalProductsCount} total`}
+              href="#/admin/products"
             />
           </section>
           <RevenueChart revenue={revenuePoints} />

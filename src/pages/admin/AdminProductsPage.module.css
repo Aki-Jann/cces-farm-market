@@ -163,9 +163,9 @@
 }
 
 .productInfo {
-  align-items: flex-end;
+  align-items: flex-start;
   display: flex;
-  gap: 8px;
+  gap: 10px;
   justify-content: space-between;
   margin: 12px 2px 10px;
   min-height: 70px;
@@ -173,8 +173,9 @@
 
 .productDetails {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
   min-width: 0;
 }
 
@@ -201,9 +202,10 @@
 .price {
   align-items: flex-end;
   display: flex;
+  flex: 0 0 auto;
   flex-direction: column;
-  flex-shrink: 0;
-  gap: 2px;
+  gap: 3px;
+  padding-top: 12px;
 }
 
 .price strong {
@@ -615,14 +617,13 @@
 
   .productInfo {
     align-items: flex-start;
-    flex-direction: column;
-    min-height: 88px;
+    min-height: 70px;
   }
 
   .price {
     align-items: flex-start;
-    flex-direction: row;
-    gap: 5px;
+    flex-direction: column;
+    padding-top: 12px;
   }
 
   .price strong {

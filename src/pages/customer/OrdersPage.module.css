@@ -25,12 +25,25 @@
 
 .ordersContent { flex: 1; min-width: 0; }
 .orderPanel { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-panel); box-shadow: var(--shadow-panel); margin: 20px 30px; min-height: calc(100vh - 150px); padding: 31px 14px; }
-.tableHeader, .orderRow { align-items: center; display: grid; gap: 12px; grid-template-columns: 1.4fr 1fr 1fr 1fr 1.2fr; text-align: center; }
+.statusFilters { align-items: center; border-bottom: 1px solid #e6ebe7; display: flex; gap: 7px; margin: -5px 2px 18px; overflow-x: auto; padding: 0 0 12px; scrollbar-width: thin; }
+.statusFilters button { align-items: center; background: #f5f8f5; border: 1px solid transparent; border-radius: 999px; color: #58645b; cursor: pointer; display: inline-flex; flex: 0 0 auto; font: inherit; font-size: 11px; font-weight: 600; gap: 8px; min-height: 36px; padding: 7px 12px; transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease; }
+.statusFilters button:hover { background: #edf5ef; border-color: #d6e6d9; color: #087b3b; }
+.statusFilters button:focus-visible { outline: 2px solid #087b3b; outline-offset: 2px; }
+.statusFilters button span { align-items: center; background: #e7ece8; border-radius: 999px; color: #56645a; display: inline-flex; font-size: 10px; font-weight: 700; height: 20px; justify-content: center; min-width: 20px; padding: 0 5px; }
+.statusFilters button.activeFilter { background: #087b3b; color: #fff; }
+.statusFilters button.activeFilter span { background: rgb(255 255 255 / 20%); color: #fff; }
+.tableHeader { align-items: center; display: grid; gap: 12px; grid-template-columns: 1.4fr 1fr 1fr 1fr 1.2fr 1fr; text-align: center; }
 .tableHeader { border-bottom: 1px solid #d9d9d9; color: #6c7175; font-size: 12px; font-weight: 700; padding: 0 16px 14px; text-transform: uppercase; }
 .orderList { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
 .orderGroup { border: 1px solid var(--color-border); border-radius: var(--radius-control); overflow: hidden; }
-.orderRow { background: #fff; border: 0; cursor: pointer; font-size: 14px; min-height: 63px; padding: 16px; width: 100%; }
+.orderLine { align-items: stretch; background: #fff; display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 1.2fr 1fr; }
+.orderRow { align-items: center; background: #fff; border: 0; cursor: pointer; display: grid; font: inherit; font-size: 14px; gap: 12px; grid-column: 1 / 6; grid-row: 1; grid-template-columns: 1.4fr 1fr 1fr 1fr 1.2fr; min-height: 63px; padding: 16px; text-align: center; width: 100%; }
 .orderRow:hover, .orderRow:focus-visible { background: #f7faf8; outline: 0; }
+.receiptColumn { align-items: center; display: flex; font-size: 11px; grid-column: 6; grid-row: 1; justify-content: center; padding: 8px; text-align: center; }
+.receiptAction { background: #eff7f0; border: 1px solid #dcecdf; border-radius: 6px; color: #087b3b; font-size: 10px; font-weight: 700; padding: 7px 9px; text-decoration: none; white-space: nowrap; }
+.receiptAction:hover { background: #e2f0e5; border-color: #b8d8bf; }
+.receiptAction:focus-visible { outline: 2px solid #087b3b; outline-offset: 2px; }
+.receiptPending, .receiptNotNeeded { color: #758178; font-size: 10px; }
 .green { color: #017632; }
 .status { border-radius: 999px; justify-self: center; padding: 5px 8px; font-size: 10px; font-weight: 700; }
 .delivered { background: var(--order-delivered-bg); color: var(--order-delivered-text); }
@@ -72,6 +85,25 @@
 .detailTotal { align-items: center; border-top: 1px solid #d8dfda; display: flex; justify-content: space-between; padding-top: 13px; }
 .detailTotal span { color: #555d58; font-size: 13px; font-weight: 700; text-transform: uppercase; }
 .detailTotal strong { color: #017632; font-size: 19px; }
+.deliveryConfirmation, .reviews { border-top: 1px solid #d8dfda; margin-top: 16px; padding-top: 16px; }
+.deliveryConfirmation { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; }
+.deliveryConfirmation p, .reviews > p { color: #555d58; font-size: 12px; margin: 0; }
+.deliveryConfirmation button, .submitReview { background: #087b3b; border: 0; border-radius: 7px; color: #fff; cursor: pointer; font-size: 10px; font-weight: 700; letter-spacing: .04em; padding: 10px 14px; }
+.deliveryConfirmation button:disabled, .submitReview:disabled { cursor: not-allowed; opacity: .55; }
+.deliveryConfirmation [role="alert"], .reviewError { color: #a33c31 !important; flex-basis: 100%; font-size: 11px !important; margin: 0; }
+.reviews h3 { color: #203c29; font-size: 15px; margin: 0 0 4px; }
+.reviews > p { margin-bottom: 12px; }
+.reviewForm, .submittedReview { background: #fff; border: 1px solid var(--color-border); border-radius: 9px; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; padding: 12px; }
+.reviewForm label { align-self: center; color: #27362c; flex: 1 1 100%; font-size: 12px; font-weight: 700; }
+.starPicker { display: flex; gap: 2px; }
+.starPicker button { background: transparent; border: 0; color: #c6cec8; cursor: pointer; font-size: 23px; line-height: 1; padding: 2px; }
+.starPicker button.selectedStar { color: #d58b12; }
+.starPicker button:focus-visible { border-radius: 3px; outline: 2px solid #087b3b; }
+.reviewForm textarea { border: 1px solid #d9e2db; border-radius: 6px; flex: 1 1 100%; font: inherit; font-size: 12px; min-height: 64px; padding: 9px; resize: vertical; }
+.submitReview { margin-left: auto; }
+.submittedReview { align-items: center; color: #56645a; font-size: 12px; }
+.reviewStars { color: #d58b12; font-size: 15px; white-space: nowrap; }
+.reviewLoading { color: #758178; font-size: 11px; }
 
 @media (max-width: 700px) {
   .ordersPage { display: block; }
@@ -81,14 +113,19 @@
   .sidebar a { font-size: 11px; margin: 0; padding: 8px; }
   .sidebar > a { margin-left: auto; }
   .orderPanel { margin: 20px 30px; padding: 16px 8px; }
+  .statusFilters { gap: 6px; margin: 0 2px 14px; padding-bottom: 10px; }
+  .statusFilters button { font-size: 10px; min-height: 34px; padding: 6px 10px; }
   .tableHeader { display: none; }
+  .orderLine { grid-template-columns: minmax(0, 1fr); }
   .orderRow { gap: 8px 10px; grid-template-areas: 'id status total' 'date payment payment'; grid-template-columns: minmax(0, 1fr) auto auto; padding: 12px; text-align: left; }
   .orderId { grid-area: id; overflow-wrap: anywhere; }
   .orderDate { color: #6c7175; font-size: 11px; grid-area: date; }
   .orderTotal { grid-area: total; white-space: nowrap; }
   .orderPayment { color: #555d58; font-size: 11px; grid-area: payment; text-align: right; }
   .orderRow .status { grid-area: status; }
+  .receiptColumn { grid-column: 1; grid-row: 2; justify-content: flex-end; padding: 0 12px 10px; }
   .details { padding: 14px 12px; }
+  .deliveryConfirmation { align-items: flex-start; flex-direction: column; }
   .detailHeader, .detailRow { gap: 6px; grid-template-columns: minmax(0, 1.5fr) minmax(42px, .8fr) minmax(65px, 1fr) minmax(72px, 1.1fr); font-size: 11px; }
   .detailHeader { font-size: 9px; }
   .emptyState { margin: 150px auto; }

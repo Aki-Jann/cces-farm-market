@@ -68,22 +68,26 @@ service cloud.firestore {
     // Path: products/{productId}
     // =========================================================================
     match /products/{productId} {
-      // All authenticated users can read products
-      allow read: if isAuthenticated();
+      // Product catalog details and sales totals are shown on the public landing page.
+      allow read: if true;
 
       // Only admins can create or delete products
       allow create, delete: if isAdmin();
 
       // Product updates:
       // - Admins have full update capabilities
-      // - Customers during checkout can ONLY decrement stock (stock <= current stock && stock >= 0)
-      //   and are forbidden from altering name, category, price, unit, imageUrl, isAvailable, createdAt, etc.
+      // - Customers during checkout can decrement stock and increment sold by the same amount.
+      //   Other product fields remain protected.
       allow update: if isAdmin() || (
         isAuthenticated() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock']) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'sold']) &&
         request.resource.data.stock is number &&
         request.resource.data.stock <= resource.data.stock &&
-        request.resource.data.stock >= 0
+        request.resource.data.stock >= 0 &&
+        request.resource.data.get('sold', 0) is number &&
+        request.resource.data.get('sold', 0) >= resource.data.get('sold', 0) &&
+        request.resource.data.get('sold', 0) - resource.data.get('sold', 0) ==
+          resource.data.stock - request.resource.data.stock
       );
     }
 
@@ -100,12 +104,44 @@ service cloud.firestore {
         request.resource.data.userId == request.auth.uid &&
         request.resource.data.status in ['pending', 'PENDING'];
 
-      // Only admins can update orders (e.g. status changes: pending -> confirmed -> packed -> delivered).
-      // Customers cannot edit existing orders or manipulate financial values after creation.
-      allow update: if isAdmin();
+      // Customers may only confirm receipt after the seller marks the order delivered.
+      allow update: if isAdmin() || (
+        isAuthenticated() &&
+        resource.data.userId == request.auth.uid &&
+        resource.data.status == 'delivered' &&
+        resource.data.get('deliveryConfirmed', false) != true &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deliveryConfirmed', 'deliveryConfirmedAt']) &&
+        request.resource.data.deliveryConfirmed == true &&
+        request.resource.data.deliveryConfirmedAt == request.time
+      );
 
       // Deletions restricted to admins
       allow delete: if isAdmin();
+    }
+
+    match /products/{productId}/reviews/{orderId} {
+      allow read: if true;
+      allow create: if isAuthenticated() &&
+        !exists(/databases/$(database)/documents/products/$(productId)/reviews/$(orderId)) &&
+        request.resource.data.keys().hasOnly([
+          'orderId', 'productId', 'orderItem', 'userId', 'rating', 'comment', 'createdAt'
+        ]) &&
+        request.resource.data.orderId == orderId &&
+        request.resource.data.productId == productId &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.rating is int &&
+        request.resource.data.rating >= 1 &&
+        request.resource.data.rating <= 5 &&
+        request.resource.data.comment is string &&
+        request.resource.data.comment.size() <= 1000 &&
+        request.resource.data.createdAt == request.time &&
+        exists(/databases/$(database)/documents/orders/$(orderId)) &&
+        get(/databases/$(database)/documents/orders/$(orderId)).data.userId == request.auth.uid &&
+        get(/databases/$(database)/documents/orders/$(orderId)).data.status == 'delivered' &&
+        get(/databases/$(database)/documents/orders/$(orderId)).data.get('deliveryConfirmed', false) == true &&
+        request.resource.data.orderItem in get(/databases/$(database)/documents/orders/$(orderId)).data.items &&
+        request.resource.data.orderItem.productId == productId;
+      allow update, delete: if false;
     }
 
     // =========================================================================

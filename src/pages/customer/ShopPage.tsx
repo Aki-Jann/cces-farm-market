@@ -4,6 +4,7 @@ import { collection, doc, getDoc, onSnapshot, runTransaction, serverTimestamp } 
 import { deleteObject, getDownloadURL, ref, uploadBytes, type StorageReference } from 'firebase/storage'
 import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
 import { Header } from '../../components/layout/Header'
+import { ProductRating } from '../../components/common/ProductRating'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import { storage } from '../../firebase/storage'
@@ -21,6 +22,7 @@ type Product = {
   unit: string
   image: string
   isAvailable: boolean
+  sold: number
 }
 
 type CartItem = Product & { quantity: number }
@@ -135,7 +137,10 @@ function ProductCard({
         <div className={styles.productDetails}>
           <small className={styles.categoryLabel}>{product.category.toUpperCase()}</small>
           <strong>{product.name}</strong>
-          <small className={styles.stockText}>{product.stock} {product.unit} in stock</small>
+          <div className={styles.productMetrics}>
+            <small className={styles.stockText}>{product.stock} {product.unit} in stock · {product.sold} sold</small>
+            <ProductRating productId={product.id} showReviews />
+          </div>
         </div>
         <div className={styles.productPrice}>
           <strong>{currency(product.price)}</strong>
@@ -615,6 +620,7 @@ export function ShopPage() {
               unit: typeof data.unit === 'string' ? data.unit : 'KG',
               image: resolveProductImage(data.imageUrl, localImages[name] ?? 'shop-apple.png'),
               isAvailable: typeof data.isAvailable === 'boolean' ? data.isAvailable : true,
+              sold: typeof data.sold === 'number' && Number.isFinite(data.sold) ? data.sold : 0,
             }]
           })
           setProducts(loadedProducts)
@@ -752,8 +758,12 @@ export function ShopPage() {
           }
 
           const remainingStock = stock - item.quantity
+          const sold = typeof productData.sold === 'number' && Number.isFinite(productData.sold)
+            ? productData.sold
+            : 0
           transaction.update(ref, {
             stock: remainingStock,
+            sold: sold + item.quantity,
           })
         })
 

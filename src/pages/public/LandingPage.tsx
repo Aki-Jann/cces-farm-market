@@ -1,4 +1,8 @@
+import { useEffect, useState } from 'react'
+import { collection, onSnapshot } from 'firebase/firestore'
 import { BrandLogo } from '../../components/common/BrandLogo'
+import { ProductRating } from '../../components/common/ProductRating'
+import { db } from '../../firebase/firestore'
 import styles from './LandingPage.module.css'
 import heroImage from '../../assets/landing-temp.png'
 import appleImage from '../../assets/apple.png'
@@ -15,6 +19,38 @@ const products = [
 ]
 
 export function LandingPage() {
+  const [soldCounts, setSoldCounts] = useState<Record<string, number> | null>(null)
+  const [productIds, setProductIds] = useState<Record<string, string>>({})
+  const [salesError, setSalesError] = useState(false)
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, 'products'),
+      (snapshot) => {
+        const counts: Record<string, number> = {}
+        const ids: Record<string, string> = {}
+        snapshot.docs.forEach((product) => {
+          const data = product.data()
+          if (typeof data.name !== 'string') return
+          const name = data.name.trim().toUpperCase()
+          ids[name] = product.id
+          counts[name] = typeof data.sold === 'number' && Number.isFinite(data.sold)
+            ? data.sold
+            : 0
+        })
+        setSoldCounts(counts)
+        setProductIds(ids)
+        setSalesError(false)
+      },
+      (error) => {
+        console.error('Loading product sales failed:', error)
+        setSalesError(true)
+      }
+    )
+
+    return () => unsubscribe()
+  }, [])
+
   return (
     <main className={styles.landing} id="top">
       <header className={styles.header}>
@@ -54,7 +90,18 @@ export function LandingPage() {
             <article className={styles.productCard} key={product.name}>
               <img src={product.image} alt={product.name} />
               <div className={styles.productInfo}>
-                <div><strong>{product.name}</strong><small>{product.category}</small></div>
+                <div>
+                  <strong>{product.name}</strong>
+                  <small>{product.category}</small>
+                  <small className={styles.soldText}>
+                    {salesError
+                      ? 'Sales unavailable'
+                      : soldCounts
+                        ? `${soldCounts[product.name] ?? 0} sold`
+                        : 'Loading sales…'}
+                  </small>
+                  <ProductRating productId={productIds[product.name]} />
+                </div>
                 <div className={styles.price}><strong>₱100.00</strong><small>PER KG</small></div>
               </div>
               <button type="button" onClick={() => { window.location.hash = '/login' }}>ADD TO CART</button>

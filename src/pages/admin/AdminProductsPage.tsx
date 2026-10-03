@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import { collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
+import { collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
+import { ProductRating } from '../../components/common/ProductRating'
 import { db } from '../../firebase/firestore'
 import { productImageKey, productImages, resolveProductImage } from '../../utils/productImages'
 import styles from './AdminProductsPage.module.css'
@@ -18,8 +19,9 @@ type Product = {
   image: string
   rawImageUrl?: string
   available: boolean
+  sold: number
 }
-type ProductDraft = Omit<Product, 'id'>
+type ProductDraft = Omit<Product, 'id' | 'sold'>
 
 const categories: ProductCategory[] = ['VEGETABLES', 'FRUITS', 'GRAINS', 'FLOWERS']
 const imageOptions = [
@@ -119,7 +121,8 @@ function ProductCard({ product, selected, onEdit }: { product: Product; selected
         <div className={styles.productDetails}>
           <span className={styles.categoryLabel}>{product.category}</span>
           <strong>{product.name}</strong>
-          <small className={styles.stockText}>{product.stock} {product.unit} in stock</small>
+          <small className={styles.stockText}>{product.stock} {product.unit} in stock · {product.sold} sold</small>
+          <ProductRating productId={product.id} />
         </div>
         <div className={styles.price}><strong>{currency(product.price)}</strong><small>PER {product.unit}</small></div>
       </div>
@@ -215,12 +218,16 @@ export function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [salesError, setSalesError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [draft, setDraft] = useState<ProductDraft>(emptyDraft())
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const productDocsForBackfill = useRef<Array<{ id: string; data: Record<string, unknown> }> | null>(null)
+  const orderDocsForBackfill = useRef<Array<Record<string, unknown>> | null>(null)
+  const salesBackfillStarted = useRef(false)
   const selectedProduct = products.find((product) => product.id === selectedId)
   const visibleProducts = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -232,9 +239,66 @@ export function AdminProductsPage() {
   }, [products, search])
 
   useEffect(() => {
+    async function backfillSalesCounts() {
+      const productDocs = productDocsForBackfill.current
+      const orderDocs = orderDocsForBackfill.current
+      if (!productDocs || !orderDocs || orderDocs.length === 0 || salesBackfillStarted.current) return
+
+      const productIds = new Set(productDocs.map(({ id }) => id))
+      const productIdByName = new Map(
+        productDocs.map(({ id, data }) => [
+          typeof data.name === 'string' ? data.name.trim().toLowerCase() : '',
+          id,
+        ])
+      )
+      const soldByProductId = new Map<string, number>()
+
+      orderDocs.forEach((order) => {
+        if (!Array.isArray(order.items)) return
+        order.items.forEach((item) => {
+          if (!item || typeof item !== 'object') return
+          const itemData = item as Record<string, unknown>
+          const quantity = typeof itemData.quantity === 'number' ? itemData.quantity : 0
+          if (!Number.isFinite(quantity) || quantity <= 0) return
+
+          const itemProductId = typeof itemData.productId === 'string' ? itemData.productId : ''
+          const productId = productIds.has(itemProductId)
+            ? itemProductId
+            : typeof itemData.name === 'string'
+              ? productIdByName.get(itemData.name.trim().toLowerCase())
+              : undefined
+          if (productId) {
+            soldByProductId.set(productId, (soldByProductId.get(productId) ?? 0) + quantity)
+          }
+        })
+      })
+
+      const productsToUpdate = productDocs.filter(({ data }) =>
+        typeof data.sold !== 'number' || !Number.isFinite(data.sold)
+      )
+      try {
+        for (let index = 0; index < productsToUpdate.length; index += 450) {
+          const batch = writeBatch(db)
+          productsToUpdate.slice(index, index + 450).forEach(({ id }) => {
+            batch.update(doc(db, 'products', id), { sold: soldByProductId.get(id) ?? 0 })
+          })
+          await batch.commit()
+        }
+        setSalesError('')
+      } catch (backfillError) {
+        console.error('Initializing product sales totals failed:', backfillError)
+        salesBackfillStarted.current = false
+        setSalesError('Unable to initialize existing sales totals. Please refresh and try again.')
+      }
+    }
+
     const unsubscribe = onSnapshot(
       collection(db, 'products'),
       (snapshot) => {
+        productDocsForBackfill.current = snapshot.docs.map((product) => ({
+          id: product.id,
+          data: product.data(),
+        }))
         setProducts(snapshot.docs.map((product) => {
           const data = product.data()
           const rawImageUrl = typeof data.imageUrl === 'string' ? data.imageUrl : ''
@@ -249,10 +313,12 @@ export function AdminProductsPage() {
             image: imageUrl,
             rawImageUrl,
             available: typeof data.isAvailable === 'boolean' ? data.isAvailable : true,
+            sold: typeof data.sold === 'number' && Number.isFinite(data.sold) ? data.sold : 0,
           }
         }))
         setError('')
         setIsLoading(false)
+        void backfillSalesCounts()
       },
       (loadError) => {
         console.error('Loading products failed:', loadError)
@@ -261,7 +327,22 @@ export function AdminProductsPage() {
       }
     )
 
-    return () => unsubscribe()
+    const unsubscribeOrders = onSnapshot(
+      collection(db, 'orders'),
+      (snapshot) => {
+        orderDocsForBackfill.current = snapshot.docs.map((order) => order.data())
+        void backfillSalesCounts()
+      },
+      (loadError) => {
+        console.error('Loading orders for product sales totals failed:', loadError)
+        setSalesError('Unable to load order sales totals. Please refresh and try again.')
+      }
+    )
+
+    return () => {
+      unsubscribe()
+      unsubscribeOrders()
+    }
   }, [])
 
   function startAdd() {
@@ -351,11 +432,13 @@ export function AdminProductsPage() {
       } else {
         await setDoc(productDocRef, {
           ...productData,
+          sold: 0,
           createdAt: serverTimestamp(),
         })
         const newProduct: Product = {
           ...normalized,
           id: productId,
+          sold: 0,
           image: resolveProductImage(imageUrlToSave, 'shop-apple.png'),
           rawImageUrl: imageUrlToSave,
         }
@@ -396,6 +479,7 @@ export function AdminProductsPage() {
             {visibleProducts.map((product) => <ProductCard key={product.id} product={product} selected={selectedId === product.id} onEdit={() => startEdit(product)} />)}
             {isLoading && <p className={styles.empty}>Loading products...</p>}
             {!isLoading && error && !isFormOpen && <p className={styles.empty} role="alert">{error}</p>}
+            {!isLoading && salesError && <p className={styles.empty} role="alert">{salesError}</p>}
             {!isLoading && !error && visibleProducts.length === 0 && <p className={styles.empty}>{search.trim() ? 'No products match your search.' : 'No products found.'}</p>}
           </section>
           {isFormOpen && (
