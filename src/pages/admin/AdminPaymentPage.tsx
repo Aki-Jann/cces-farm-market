@@ -13,6 +13,7 @@ type PaymentRecord = {
   date: string
   items: string[]
   method: string
+  paymentReceiptUrl: string
   amount: number
   // Firestore orders collection does not contain a separate payment status field.
   // We track the order fulfillment status here to calculate pending order totals.
@@ -79,6 +80,7 @@ function PaymentTable({
           <strong>DATE</strong>
           <strong>ITEMS</strong>
           <strong>METHOD</strong>
+          <strong>DIGITAL RECEIPT</strong>
           <strong>AMOUNT</strong>
         </div>
         {isLoading ? (
@@ -97,6 +99,13 @@ function PaymentTable({
               <span>{payment.date}</span>
               <span>{payment.items.length > 0 ? payment.items.join(', ') : '—'}</span>
               <span>{payment.method}</span>
+              <span className={styles.receiptCell}>
+                {payment.method === 'GCASH' || payment.method === 'MAYA'
+                  ? payment.paymentReceiptUrl
+                    ? <a href={payment.paymentReceiptUrl} target="_blank" rel="noreferrer" aria-label={`View payment receipt for order ${payment.orderId}`}><img src={payment.paymentReceiptUrl} alt={`Payment receipt for order ${payment.orderId}`} /><span>View receipt</span></a>
+                    : <span className={styles.receiptMissing}>Not uploaded</span>
+                  : <span className={styles.receiptNotRequired}>Not required</span>}
+              </span>
               <strong>{currency(payment.amount)}</strong>
             </div>
           ))
@@ -143,6 +152,7 @@ export function AdminPaymentPage() {
             date: formatOrderDate(parsedDate),
             items,
             method,
+            paymentReceiptUrl: typeof data.paymentReceiptUrl === 'string' ? data.paymentReceiptUrl : '',
             amount: typeof data.total === 'number' && !isNaN(data.total) ? data.total : 0,
             fulfillmentStatus: rawStatus,
             createdAtDate: parsedDate,
@@ -222,4 +232,3 @@ export function AdminPaymentPage() {
     </main>
   )
 }
-
