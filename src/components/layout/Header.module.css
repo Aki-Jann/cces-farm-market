@@ -1,59 +1,74 @@
 .header {
   align-items: center;
-  background: #fff;
+  background: rgb(255 255 255 / 96%);
+  border-bottom: 1px solid #e8ede9;
   box-sizing: border-box;
-  box-shadow: 0 3px 5px rgb(0 0 0 / 10%);
   display: flex;
   flex: 0 0 auto;
-  gap: 10px;
-  min-height: 4.5em;
-  padding: 20px 30px;
+  gap: 18px;
+  min-height: 76px;
+  padding: 14px 30px;
   position: sticky;
   top: 0;
   z-index: 10;
 }
 
 .header h1 {
-  color: #017632;
+  color: #183b28;
   flex: 0 0 auto;
-  font-size: 2rem;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -.035em;
   line-height: 1;
   margin: 0;
 }
 
 .search {
   align-items: center;
-  background: #f5f5f5;
-  border-radius: 53px;
+  background: #f5f8f5;
+  border: 1px solid #e8eee9;
+  border-radius: 9px;
   display: flex;
   flex: 1 1 260px;
-  gap: 0.5rem;
-  height: auto;
+  gap: 9px;
+  min-height: 40px;
   min-width: 0;
-  padding: 5px 10px;
+  padding: 0 12px;
+  transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.search:focus-within {
+  background: #fff;
+  border-color: #76ae84;
+  box-shadow: 0 0 0 3px rgb(8 123 59 / 9%);
 }
 
 .search svg {
-  color: #6c7175;
+  color: #7b887f;
   flex: 0 0 auto;
-  font-size: 1rem;
+  height: 15px;
+  width: 15px;
 }
 
 .search input {
   background: transparent;
   border: 0;
-  color: #191919;
-  font-size: 1rem;
+  color: #26372b;
+  font-size: 13px;
   min-width: 0;
   outline: 0;
   width: 100%;
+}
+
+.search input::placeholder {
+  color: #89958c;
 }
 
 .actions {
   align-items: center;
   display: flex;
   flex: 0 0 auto;
-  gap: 20px;
+  gap: 5px;
 }
 
 .logoSlot {
@@ -63,41 +78,42 @@
 
 .actions :where(button, a) {
   background: transparent;
-  border: 0;
-  border-radius: 5px;
-  color: #017632;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: #526157;
   cursor: pointer;
   font: inherit;
-  font-size: 16px;
-  padding: 9px 12px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .025em;
+  padding: 9px 11px;
   text-decoration: none;
-  transition: background-color 160ms ease, color 160ms ease;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
   white-space: nowrap;
 }
 
-.actions :where(button, a):hover,
+.actions :where(button, a):hover {
+  background: #f1f7f2;
+  color: #087b3b;
+}
+
 .actions :where(button, a):focus-visible {
-  background: #cce9d5;
-  outline: 0;
+  outline: 3px solid rgb(1 118 50 / 22%);
+  outline-offset: 2px;
 }
 
 .actions :where(button, a)[aria-current='page'],
 .actions :where(button, a).active {
-  background: #017632;
-  color: #fff;
-  font-weight: 700;
-}
-
-.actions :where(button, a)[aria-current='page']:hover,
-.actions :where(button, a).active:hover {
-  background: #015c27;
-  color: #fff;
+  background: #e9f5ec;
+  border-color: #d7eadb;
+  color: #087b3b;
 }
 
 .stacked {
   align-items: stretch;
   flex-direction: row;
   flex-wrap: wrap;
+  gap: 10px 18px;
 }
 
 .stacked .search {
@@ -113,11 +129,11 @@
 @media (max-width: 1050px) {
   .header {
     flex-wrap: wrap;
+    gap: 10px 14px;
   }
 
   .search {
-    flex: 1 1 0;
-    order: 0;
+    flex: 1 1 220px;
   }
 
   .actions {
@@ -128,25 +144,28 @@
 
 @media (max-width: 700px) {
   .header {
-    box-sizing: border-box;
-    gap: 12px;
-    min-height: 70px;
-    padding: 12px;
-    top: 48px;
+    gap: 10px;
+    min-height: 64px;
+    padding: 10px 14px;
+    top: 54px;
   }
 
   .header h1 {
-    font-size: 24px;
+    font-size: 18px;
   }
 
   .search {
-    flex: 1 1 0;
-    order: 0;
-    width: auto;
+    flex: 1 1 130px;
+    min-height: 38px;
+    padding: 0 10px;
+  }
+
+  .search input {
+    font-size: 12px;
   }
 
   .actions {
-    gap: 4px;
+    gap: 3px;
     max-width: 100%;
     min-width: 0;
     overflow-x: auto;
@@ -154,21 +173,13 @@
     width: 100%;
   }
 
-  .actions :where(button, a) {
-    flex: 0 0 auto;
-    font-size: 12px;
-    padding: 8px 4px;
-  }
-
   .actions::-webkit-scrollbar {
     display: none;
   }
 
-  .search {
-    height: 46px;
-  }
-
-  .search input {
-    font-size: 16px;
+  .actions :where(button, a) {
+    flex: 0 0 auto;
+    font-size: 9px;
+    padding: 8px;
   }
 }
