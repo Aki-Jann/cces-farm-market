@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth'
+import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth'
 import { Timestamp, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { BrandLogo } from '../../components/common/BrandLogo'
 import { auth } from '../../firebase/auth'
@@ -62,17 +62,17 @@ function Field({ label, placeholder, type = 'text', value, onChange, error }: Fi
   )
 }
 
-function submitMock(event: FormEvent<HTMLFormElement>, destination: string) {
-  event.preventDefault()
-  window.location.hash = destination
-}
-
 export function AuthPage({ type }: { type: AuthType }) {
   const isRegister = type === 'register'
   const isForgot = type === 'forgot-password'
   const [registrationError, setRegistrationError] = useState('')
   const [loginError, setLoginError] = useState('')
+  const [loginFieldErrors, setLoginFieldErrors] = useState<{ email?: string; password?: string }>({})
   const [loginFields, setLoginFields] = useState({ email: '', password: '' })
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetError, setResetError] = useState('')
+  const [resetSuccess, setResetSuccess] = useState('')
+  const [isSendingReset, setIsSendingReset] = useState(false)
   const [showRegistrationErrors, setShowRegistrationErrors] = useState(false)
   const [registrationFields, setRegistrationFields] = useState<RegistrationFields>({
     firstName: '',
@@ -96,15 +96,32 @@ export function AuthPage({ type }: { type: AuthType }) {
   function updateLoginField(field: keyof typeof loginFields) {
     return (event: ChangeEvent<HTMLInputElement>) => {
       setLoginFields((current) => ({ ...current, [field]: event.target.value }))
+      setLoginFieldErrors((current) => ({ ...current, [field]: undefined }))
+      setLoginError('')
     }
   }
 
   async function login(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setLoginError('')
+    setLoginFieldErrors({})
+
+    const email = loginFields.email.trim()
+    const fieldErrors: { email?: string; password?: string } = {}
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      fieldErrors.email = 'Enter a valid email address.'
+    }
+    if (!loginFields.password) {
+      fieldErrors.password = 'Enter your password.'
+    }
+
+    if (Object.keys(fieldErrors).length > 0) {
+      setLoginFieldErrors(fieldErrors)
+      return
+    }
 
     try {
-      const credential = await signInWithEmailAndPassword(auth, loginFields.email, loginFields.password)
+      const credential = await signInWithEmailAndPassword(auth, email, loginFields.password)
       const profileSnapshot = await getDoc(doc(db, 'users', credential.user.uid))
 
       if (!profileSnapshot.exists()) {
@@ -127,15 +144,54 @@ export function AuthPage({ type }: { type: AuthType }) {
     } catch (error) {
       console.error('Login failed:', error)
       const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : ''
+      if (code === 'auth/wrong-password') {
+        setLoginFieldErrors({ password: 'Incorrect password.' })
+        return
+      }
+      if (code === 'auth/invalid-credential') {
+        setLoginFieldErrors({ password: 'Incorrect email or password.' })
+        return
+      }
+      if (code === 'auth/invalid-email') {
+        setLoginFieldErrors({ email: 'Enter a valid email address.' })
+        return
+      }
       const messages: Record<string, string> = {
-        'auth/invalid-credential': 'The email or password is incorrect.',
         'auth/user-not-found': 'The email or password is incorrect.',
-        'auth/wrong-password': 'The email or password is incorrect.',
-        'auth/invalid-email': 'Enter a valid email address.',
         'auth/too-many-requests': 'Too many attempts. Please try again later.',
         'auth/network-request-failed': 'A network error occurred. Check your connection and try again.',
       }
       setLoginError(messages[String(code)] ?? 'Unable to sign in. Please try again.')
+    }
+  }
+
+  async function sendResetLink(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setResetError('')
+    setResetSuccess('')
+
+    const email = resetEmail.trim()
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setResetError('Enter a valid email address.')
+      return
+    }
+
+    setIsSendingReset(true)
+    try {
+      await sendPasswordResetEmail(auth, email)
+      setResetSuccess('If an account exists for this email, a password reset link has been sent.')
+    } catch (error) {
+      console.error('Sending password reset email failed:', error)
+      const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : ''
+      const messages: Record<string, string> = {
+        'auth/invalid-email': 'Enter a valid email address.',
+        'auth/user-not-found': 'No account was found with this email address.',
+        'auth/too-many-requests': 'Too many attempts. Please try again later.',
+        'auth/network-request-failed': 'A network error occurred. Check your connection and try again.',
+      }
+      setResetError(messages[String(code)] ?? 'Unable to send the reset email. Please try again.')
+    } finally {
+      setIsSendingReset(false)
     }
   }
 
@@ -176,7 +232,11 @@ export function AuthPage({ type }: { type: AuthType }) {
 
   if (isRegister) {
     return (
-      <main className={styles.authCanvas}>
+      <main className={`${styles.authCanvas} ${styles.registerCanvas}`}>
+        <a className={styles.homeButton} href="#/" aria-label="Back to the landing page">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /><path d="M9 12h12" /></svg>
+          <span>BACK TO HOME</span>
+        </a>
         <form className={`${styles.authCard} ${styles.registerCard}`} onSubmit={register} noValidate>
           <div className={styles.authLogo}><BrandLogo compact /></div>
           <div className={styles.authHeading}>
@@ -205,7 +265,11 @@ export function AuthPage({ type }: { type: AuthType }) {
 
   return (
     <main className={styles.authCanvas}>
-      <form className={`${styles.authCard} ${isForgot ? styles.forgotCard : ''}`} onSubmit={isForgot ? (event) => submitMock(event, '/login') : login}>
+      <a className={styles.homeButton} href="#/" aria-label="Back to the landing page">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /><path d="M9 12h12" /></svg>
+        <span>BACK TO HOME</span>
+      </a>
+      <form className={`${styles.authCard} ${isForgot ? styles.forgotCard : ''}`} onSubmit={isForgot ? sendResetLink : login} noValidate>
         <div className={styles.authLogo}><BrandLogo compact /></div>
         <div className={styles.authHeading}>
           <h1>{isForgot ? 'Forgot Password' : 'Welcome Back!'}</h1>
@@ -216,24 +280,37 @@ export function AuthPage({ type }: { type: AuthType }) {
             label={isForgot ? 'Email' : 'Email Address'}
             placeholder="name@example.com"
             type="email"
-            value={isForgot ? undefined : loginFields.email}
-            onChange={isForgot ? undefined : updateLoginField('email')}
+            value={isForgot ? resetEmail : loginFields.email}
+            onChange={isForgot ? (event) => {
+              setResetEmail(event.target.value)
+              setResetError('')
+              setResetSuccess('')
+            } : updateLoginField('email')}
+            error={isForgot ? resetError : loginFieldErrors.email}
           />
+          {isForgot && resetSuccess && <p className={styles.fieldSuccess} role="status">{resetSuccess}</p>}
           {!isForgot && (
             <div className={styles.passwordGroup}>
-              <Field label="Password" placeholder="Enter Password" type="password" value={loginFields.password} onChange={updateLoginField('password')} />
+              <Field label="Password" placeholder="Enter Password" type="password" value={loginFields.password} onChange={updateLoginField('password')} error={loginFieldErrors.password} />
               <a href="#/forgot-password" className={styles.inlineLink}>Forgot Password?</a>
             </div>
           )}
+          {!isForgot && loginError && <p className={styles.registrationError} role="alert">{loginError}</p>}
         </div>
         {!isForgot && (
           <>
-            {loginError && <p className={styles.registrationError} role="alert">{loginError}</p>}
             <button type="submit" className={styles.submitButton}>SUBMIT</button>
             <p className={styles.switchPrompt}>New to GreenMarket? <a href="#/register">Register Here</a></p>
           </>
         )}
-        {isForgot && <a href="#/login" className={styles.backLink}>Back to Login</a>}
+        {isForgot && (
+          <>
+            <button className={styles.submitButton} disabled={isSendingReset} type="submit">
+              {isSendingReset ? 'SENDING…' : 'SEND RESET LINK'}
+            </button>
+            <a href="#/login" className={styles.backLink}>Back to Login</a>
+          </>
+        )}
       </form>
     </main>
   )
