@@ -14,6 +14,7 @@ type Customer = {
   id: string
   initials: string
   name: string
+  photoUrl: string
   phone: string
   email: string
   segment: string
@@ -58,13 +59,28 @@ function orderStatus(value: unknown): Order['status'] {
   return 'PENDING'
 }
 
+function CustomerAvatar({ customer, large = false }: { customer: Customer; large?: boolean }) {
+  const [imageFailed, setImageFailed] = useState(false)
+
+  return (
+    <span className={large ? styles.largeAvatar : styles.avatar}>
+      {customer.photoUrl && !imageFailed
+        ? <img alt="" onError={() => setImageFailed(true)} src={customer.photoUrl} />
+        : customer.initials}
+    </span>
+  )
+}
+
 function CustomerList({ customers, selectedId, onSelect }: { customers: Customer[]; selectedId: string; onSelect: (id: string) => void }) {
   return (
     <aside className={styles.customerList} aria-label="Customers">
+      <div className={styles.customerListHeader}>
+        <div><h2>Customers</h2><span>{customers.length} profiles</span></div>
+      </div>
       {customers.map((customer) => (
         <button className={selectedId === customer.id ? styles.selectedCustomer : ''} key={customer.id} type="button" onClick={() => onSelect(customer.id)}>
-          <span className={styles.avatar}>{customer.initials}</span>
-          <span className={styles.customerSummary}><strong>{customer.name}</strong><small>{customer.phone}</small><small>{customer.orders.length} ORDER{customer.orders.length === 1 ? '' : 'S'}</small></span>
+          <CustomerAvatar key={`${customer.id}-${customer.photoUrl}`} customer={customer} />
+          <span className={styles.customerSummary}><strong>{customer.name}</strong><small>{customer.phone || customer.email || 'No contact details'}</small><small>{customer.orders.length} ORDER{customer.orders.length === 1 ? '' : 'S'}</small></span>
           <span className={styles.segment}>{customer.segment}</span>
           <strong className={styles.spent}>{currency(customer.orders.reduce((sum, order) => sum + order.total, 0))} spent</strong>
         </button>
@@ -77,7 +93,7 @@ function CustomerHeader({ customer, onChangeCustomerType }: { customer: Customer
   const [isEditing, setIsEditing] = useState(false)
   const customerType = normalizeCustomerType(customer.segment)
 
-  return <div className={styles.customerHeader}><span className={styles.largeAvatar}>{customer.initials}</span><div><h2>{customer.name}</h2><p>{customer.phone} <a href={`mailto:${customer.email}`}>{customer.email}</a></p></div><div className={styles.headerMeta}>{isEditing ? <select className={styles.customerTypeSelect} aria-label="Customer type" autoFocus value={customerType} onChange={(event) => { onChangeCustomerType(event.target.value as CustomerType); setIsEditing(false) }} onBlur={() => setIsEditing(false)}>{customerTypes.map((type) => <option key={type} value={type}>{type}</option>)}</select> : <strong onClick={() => setIsEditing(true)} role="button" tabIndex={0}>{customer.segment}</strong>}<small>Since {customer.joined}</small></div></div>
+  return <div className={styles.customerHeader}><CustomerAvatar key={`${customer.id}-${customer.photoUrl}`} customer={customer} large /><div className={styles.customerIdentity}><h2>{customer.name}</h2><p>{customer.phone || 'Phone not provided'}{customer.email && <> <a href={`mailto:${customer.email}`}>{customer.email}</a></>}</p></div><div className={styles.headerMeta}>{isEditing ? <select className={styles.customerTypeSelect} aria-label="Customer type" autoFocus value={customerType} onChange={(event) => { onChangeCustomerType(event.target.value as CustomerType); setIsEditing(false) }} onBlur={() => setIsEditing(false)}>{customerTypes.map((type) => <option key={type} value={type}>{type}</option>)}</select> : <button className={styles.customerTypeButton} type="button" onClick={() => setIsEditing(true)}>{customer.segment} <span aria-hidden="true">⌄</span></button>}<small>Customer since {customer.joined}</small></div></div>
 }
 
 function Profile({ customer, onSaveNotes, isSaving }: {
@@ -97,8 +113,10 @@ function Profile({ customer, onSaveNotes, isSaving }: {
 
   return <div className={styles.profile}>
     <div className={styles.stats}><article><strong>{customer.orders.length}</strong><span>TOTAL ORDER{customer.orders.length === 1 ? '' : 'S'}</span></article><article><strong>{currency(spent)}</strong><span>SPENT</span></article><article><strong>{active}</strong><span>ACTIVE ORDER{active === 1 ? '' : 'S'}</span></article></div>
-    <h3>FARM NOTES</h3>{isEditingNotes ? <textarea className={styles.notesEditor} aria-label="Farm notes" autoFocus value={notes} disabled={isSaving} onChange={(event) => setNotes(event.target.value)} onBlur={() => void saveNotes(notes)} onKeyDown={(event) => { if (event.key === 'Escape') { setNotes(customer.farmNotes); setIsEditingNotes(false) } }} /> : <p className={styles.notes} onClick={() => setIsEditingNotes(true)}>{notes || 'No farm notes.'}</p>}
-    <h3>ORDER HISTORY</h3><div className={styles.orderHistory}>{customer.orders.map((order) => <div key={order.id}><span>{order.id}</span><span>{order.date}</span><b>{order.status}</b><strong>{currency(order.total)}</strong></div>)}</div>
+    <div className={styles.sectionHeading}><h3>Farm notes</h3>{!isEditingNotes && <button type="button" onClick={() => setIsEditingNotes(true)}>EDIT NOTES</button>}</div>
+    {isEditingNotes ? <textarea className={styles.notesEditor} aria-label="Farm notes" autoFocus value={notes} disabled={isSaving} onChange={(event) => setNotes(event.target.value)} onBlur={() => void saveNotes(notes)} onKeyDown={(event) => { if (event.key === 'Escape') { setNotes(customer.farmNotes); setIsEditingNotes(false) } }} /> : <p className={styles.notes}>{notes || 'No farm notes yet. Add details about this customer’s farm, preferences, or delivery requirements.'}</p>}
+    <div className={styles.sectionHeading}><h3>Order history</h3><span>{customer.orders.length} orders</span></div>
+    {customer.orders.length ? <div className={styles.orderHistory}><div className={styles.orderHistoryHeading}><span>ORDER</span><span>DATE</span><span>STATUS</span><span>TOTAL</span></div>{customer.orders.map((order) => <div className={styles.orderRow} key={order.id}><span>{order.id}</span><span>{order.date}</span><b className={styles[order.status.toLowerCase()]}>{order.status}</b><strong>{currency(order.total)}</strong></div>)}</div> : <p className={styles.emptyOrders}>No orders from this customer yet.</p>}
   </div>
 }
 
@@ -225,6 +243,8 @@ export function AdminCustomersPage() {
         id,
         initials: name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase(),
         name: name.toUpperCase(),
+        photoUrl: [data.photoURL, data.photoUrl, data.profilePicture, data.profileImage, data.avatarUrl]
+          .find((value): value is string => typeof value === 'string' && value.trim().length > 0)?.trim() ?? '',
         phone: typeof data.contactNumber === 'string' ? data.contactNumber : '',
         email: typeof data.email === 'string' ? data.email : '',
         segment: customerType.toUpperCase(),

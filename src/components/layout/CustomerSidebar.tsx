@@ -13,7 +13,7 @@ export function CustomerSidebar({ active }: { active: CustomerNavItem }) {
   return (
     <nav className={styles.sidebar} aria-label="Customer navigation">
       <div className={styles.top}>
-        <BrandLogo compact />
+        <div className={styles.logo}><BrandLogo compact /></div>
         <div className={styles.rule} />
         {links.map((link) => (
           <a className={active === link.key ? styles.active : ''} href={link.href} key={link.key}>

@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { collection, onSnapshot } from 'firebase/firestore'
+import { onAuthStateChanged } from 'firebase/auth'
+import { collection, doc, onSnapshot } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
+import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import styles from './AdminDashboard.module.css'
 
-type RevenuePoint = { day: string; amount: number; fill: 'green' | 'lime' | 'empty' }
+type RevenuePoint = { day: string; amount: number; isToday: boolean; fill: 'green' | 'today' | 'empty' }
 type RecentOrder = { id: string; customer: string; total: number; status: 'PENDING' | 'CONFIRMED' | 'PACKED' | 'DELIVERED'; createdAtTime: number }
 type InventoryItem = { name: string; category: string; stock: string; stockNum: number; isAvailable: boolean }
 
@@ -59,13 +61,14 @@ function formatCategory(category?: string): string {
   return category.charAt(0).toUpperCase() + category.slice(1).toLowerCase()
 }
 
-function StatCard({ label, value, note }: { label: string; value: string; note: string }) {
+function StatCard({ label, value, note, href }: { label: string; value: string; note: string; href: string }) {
   return (
-    <article className={styles.statCard}>
+    <a className={styles.statCard} href={href}>
       <h2>{label}</h2>
       <strong>{value}</strong>
       <p>{note}</p>
-    </article>
+      <span className={styles.cardArrow} aria-hidden="true">→</span>
+    </a>
   )
 }
 
@@ -77,7 +80,7 @@ function RevenueChart({ revenue }: { revenue: RevenuePoint[] }) {
       <div className={styles.panelHeading}><h2>WEEKLY REVENUE</h2><a href="#/admin/analytics">See more</a></div>
       <div className={styles.chart}>
         {revenue.map((point) => (
-          <div className={styles.barColumn} key={point.day}>
+          <div className={`${styles.barColumn} ${point.isToday ? styles.today : ''}`} key={point.day}>
             <span>{point.amount > 0 ? currency(point.amount).replace('.00', '') : '₱0'}</span>
             <div className={styles.barTrack}>
               <div className={`${styles.barFill} ${styles[point.fill]}`} style={{ height: `${point.fill === 'empty' ? 0 : (point.amount / safeMax) * 100}%` }} />
@@ -99,11 +102,11 @@ function RecentOrders({ orders }: { orders: RecentOrder[] }) {
           <p style={{ color: '#6c7175', fontSize: '13px', margin: '16px 0' }}>No orders found.</p>
         ) : (
           orders.slice(0, 4).map((order) => (
-            <div className={styles.orderRow} key={order.id}>
+            <a className={styles.orderRow} href="#/admin/orders" key={order.id} aria-label={`Open orders to view ${order.id}, ${order.status}`}>
               <div><strong>{order.customer}</strong><small>{order.id}</small></div>
-              <span className={styles.status}>{order.status}</span>
+              <span className={`${styles.status} ${styles[order.status.toLowerCase()]}`}>{order.status}</span>
               <strong>{currency(order.total)}</strong>
-            </div>
+            </a>
           ))
         )}
       </div>
@@ -120,10 +123,10 @@ function ProductInventory({ items }: { items: InventoryItem[] }) {
           <p style={{ color: '#6c7175', fontSize: '13px', margin: '16px 0' }}>No products found.</p>
         ) : (
           items.slice(0, 4).map((item) => (
-            <div className={styles.inventoryRow} key={item.name}>
+            <a className={styles.inventoryRow} href="#/admin/products" key={item.name} aria-label={`Open product inventory to manage ${item.name}`}>
               <div><strong>{item.name}</strong><small>{item.category}</small></div>
               <strong>{item.stock}</strong>
-            </div>
+            </a>
           ))
         )}
       </div>
@@ -133,11 +136,47 @@ function ProductInventory({ items }: { items: InventoryItem[] }) {
 
 export function AdminDashboard() {
   const [search, setSearch] = useState('')
+  const [adminName, setAdminName] = useState('')
   const [orders, setOrders] = useState<FirestoreOrder[]>([])
   const [products, setProducts] = useState<FirestoreProduct[]>([])
   const [ordersLoaded, setOrdersLoaded] = useState(false)
   const [productsLoaded, setProductsLoaded] = useState(false)
   const isLoading = !ordersLoaded || !productsLoaded
+
+  useEffect(() => {
+    let unsubscribeProfile: (() => void) | undefined
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      unsubscribeProfile?.()
+      unsubscribeProfile = undefined
+
+      if (!user) {
+        setAdminName('')
+        return
+      }
+
+      setAdminName(user.displayName?.trim() || user.email?.split('@')[0] || 'Admin')
+      unsubscribeProfile = onSnapshot(
+        doc(db, 'users', user.uid),
+        (snapshot) => {
+          if (!snapshot.exists() || snapshot.data().role !== 'admin') return
+          const data = snapshot.data()
+          const profileName = [data.firstName, data.lastName]
+            .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+            .map((part) => part.trim())
+            .join(' ')
+          if (profileName) setAdminName(profileName)
+        },
+        (profileError) => {
+          console.error('Loading admin welcome profile failed:', profileError)
+        }
+      )
+    })
+
+    return () => {
+      unsubscribeAuth()
+      unsubscribeProfile?.()
+    }
+  }, [])
 
   // Orders and products are independent collections, so each gets its own
   // real-time listener rather than merging unrelated data into one.
@@ -206,6 +245,7 @@ export function AdminDashboard() {
       compStart: number
       compEnd: number
       amount: number
+      isToday: boolean
     }> = []
 
     for (let i = 0; i < 7; i++) {
@@ -226,6 +266,7 @@ export function AdminDashboard() {
         compStart,
         compEnd,
         amount: 0,
+        isToday: offset === 0,
       })
     }
 
@@ -279,15 +320,12 @@ export function AdminDashboard() {
         : '0% vs last week'
 
     // Revenue chart points fill determination
-    const maxDayAmount = Math.max(0, ...days.map((d) => d.amount))
     const revPoints: RevenuePoint[] = days.map((day) => {
-      let fill: 'green' | 'lime' | 'empty' = 'empty'
-      if (day.amount > 0) {
-        fill = day.amount >= maxDayAmount * 0.7 ? 'green' : 'lime'
-      }
+      const fill: RevenuePoint['fill'] = day.amount <= 0 ? 'empty' : day.isToday ? 'today' : 'green'
       return {
         day: day.dayLabel,
         amount: day.amount,
+        isToday: day.isToday,
         fill,
       }
     })
@@ -341,32 +379,59 @@ export function AdminDashboard() {
     )
   }, [inventoryList, search])
 
+  const currentHour = new Date().getHours()
+  const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening'
+  const todayLabel = new Intl.DateTimeFormat('en-PH', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date())
+
   return (
     <main className={styles.page}>
       <AdminSidebar active="dashboard" />
       <section className={styles.content}>
         <Header title="DASHBOARD" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
         <div className={styles.dashboard}>
+          <section className={styles.welcome}>
+            <div className={styles.welcomeCopy}>
+              <span className={styles.welcomeEyebrow}>FARM MARKET OVERVIEW</span>
+              <h1>{greeting}{adminName ? `, ${adminName}` : ', Admin'}!</h1>
+              <p>Here’s what’s happening with your farm market today.</p>
+            </div>
+            <div className={styles.welcomeMeta}>
+              <time>{todayLabel}</time>
+              <div className={styles.quickLinks}>
+                <a href="#/admin/orders">VIEW ORDERS</a>
+                <a href="#/admin/products">MANAGE PRODUCTS</a>
+              </div>
+            </div>
+          </section>
           <section className={styles.stats}>
             <StatCard
               label="REVENUE THIS WEEK"
               value={isLoading ? '...' : currency(weeklyRevenue)}
               note={isLoading ? 'Calculating...' : revenueGrowthText}
+              href="#/admin/analytics"
             />
             <StatCard
               label="ACTIVE ORDERS"
               value={isLoading ? '...' : activeOrdersCount.toLocaleString()}
               note={isLoading ? 'Loading...' : `${activeOrdersCount} need attention`}
+              href="#/admin/orders"
             />
             <StatCard
               label="FRESH INVENTORY"
               value={isLoading ? '...' : `${totalFreshStock.toLocaleString()}kg`}
               note="Across all crops"
+              href="#/admin/products"
             />
             <StatCard
               label="LISTED PRODUCTS"
               value={isLoading ? '...' : availableProductsCount.toLocaleString()}
               note={`of ${totalProductsCount} total`}
+              href="#/admin/products"
             />
           </section>
           <RevenueChart revenue={revenuePoints} />
@@ -379,4 +444,3 @@ export function AdminDashboard() {
     </main>
   )
 }
-

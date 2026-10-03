@@ -21,6 +21,8 @@ type Order = {
   total: number
   fulfillmentType: 'delivery' | 'pickup'
   address: string
+  pickupDays: string
+  pickupHours: string
   sellerNotes: string
   paymentReceiptUrl: string
   items: OrderItem[]
@@ -88,6 +90,8 @@ function OrderDetails({ order, onAdvance, onBack, isUpdating }: { order: Order; 
             <strong>{order.fulfillmentType === 'pickup' ? 'Pickup location' : 'Address'}</strong>
             <span>{order.address || (order.fulfillmentType === 'pickup' ? 'Temporary farmer pickup address - exact location to be confirmed with the seller.' : 'Not provided')}</span>
           </p>
+          {order.fulfillmentType === 'pickup' && order.pickupDays && <p><strong>Pickup days</strong><span>{order.pickupDays}</span></p>}
+          {order.fulfillmentType === 'pickup' && order.pickupHours && <p><strong>Pickup hours</strong><span>{order.pickupHours}</span></p>}
         {order.sellerNotes && <p><strong>Note to seller</strong><span>{order.sellerNotes}</span></p>}
         {order.paymentReceiptUrl && <a href={order.paymentReceiptUrl} target="_blank" rel="noreferrer">View payment receipt</a>}
       </div>
@@ -164,6 +168,8 @@ export function AdminOrdersPage() {
             total: typeof data.total === 'number' ? data.total : 0,
             fulfillmentType: data.fulfillmentType === 'pickup' ? 'pickup' : 'delivery',
             address: typeof data.deliveryAddress === 'string' ? data.deliveryAddress : '',
+            pickupDays: typeof data.pickupDays === 'string' ? data.pickupDays : '',
+            pickupHours: typeof data.pickupHours === 'string' ? data.pickupHours : '',
             sellerNotes: typeof data.sellerNotes === 'string' ? data.sellerNotes : '',
             paymentReceiptUrl: typeof data.paymentReceiptUrl === 'string' ? data.paymentReceiptUrl : '',
             items: items.flatMap((item) => {

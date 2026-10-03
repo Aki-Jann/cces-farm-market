@@ -1,51 +1,109 @@
 .authCanvas {
   align-items: center;
-  background: #f4f4f4;
+  background:
+    radial-gradient(ellipse at 15% 12%, rgb(220 239 224 / 78%), transparent 34%),
+    radial-gradient(ellipse at 88% 86%, rgb(231 241 228 / 76%), transparent 32%),
+    var(--color-canvas);
   display: flex;
   justify-content: center;
   min-height: 100vh;
-  padding: 32px;
+  padding: clamp(20px, 4vw, 48px);
+  position: relative;
+}
+
+.homeButton {
+  align-items: center;
+  background: rgb(255 255 255 / 88%);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  box-shadow: 0 3px 12px rgb(24 56 35 / 5%);
+  color: #526157;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 700;
+  gap: 7px;
+  left: clamp(12px, 3vw, 32px);
+  letter-spacing: .05em;
+  padding: 9px 13px;
+  position: absolute;
+  text-decoration: none;
+  top: clamp(12px, 3vw, 28px);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 150ms ease;
+  z-index: 2;
+}
+
+.homeButton:hover {
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+  color: var(--color-brand);
+  transform: translateX(-2px);
+}
+
+.homeButton:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.homeButton svg {
+  fill: none;
+  height: 15px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  width: 15px;
+}
+
+.registerCanvas {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+  padding: 10px;
 }
 
 .authCard {
-  background: #fff;
-  border-radius: 10px;
-  box-shadow: 0 3px 5px rgb(0 0 0 / 10%);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-panel);
   display: flex;
   flex-direction: column;
-  gap: 15px;
-  padding: 30px;
-  width: 28em;
+  gap: 12px;
+  padding: 20px 30px;
+  width: min(100%, 440px);
 }
 
 .authLogo {
   align-self: center;
   display: flex;
   justify-content: center;
+  margin-bottom: 0;
 }
 
 .authHeading {
-  color: #191919;
+  color: var(--color-text);
   text-align: center;
 }
 
 .authHeading h1 {
-  color: #017632;
-  font-size: 1.75rem;
-  line-height: 1.05;
+  color: #183b28;
+  font-size: 24px;
+  letter-spacing: -.035em;
+  line-height: 1.15;
   margin: 0;
 }
 
 .authHeading p {
-  font-size: 1rem;
-  margin: 0.25rem 0 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  margin: 2px 0 0;
 }
 
 .authFields,
 .passwordGroup {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
 }
 
 .passwordGroup {
@@ -55,35 +113,46 @@
 .field {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 5px;
   width: 100%;
 }
 
 .field > span {
-  color: #017632;
-  font-size: 0.875rem;
-  font-weight: 600;
+  color: #405747;
+  font-size: 11px;
+  font-weight: 700;
 }
 
 .field input {
-  background: #f5f5f5;
-  border: 0;
-  border-radius: 5px;
-  color: #191919;
-  font-size: 1rem;
-  min-height: 30px;
-  outline: 1px solid transparent;
-  padding: 10px;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text);
+  font-size: 12px;
+  min-height: 38px;
+  padding: 8px 9px;
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
   width: 100%;
 }
 
 .field input::placeholder {
-  color: #6c7175;
+  color: #89958c;
   opacity: 1;
 }
 
 .field input:focus {
-  outline-color: #017632;
+  background: var(--color-surface);
+  border-color: #76ae84;
+  box-shadow: 0 0 0 3px rgb(8 123 59 / 9%);
+  outline: 0;
+}
+
+.field input[aria-invalid='true'] {
+  border-color: #d98f85;
+}
+
+.field input[aria-invalid='true']:focus {
+  box-shadow: 0 0 0 3px rgb(180 35 24 / 10%);
 }
 
 .fieldError,
@@ -96,11 +165,27 @@
 }
 
 .fieldError {
+  font-size: 10px;
   margin: -6px 0 0;
 }
 
+.fieldSuccess {
+  color: var(--color-brand);
+  font-size: 10px;
+  line-height: 1.25;
+  margin: -6px 0 0;
+  overflow-wrap: anywhere;
+}
+
 .registrationError {
+  background: #fff4f2;
+  border: 1px solid #f3d2cc;
+  border-radius: var(--radius-control);
+  color: #b42318;
+  font-size: 12px;
+  line-height: 1.35;
   margin: 0;
+  padding: 9px 11px;
   width: 100%;
 }
 
@@ -108,8 +193,9 @@
 .backLink,
 .switchPrompt a,
 .registerAction a {
-  color: #017632;
-  font-size: 0.875rem;
+  color: var(--color-brand);
+  font-size: 12px;
+  font-weight: 600;
   text-decoration: none;
 }
 
@@ -118,17 +204,39 @@
 }
 
 .submitButton {
-  background: #017632;
+  background: var(--color-brand);
   border: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   color: #fff;
   cursor: pointer;
-  font-size: 1rem;
-  padding: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  min-height: 38px;
+  padding: 8px 14px;
+  transition: background-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
 }
 
 .submitButton:hover {
-  background-color: #015c27;
+  background-color: var(--color-brand-strong);
+  box-shadow: 0 5px 12px rgb(6 100 49 / 18%);
+  transform: translateY(-1px);
+}
+
+.submitButton:active {
+  box-shadow: none;
+  transform: translateY(0);
+}
+
+.submitButton:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.submitButton:disabled {
+  cursor: wait;
+  opacity: .7;
+  transform: none;
 }
 
 .registerAction a:hover,
@@ -141,7 +249,8 @@
 .switchPrompt,
 .backLink {
   align-self: center;
-  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  font-size: 11px;
   margin: -2px 0 0;
 }
 
@@ -151,9 +260,9 @@
 
 .registerCard {
   align-self: safe center;
-  gap: 15px;
-  max-width: 40rem;
-  padding: clamp(1.25rem, 4vw, 2rem);
+  gap: 12px;
+  max-width: 680px;
+  padding: 20px 30px;
   width: 100%;
 }
 
@@ -162,27 +271,68 @@
   width: 100%;
 }
 
+.registerCard .authLogo {
+  margin-bottom: -2px;
+  transform: scale(.82);
+}
+
+.registerCard .authHeading h1 {
+  font-size: 24px;
+}
+
+.registerCard .authHeading p {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
 .registerFields {
   display: grid;
-  gap: 20px;
+  gap: 11px 20px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   min-width: 0;
+}
+
+.registerFields .field {
+  gap: 5px;
+}
+
+.registerFields .field > span {
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.registerFields .field input {
+  font-size: 12px;
+  min-height: 38px;
+  padding: 8px 9px;
+}
+
+.registerFields .fieldError,
+.registerFields .registrationError {
+  font-size: 10px;
+  line-height: 1.15;
 }
 
 .registerAction {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 16px;
   grid-column: 1 / -1;
   min-width: 0;
 }
 
 .registerAction p {
-  color: #017632;
+  color: var(--color-text-muted);
+  font-size: 11px;
   margin: 0;
-  font-size: 0.875rem;
   text-align: center;
   white-space: normal;
+}
+
+.registerAction .submitButton,
+.registerAction .disabledButton {
+  min-height: 38px;
+  padding: 8px 14px;
 }
 
 .registerAction .registrationError {
@@ -194,37 +344,37 @@
 }
 
 .disabledButton {
-  background: #d9d9d9;
+  background: #e8ece9;
   border: 0;
-  border-radius: 5px;
-  color: #6c7175;
+  border-radius: var(--radius-control);
+  color: #69766d;
   cursor: pointer;
-  font-size: 1rem;
-  min-height: 3rem;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  min-height: 46px;
   padding: 0 26px;
   width: 100%;
 }
 
 @media (max-width: 760px) {
   .authCanvas {
-    padding: 16px;
+    padding: 20px 16px;
   }
 
   .authCard,
   .registerCard {
-    padding: 28px 20px;
-  }
-
-  .authHeading h1 {
-    font-size: 34px;
+    padding: 20px 30px;
   }
 
   .field > span {
-    font-size: 19px;
+    font-size: 10px;
   }
 
   .field input {
-    font-size: 18px;
+    font-size: 11px;
+    min-height: 36px;
+    padding: 7px;
   }
 
   .registerCard > div:first-child {
@@ -232,6 +382,67 @@
   }
 
   .registerFields {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .registerCanvas {
+    padding: 10px;
+  }
+
+  .registerCard {
+    gap: 10px;
+    padding: 20px 30px;
+  }
+
+  .registerFields {
+    gap: 9px 14px;
+  }
+
+  .registerFields .field > span {
+    font-size: 10px;
+  }
+
+  .registerFields .field input {
+    font-size: 11px;
+    min-height: 36px;
+    padding: 7px;
+  }
+
+  .homeButton {
+    font-size: 9px;
+    padding: 8px 10px;
+  }
+}
+
+@media (max-height: 600px) {
+  .registerCanvas {
+    padding-block: 4px;
+  }
+
+  .registerCard {
+    gap: 8px;
+  }
+
+  .registerCard .authLogo {
+    transform: scale(.68);
+  }
+
+  .registerFields {
+    gap: 6px 12px;
+  }
+
+  .registerFields .field input {
+    min-height: 32px;
+    padding-block: 5px;
+  }
+
+  .registerAction {
+    gap: 12px;
+  }
+
+  .registerAction .submitButton,
+  .registerAction .disabledButton {
+    min-height: 34px;
+    padding-block: 6px;
   }
 }

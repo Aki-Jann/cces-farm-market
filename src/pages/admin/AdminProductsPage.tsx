@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import { collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
+import { collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
+import { ProductRating } from '../../components/common/ProductRating'
 import { db } from '../../firebase/firestore'
 import { productImageKey, productImages, resolveProductImage } from '../../utils/productImages'
 import styles from './AdminProductsPage.module.css'
@@ -18,8 +19,9 @@ type Product = {
   image: string
   rawImageUrl?: string
   available: boolean
+  sold: number
 }
-type ProductDraft = Omit<Product, 'id'>
+type ProductDraft = Omit<Product, 'id' | 'sold'>
 
 const categories: ProductCategory[] = ['VEGETABLES', 'FRUITS', 'GRAINS', 'FLOWERS']
 const imageOptions = [
@@ -111,18 +113,20 @@ function ProductCard({ product, selected, onEdit }: { product: Product; selected
 
   return (
     <article className={`${styles.productCard} ${selected ? styles.selectedCard : ''}`}>
-      <img src={product.image} alt={product.name} />
+      <div className={styles.productImage}>
+        <img src={product.image} alt={product.name} />
+        <span className={`${styles.stockBadge} ${availabilityClass}`}>{availabilityLabel}</span>
+      </div>
       <div className={styles.productInfo}>
-        <div>
+        <div className={styles.productDetails}>
+          <span className={styles.categoryLabel}>{product.category}</span>
           <strong>{product.name}</strong>
-          <small>{product.category}</small>
-          <small className={availabilityClass}>
-            {product.stock} {product.unit} {availabilityLabel}
-          </small>
+          <small className={styles.stockText}>{product.stock} {product.unit} in stock · {product.sold} sold</small>
+          <ProductRating productId={product.id} />
         </div>
         <div className={styles.price}><strong>{currency(product.price)}</strong><small>PER {product.unit}</small></div>
       </div>
-      <button type="button" onClick={onEdit}>EDIT</button>
+      <button className={styles.editButton} type="button" onClick={onEdit}>EDIT PRODUCT</button>
     </article>
   )
 }
@@ -130,19 +134,23 @@ function ProductCard({ product, selected, onEdit }: { product: Product; selected
 function ProductForm({
   draft,
   editing,
+  hasSelectedPhoto,
   isSaving,
   error,
   onChange,
   onFileSelect,
   onSubmit,
+  onCancel,
 }: {
   draft: ProductDraft
   editing: boolean
+  hasSelectedPhoto: boolean
   isSaving: boolean
   error: string
   onChange: (draft: ProductDraft) => void
   onFileSelect: (file: File) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
+  onCancel: () => void
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -156,29 +164,36 @@ function ProductForm({
 
   return (
     <form className={styles.form} onSubmit={onSubmit}>
-      <div
-        className={styles.imagePreview}
-        role="button"
-        tabIndex={0}
-        title="Click to choose a product image"
-        aria-label="Upload product image"
-        onClick={() => fileInputRef.current?.click()}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            fileInputRef.current?.click()
-          }
-        }}
-      >
-        <img src={draft.image} alt="Product preview" />
+      <div className={styles.formHeader}>
+        <div>
+          <span>{editing ? 'PRODUCT DETAILS' : 'INVENTORY'}</span>
+          <h2>{editing ? 'Edit product' : 'Add a product'}</h2>
+        </div>
+        <button className={styles.closeForm} type="button" aria-label="Close product form" onClick={onCancel}>×</button>
+      </div>
+      <section className={styles.photoSection} aria-label="Product photo">
+        <div className={styles.photoSectionHeading}>
+          <div><h3>Product photo</h3><p>Add a clear photo to help customers recognize this product.</p></div>
+          <span className={styles.photoStatus}>{hasSelectedPhoto ? 'NEW PHOTO' : editing ? 'CURRENT PHOTO' : 'PREVIEW'}</span>
+        </div>
+        <div className={styles.imagePreview}>
+          <img src={draft.image} alt={`${draft.name || 'Product'} photo preview`} />
+        </div>
         <input
           ref={fileInputRef}
           type="file"
           accept="image/png,image/jpeg,image/webp"
-          style={{ display: 'none' }}
+          className={styles.fileInput}
+          aria-label="Choose product photo"
           onChange={handleFileChange}
         />
-      </div>
+        <div className={styles.photoActions}>
+          <button className={styles.uploadButton} type="button" onClick={() => fileInputRef.current?.click()}>
+            <span aria-hidden="true">↑</span>{editing || hasSelectedPhoto ? 'CHANGE PHOTO' : 'UPLOAD PHOTO'}
+          </button>
+          <span className={styles.photoHelp}>JPG, PNG, or WEBP · up to 5 MB</span>
+        </div>
+      </section>
       {error && <p className={styles.formError} role="alert">{error}</p>}
       <label>PRODUCT NAME
         <input required value={draft.name} placeholder="e.g. TOMATO" onChange={(event) => onChange({ ...draft, name: event.target.value.toUpperCase() })} />
@@ -203,12 +218,16 @@ export function AdminProductsPage() {
   const [products, setProducts] = useState<Product[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [salesError, setSalesError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [draft, setDraft] = useState<ProductDraft>(emptyDraft())
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const productDocsForBackfill = useRef<Array<{ id: string; data: Record<string, unknown> }> | null>(null)
+  const orderDocsForBackfill = useRef<Array<Record<string, unknown>> | null>(null)
+  const salesBackfillStarted = useRef(false)
   const selectedProduct = products.find((product) => product.id === selectedId)
   const visibleProducts = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -220,9 +239,66 @@ export function AdminProductsPage() {
   }, [products, search])
 
   useEffect(() => {
+    async function backfillSalesCounts() {
+      const productDocs = productDocsForBackfill.current
+      const orderDocs = orderDocsForBackfill.current
+      if (!productDocs || !orderDocs || orderDocs.length === 0 || salesBackfillStarted.current) return
+
+      const productIds = new Set(productDocs.map(({ id }) => id))
+      const productIdByName = new Map(
+        productDocs.map(({ id, data }) => [
+          typeof data.name === 'string' ? data.name.trim().toLowerCase() : '',
+          id,
+        ])
+      )
+      const soldByProductId = new Map<string, number>()
+
+      orderDocs.forEach((order) => {
+        if (!Array.isArray(order.items)) return
+        order.items.forEach((item) => {
+          if (!item || typeof item !== 'object') return
+          const itemData = item as Record<string, unknown>
+          const quantity = typeof itemData.quantity === 'number' ? itemData.quantity : 0
+          if (!Number.isFinite(quantity) || quantity <= 0) return
+
+          const itemProductId = typeof itemData.productId === 'string' ? itemData.productId : ''
+          const productId = productIds.has(itemProductId)
+            ? itemProductId
+            : typeof itemData.name === 'string'
+              ? productIdByName.get(itemData.name.trim().toLowerCase())
+              : undefined
+          if (productId) {
+            soldByProductId.set(productId, (soldByProductId.get(productId) ?? 0) + quantity)
+          }
+        })
+      })
+
+      const productsToUpdate = productDocs.filter(({ data }) =>
+        typeof data.sold !== 'number' || !Number.isFinite(data.sold)
+      )
+      try {
+        for (let index = 0; index < productsToUpdate.length; index += 450) {
+          const batch = writeBatch(db)
+          productsToUpdate.slice(index, index + 450).forEach(({ id }) => {
+            batch.update(doc(db, 'products', id), { sold: soldByProductId.get(id) ?? 0 })
+          })
+          await batch.commit()
+        }
+        setSalesError('')
+      } catch (backfillError) {
+        console.error('Initializing product sales totals failed:', backfillError)
+        salesBackfillStarted.current = false
+        setSalesError('Unable to initialize existing sales totals. Please refresh and try again.')
+      }
+    }
+
     const unsubscribe = onSnapshot(
       collection(db, 'products'),
       (snapshot) => {
+        productDocsForBackfill.current = snapshot.docs.map((product) => ({
+          id: product.id,
+          data: product.data(),
+        }))
         setProducts(snapshot.docs.map((product) => {
           const data = product.data()
           const rawImageUrl = typeof data.imageUrl === 'string' ? data.imageUrl : ''
@@ -237,10 +313,12 @@ export function AdminProductsPage() {
             image: imageUrl,
             rawImageUrl,
             available: typeof data.isAvailable === 'boolean' ? data.isAvailable : true,
+            sold: typeof data.sold === 'number' && Number.isFinite(data.sold) ? data.sold : 0,
           }
         }))
         setError('')
         setIsLoading(false)
+        void backfillSalesCounts()
       },
       (loadError) => {
         console.error('Loading products failed:', loadError)
@@ -249,7 +327,22 @@ export function AdminProductsPage() {
       }
     )
 
-    return () => unsubscribe()
+    const unsubscribeOrders = onSnapshot(
+      collection(db, 'orders'),
+      (snapshot) => {
+        orderDocsForBackfill.current = snapshot.docs.map((order) => order.data())
+        void backfillSalesCounts()
+      },
+      (loadError) => {
+        console.error('Loading orders for product sales totals failed:', loadError)
+        setSalesError('Unable to load order sales totals. Please refresh and try again.')
+      }
+    )
+
+    return () => {
+      unsubscribe()
+      unsubscribeOrders()
+    }
   }, [])
 
   function startAdd() {
@@ -266,6 +359,13 @@ export function AdminProductsPage() {
     setError('')
     setDraft({ ...product })
     setIsFormOpen(true)
+  }
+
+  function closeForm() {
+    setIsFormOpen(false)
+    setSelectedId(null)
+    setSelectedFile(null)
+    setError('')
   }
 
   function handleFileSelect(file: File) {
@@ -332,11 +432,13 @@ export function AdminProductsPage() {
       } else {
         await setDoc(productDocRef, {
           ...productData,
+          sold: 0,
           createdAt: serverTimestamp(),
         })
         const newProduct: Product = {
           ...normalized,
           id: productId,
+          sold: 0,
           image: resolveProductImage(imageUrlToSave, 'shop-apple.png'),
           rawImageUrl: imageUrlToSave,
         }
@@ -350,6 +452,7 @@ export function AdminProductsPage() {
         image: resolveProductImage(imageUrlToSave, 'shop-apple.png'),
         rawImageUrl: imageUrlToSave,
       }))
+      setIsFormOpen(false)
     } catch (saveError) {
       console.error('Saving product failed:', saveError)
       if (saveError instanceof Error && saveError.message) {
@@ -369,21 +472,27 @@ export function AdminProductsPage() {
         <Header title="PRODUCTS" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
         <div className={`${styles.workspace} ${isFormOpen ? styles.workspaceWithForm : ''}`}>
           <section className={`${styles.grid} ${isFormOpen ? styles.gridWithForm : styles.gridList}`}>
-            <button className={`${styles.addTile} ${isFormOpen && !selectedId ? styles.activeTile : ''}`} type="button" onClick={startAdd}><span>+</span><strong>ADD NEW PRODUCT</strong></button>
+            <div className={styles.catalogHeader}>
+              <div><span>MARKET INVENTORY</span><h2>Products</h2><p>{products.length} product{products.length === 1 ? '' : 's'} in your catalog</p></div>
+              <button className={styles.addButton} type="button" onClick={startAdd}><span aria-hidden="true">+</span> ADD PRODUCT</button>
+            </div>
             {visibleProducts.map((product) => <ProductCard key={product.id} product={product} selected={selectedId === product.id} onEdit={() => startEdit(product)} />)}
             {isLoading && <p className={styles.empty}>Loading products...</p>}
             {!isLoading && error && !isFormOpen && <p className={styles.empty} role="alert">{error}</p>}
+            {!isLoading && salesError && <p className={styles.empty} role="alert">{salesError}</p>}
             {!isLoading && !error && visibleProducts.length === 0 && <p className={styles.empty}>{search.trim() ? 'No products match your search.' : 'No products found.'}</p>}
           </section>
           {isFormOpen && (
             <ProductForm
               draft={draft}
               editing={Boolean(selectedId)}
+              hasSelectedPhoto={Boolean(selectedFile)}
               isSaving={isSaving}
               error={error}
               onChange={setDraft}
               onFileSelect={handleFileSelect}
               onSubmit={saveProduct}
+              onCancel={closeForm}
             />
           )}
         </div>
