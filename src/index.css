@@ -4,6 +4,14 @@
   font-family: 'DM Sans', Arial, sans-serif;
   color: #191919;
   background: #fff;
+  --order-pending-bg: #fff4d9;
+  --order-pending-text: #956400;
+  --order-confirmed-bg: #e8f1ff;
+  --order-confirmed-text: #365f99;
+  --order-packed-bg: #f0eaff;
+  --order-packed-text: #694fa0;
+  --order-delivered-bg: #e7f4e9;
+  --order-delivered-text: #287747;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;

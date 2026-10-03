@@ -414,12 +414,32 @@
 }
 
 .orderRow b {
-  background: #eef5ef;
   border-radius: 999px;
-  color: #3f694c;
   font-size: 9px;
+  font-weight: 700;
   justify-self: start;
   padding: 5px 8px;
+  white-space: nowrap;
+}
+
+.orderRow .pending {
+  background: var(--order-pending-bg);
+  color: var(--order-pending-text);
+}
+
+.orderRow .confirmed {
+  background: var(--order-confirmed-bg);
+  color: var(--order-confirmed-text);
+}
+
+.orderRow .packed {
+  background: var(--order-packed-bg);
+  color: var(--order-packed-text);
+}
+
+.orderRow .delivered {
+  background: var(--order-delivered-bg);
+  color: var(--order-delivered-text);
 }
 
 .orderRow strong {

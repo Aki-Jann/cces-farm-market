@@ -85,15 +85,15 @@
 }
 
 .summaryCard:nth-child(3) {
-  border-left-color: #d49a28;
+  border-left-color: var(--order-pending-text);
 }
 
 .summaryCard:nth-child(3) h2::before {
-  background: #d49a28;
+  background: var(--order-pending-text);
 }
 
 .summaryCard:nth-child(3) strong {
-  color: #a8710b;
+  color: var(--order-pending-text);
 }
 
 .tablePanel {

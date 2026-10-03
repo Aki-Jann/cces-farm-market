@@ -59,7 +59,7 @@ export function OrderDetails({ order }: { order: Order }) {
           <h2>Order details</h2>
           <p>{order.items.length} {order.items.length === 1 ? 'item' : 'items'}</p>
         </div>
-        <strong className={styles.detailsStatus}>{order.status}</strong>
+        <strong className={`${styles.detailsStatus} ${styles[order.status.toLowerCase()]}`}>{order.status}</strong>
       </div>
       <div className={styles.detailMeta}>
         <div><span>FULFILLMENT</span><strong>{order.fulfillmentType === 'pickup' ? 'Pickup' : 'Delivery'}</strong></div>

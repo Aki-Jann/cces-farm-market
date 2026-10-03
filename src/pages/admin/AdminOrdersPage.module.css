@@ -29,7 +29,7 @@
   align-items: center;
   background: linear-gradient(135deg, #fff 0%, #fbfdfb 100%);
   border: 1px solid #e3eae4;
-  border-left: 3px solid #d89b22;
+  border-left: 3px solid var(--order-pending-text);
   border-radius: 11px;
   box-shadow: 0 5px 16px rgb(24 56 35 / 5%);
   display: flex;
@@ -52,7 +52,7 @@
 }
 
 .stat:first-child strong {
-  color: #956400;
+  color: var(--order-pending-text);
 }
 
 .stat span {
@@ -64,27 +64,27 @@
 }
 
 .stat:nth-child(2) {
-  border-left-color: #5b8ecb;
+  border-left-color: var(--order-confirmed-text);
 }
 
 .stat:nth-child(3) {
-  border-left-color: #9a7bc8;
+  border-left-color: var(--order-packed-text);
 }
 
 .stat:nth-child(4) {
-  border-left-color: #4b9a68;
+  border-left-color: var(--order-delivered-text);
 }
 
 .stat:nth-child(2) strong {
-  color: #426fa5;
+  color: var(--order-confirmed-text);
 }
 
 .stat:nth-child(3) strong {
-  color: #7659a5;
+  color: var(--order-packed-text);
 }
 
 .stat:nth-child(4) strong {
-  color: #287747;
+  color: var(--order-delivered-text);
 }
 
 .ordersPanel {
@@ -195,23 +195,23 @@
 }
 
 .pending {
-  background: #fff4d9;
-  color: #956400;
+  background: var(--order-pending-bg);
+  color: var(--order-pending-text);
 }
 
 .confirmed {
-  background: #e8f1ff;
-  color: #365f99;
+  background: var(--order-confirmed-bg);
+  color: var(--order-confirmed-text);
 }
 
 .packed {
-  background: #f0eaff;
-  color: #694fa0;
+  background: var(--order-packed-bg);
+  color: var(--order-packed-text);
 }
 
 .delivered {
-  background: #e7f4e9;
-  color: #287747;
+  background: var(--order-delivered-bg);
+  color: var(--order-delivered-text);
 }
 
 .details {

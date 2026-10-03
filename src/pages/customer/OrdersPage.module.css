@@ -32,10 +32,11 @@
 .orderRow { background: #fff; border: 0; cursor: pointer; font-size: 14px; min-height: 63px; padding: 16px; width: 100%; }
 .orderRow:hover, .orderRow:focus-visible { background: #f7faf8; outline: 0; }
 .green { color: #017632; }
-.status { border-radius: 4px; color: #fff; justify-self: center; padding: 5px 8px; font-size: 11px; font-weight: 700; }
-.delivered, .confirmed { background: #017632; }
-.pending { background: #a96700; }
-.packed { background: #326e9b; }
+.status { border-radius: 999px; justify-self: center; padding: 5px 8px; font-size: 10px; font-weight: 700; }
+.delivered { background: var(--order-delivered-bg); color: var(--order-delivered-text); }
+.confirmed { background: var(--order-confirmed-bg); color: var(--order-confirmed-text); }
+.pending { background: var(--order-pending-bg); color: var(--order-pending-text); }
+.packed { background: var(--order-packed-bg); color: var(--order-packed-text); }
 
 .emptyState { align-items: center; background: #cce9d5; border-radius: 10px; box-shadow: 0 3px 5px rgb(0 0 0 / 10%); display: flex; flex-direction: column; gap: 20px; margin: 200px auto; padding: 50px; width: 210px; }
 .emptyState strong { font-size: 22px; white-space: nowrap; }
@@ -53,7 +54,7 @@
 .detailsHeading { align-items: center; display: flex; justify-content: space-between; margin-bottom: 14px; }
 .detailsHeading h2 { color: #017632; font-size: 17px; margin: 0; }
 .detailsHeading p { color: #6c7175; font-size: 12px; margin: 3px 0 0; }
-.detailsStatus { background: #eaf5ed; border-radius: 4px; color: #017632; font-size: 11px; padding: 6px 8px; }
+.detailsStatus { border-radius: 999px; font-size: 10px; font-weight: 700; padding: 6px 9px; white-space: nowrap; }
 .detailMeta { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 12px; }
 .detailMeta > div { background: #fff; border: 1px solid #e2e7e3; border-radius: 5px; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; }
 .detailMeta span { color: #6c7175; font-size: 10px; font-weight: 700; }
