@@ -11,8 +11,9 @@ import { AdminPaymentPage } from './pages/admin/AdminPaymentPage'
 import { AdminProductsPage } from './pages/admin/AdminProductsPage'
 import { AdminCustomersPage } from './pages/admin/AdminCustomersPage'
 import { AdminAnalyticsPage } from './pages/admin/AdminAnalyticsPage'
+import { AdminAccountPage } from './pages/admin/AdminAccountPage'
 
-export type Route = 'landing' | 'shop' | 'orders' | 'messages' | 'account' | 'admin' | 'admin-orders' | 'admin-payment' | 'admin-products' | 'admin-customers' | 'admin-analytics' | 'login' | 'register' | 'forgot-password'
+export type Route = 'landing' | 'shop' | 'orders' | 'messages' | 'account' | 'admin' | 'admin-orders' | 'admin-payment' | 'admin-products' | 'admin-customers' | 'admin-analytics' | 'admin-account' | 'login' | 'register' | 'forgot-password'
 
 function getRoute(): Route {
   const path = window.location.hash.replace(/^#\/?/, '')
@@ -22,6 +23,7 @@ function getRoute(): Route {
   if (path === 'admin/products') return 'admin-products'
   if (path === 'admin/customers') return 'admin-customers'
   if (path === 'admin/analytics') return 'admin-analytics'
+  if (path === 'admin/account') return 'admin-account'
   if (path === 'shop') return 'shop'
   if (path === 'messages') return 'messages'
   if (path === 'account') return 'account'
@@ -83,6 +85,10 @@ function App() {
 
   if (route === 'admin-analytics') {
     return <AdminAnalyticsPage />
+  }
+
+  if (route === 'admin-account') {
+    return <AdminAccountPage />
   }
 
   return <AuthPage type={route} />

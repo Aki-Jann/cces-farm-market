@@ -17,6 +17,8 @@ type Order = {
   payment: string
   fulfillmentType: 'delivery' | 'pickup'
   address: string
+  pickupDays: string
+  pickupHours: string
   sellerNotes: string
   paymentReceiptUrl: string
   status: OrderStatus
@@ -67,6 +69,8 @@ export function OrderDetails({ order }: { order: Order }) {
         <strong>{order.fulfillmentType === 'pickup' ? 'Pickup location' : 'Delivery address'}</strong>
         <span>{order.address || 'Not provided'}</span>
       </p>
+      {order.fulfillmentType === 'pickup' && order.pickupDays && <p className={styles.detailNote}><strong>Pickup days</strong><span>{order.pickupDays}</span></p>}
+      {order.fulfillmentType === 'pickup' && order.pickupHours && <p className={styles.detailNote}><strong>Pickup hours</strong><span>{order.pickupHours}</span></p>}
       {order.sellerNotes && <p className={styles.detailNote}><strong>Note to seller</strong><span>{order.sellerNotes}</span></p>}
       {order.paymentReceiptUrl && <a className={styles.receiptLink} href={order.paymentReceiptUrl} target="_blank" rel="noreferrer">View payment receipt</a>}
       <div className={styles.detailTable}>
@@ -148,6 +152,8 @@ export function OrdersPage() {
               payment: typeof data.paymentMethod === 'string' ? data.paymentMethod : '',
               fulfillmentType: data.fulfillmentType === 'pickup' ? 'pickup' as const : 'delivery' as const,
               address: typeof data.deliveryAddress === 'string' ? data.deliveryAddress : '',
+              pickupDays: typeof data.pickupDays === 'string' ? data.pickupDays : '',
+              pickupHours: typeof data.pickupHours === 'string' ? data.pickupHours : '',
               sellerNotes: typeof data.sellerNotes === 'string' ? data.sellerNotes : '',
               paymentReceiptUrl: typeof data.paymentReceiptUrl === 'string' ? data.paymentReceiptUrl : '',
               status,

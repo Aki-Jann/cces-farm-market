@@ -31,8 +31,30 @@ type CheckoutDetails = {
   receiptFile: File | null
 }
 
+type StoreSettings = {
+  pickupLocation: string
+  pickupDays: string
+  pickupHours: string
+  gcashAccountName: string
+  gcashAccountNumber: string
+  gcashQrUrl: string
+  mayaAccountName: string
+  mayaAccountNumber: string
+  mayaQrUrl: string
+}
+
 const categories: Category[] = ['All', 'Vegetables', 'Fruits', 'Grains', 'Flowers']
-const temporaryPickupAddress = 'Temporary farmer pickup address - exact location to be confirmed with the seller.'
+const defaultStoreSettings: StoreSettings = {
+  pickupLocation: '',
+  pickupDays: '',
+  pickupHours: '',
+  gcashAccountName: '',
+  gcashAccountNumber: '',
+  gcashQrUrl: '',
+  mayaAccountName: '',
+  mayaAccountNumber: '',
+  mayaQrUrl: '',
+}
 const localImages: Record<string, string> = {
   APPLE: productImages['shop-apple.png'],
   BANANA: productImages['shop-banana.png'],
@@ -78,24 +100,21 @@ function ProductCard({
   onAdd: () => void
   onChange: (quantity: number) => void
 }) {
-  const [quantityInput, setQuantityInput] = useState(String(quantity))
+  const [quantityInput, setQuantityInput] = useState<string | null>(null)
   const canAddProduct = product.isAvailable && product.stock > 0
   const isOutOfStock = product.stock <= 0
 
-  useEffect(() => {
-    setQuantityInput(String(quantity))
-  }, [quantity])
-
   function commitQuantity() {
-    const parsedQuantity = Number(quantityInput)
-    if (quantityInput.trim() === '' || !Number.isFinite(parsedQuantity)) {
-      setQuantityInput(String(quantity))
+    const value = quantityInput ?? String(quantity)
+    const parsedQuantity = Number(value)
+    if (value.trim() === '' || !Number.isFinite(parsedQuantity)) {
+      setQuantityInput(null)
       return
     }
 
     const nextQuantity = Math.max(Math.floor(parsedQuantity), 0)
     onChange(nextQuantity)
-    setQuantityInput(String(Math.min(nextQuantity, product.stock)))
+    setQuantityInput(null)
   }
 
   return (
@@ -127,7 +146,8 @@ function ProductCard({
             max={product.stock}
             step={1}
             inputMode="numeric"
-            value={quantityInput}
+            value={quantityInput ?? String(quantity)}
+            onFocus={() => setQuantityInput(String(quantity))}
             onChange={(event) => setQuantityInput(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
@@ -169,6 +189,8 @@ function Cart({
   orderMessage,
   addressError,
   isCheckingOut,
+  storeSettings,
+  storeSettingsError,
 }: {
   items: CartItem[]
   onChange: (id: string, quantity: number) => void
@@ -183,6 +205,8 @@ function Cart({
   orderMessage: string
   addressError: string
   isCheckingOut: boolean
+  storeSettings: StoreSettings
+  storeSettingsError: string
 }) {
   const [isEditingAddress, setIsEditingAddress] = useState(false)
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
@@ -197,6 +221,10 @@ function Cart({
   const delivery = subtotal > 0 ? 100 : 0
   const tax = subtotal * 0.05
   const total = subtotal + delivery + tax
+  const paymentProviderName = paymentMethod === 'GCASH' ? 'GCash' : 'Maya'
+  const paymentQrUrl = paymentMethod === 'GCASH' ? storeSettings.gcashQrUrl : storeSettings.mayaQrUrl
+  const paymentAccountName = paymentMethod === 'GCASH' ? storeSettings.gcashAccountName : storeSettings.mayaAccountName
+  const paymentAccountNumber = paymentMethod === 'GCASH' ? storeSettings.gcashAccountNumber : storeSettings.mayaAccountNumber
 
   function openCheckout() {
     if (fulfillmentType === 'delivery' && !address.trim()) {
@@ -369,6 +397,7 @@ function Cart({
               <h2 id="checkout-title">Complete your order</h2>
               <button type="button" aria-label="Close checkout" disabled={isCheckingOut} onClick={() => setIsCheckoutOpen(false)}>×</button>
             </div>
+            {storeSettingsError && <p className={styles.storeSettingsError} role="alert">{storeSettingsError}</p>}
             <fieldset className={styles.fulfillmentOptions}>
               <legend>How would you like to receive your order?</legend>
               <label className={fulfillmentType === 'delivery' ? styles.optionSelected : ''}>
@@ -380,9 +409,15 @@ function Cart({
                 Pickup
               </label>
             </fieldset>
-            <p className={styles.checkoutAddress}>
-              {fulfillmentType === 'delivery' ? `Delivering to: ${address}` : `Pickup at: ${temporaryPickupAddress}`}
-            </p>
+            {fulfillmentType === 'delivery' ? (
+              <p className={styles.checkoutAddress}>Delivering to: {address}</p>
+            ) : (
+              <div className={styles.pickupDetails}>
+                <p><strong>Pickup location:</strong> {storeSettings.pickupLocation || 'To be confirmed by the seller.'}</p>
+                {storeSettings.pickupDays && <p><strong>Pickup days:</strong> {storeSettings.pickupDays}</p>}
+                {storeSettings.pickupHours && <p><strong>Pickup hours:</strong> {storeSettings.pickupHours}</p>}
+              </div>
+            )}
             <label className={styles.sellerNotes}>
               <span>Note to seller <small>(optional)</small></span>
               <textarea value={sellerNotes} onChange={(event) => setSellerNotes(event.target.value)} placeholder="Add instructions for the seller" rows={3} />
@@ -390,11 +425,24 @@ function Cart({
             <p className={styles.messagePrompt}>Need to discuss your order? <a href="#/messages">Message the seller</a></p>
             {paymentMethod !== 'COD' && (
               <div className={styles.onlinePayment}>
-                <h3>Pay with {paymentMethod === 'GCASH' ? 'GCash' : 'Maya'}</h3>
+                <h3>Pay with {paymentProviderName}</h3>
                 <div className={styles.qrPlaceholder}>
-                  <span>QR</span>
-                  <strong>{paymentMethod === 'GCASH' ? 'GCash' : 'Maya'} QR not configured</strong>
-                  <small>Contact the seller for payment details before paying.</small>
+                  {paymentQrUrl ? (
+                    <img
+                      className={styles.paymentQr}
+                      src={paymentQrUrl}
+                      alt={`${paymentProviderName} payment QR code`}
+                    />
+                  ) : null}
+                  {!paymentQrUrl && (
+                    <>
+                      <span>QR</span>
+                      <strong>{paymentProviderName} QR not configured</strong>
+                      <small>Contact the seller for payment details before paying.</small>
+                    </>
+                  )}
+                  {paymentAccountName && <strong>{paymentAccountName}</strong>}
+                  {paymentAccountNumber && <small>{paymentAccountNumber}</small>}
                 </div>
                 <label className={styles.receiptUpload}>
                   <span>Payment receipt screenshot</span>
@@ -445,6 +493,8 @@ export function ShopPage() {
   const [deliveryAddress, setDeliveryAddress] = useState('')
   const [addressError, setAddressError] = useState('')
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'GCASH' | 'MAYA'>('COD')
+  const [storeSettings, setStoreSettings] = useState<StoreSettings>(defaultStoreSettings)
+  const [storeSettingsError, setStoreSettingsError] = useState('')
   const [orderMessage, setOrderMessage] = useState('')
   const [quantityNotice, setQuantityNotice] = useState<{ message: string } | null>(null)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
@@ -471,6 +521,7 @@ export function ShopPage() {
   useEffect(() => {
     let isMounted = true
     let unsubscribeProducts: (() => void) | undefined
+    let unsubscribeStoreSettings: (() => void) | undefined
 
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       // Tear down any previous products listener before attaching a new one.
@@ -478,12 +529,16 @@ export function ShopPage() {
         unsubscribeProducts()
         unsubscribeProducts = undefined
       }
+      unsubscribeStoreSettings?.()
+      unsubscribeStoreSettings = undefined
 
       if (!user) {
         if (isMounted) {
           cartOwnerId.current = null
           setQuantities({})
           setDeliveryAddress('')
+          setStoreSettings(defaultStoreSettings)
+          setStoreSettingsError('')
           setIsLoading(false)
           setError('Please log in to view the shop.')
         }
@@ -492,6 +547,34 @@ export function ShopPage() {
 
       cartOwnerId.current = user.uid
       setQuantities(readSavedCart(user.uid))
+      unsubscribeStoreSettings = onSnapshot(
+        doc(db, 'settings', 'storefront'),
+        (snapshot) => {
+          if (!isMounted) return
+          if (!snapshot.exists()) {
+            setStoreSettings(defaultStoreSettings)
+            setStoreSettingsError('')
+            return
+          }
+          const data = snapshot.data()
+          setStoreSettings({
+            pickupLocation: typeof data.pickupLocation === 'string' ? data.pickupLocation : '',
+            pickupDays: typeof data.pickupDays === 'string' ? data.pickupDays : '',
+            pickupHours: typeof data.pickupHours === 'string' ? data.pickupHours : '',
+            gcashAccountName: typeof data.gcashAccountName === 'string' ? data.gcashAccountName : '',
+            gcashAccountNumber: typeof data.gcashAccountNumber === 'string' ? data.gcashAccountNumber : '',
+            gcashQrUrl: typeof data.gcashQrUrl === 'string' ? data.gcashQrUrl : '',
+            mayaAccountName: typeof data.mayaAccountName === 'string' ? data.mayaAccountName : '',
+            mayaAccountNumber: typeof data.mayaAccountNumber === 'string' ? data.mayaAccountNumber : '',
+            mayaQrUrl: typeof data.mayaQrUrl === 'string' ? data.mayaQrUrl : '',
+          })
+          setStoreSettingsError('')
+        },
+        (settingsError) => {
+          console.error('Loading store settings for checkout failed:', settingsError)
+          setStoreSettingsError('Store pickup and payment settings could not be loaded. Contact the seller before paying or arranging pickup.')
+        }
+      )
 
       void getDoc(doc(db, 'users', user.uid))
         .then((profileSnapshot) => {
@@ -546,6 +629,7 @@ export function ShopPage() {
       isMounted = false
       unsubscribeAuth()
       if (unsubscribeProducts) unsubscribeProducts()
+      unsubscribeStoreSettings?.()
     }
   }, [])
 
@@ -681,7 +765,11 @@ export function ShopPage() {
           paymentStatus: paymentMethod === 'COD' ? 'unpaid' : 'awaiting_verification',
           status: 'pending',
           fulfillmentType,
-          deliveryAddress: fulfillmentType === 'pickup' ? temporaryPickupAddress : addressForOrder,
+          deliveryAddress: fulfillmentType === 'pickup'
+            ? storeSettings.pickupLocation || 'Pickup location to be confirmed by the seller.'
+            : addressForOrder,
+          pickupHours: fulfillmentType === 'pickup' ? storeSettings.pickupHours : '',
+          pickupDays: fulfillmentType === 'pickup' ? storeSettings.pickupDays : '',
           sellerNotes,
           paymentReceiptUrl,
           createdAt: serverTimestamp(),
@@ -769,7 +857,7 @@ export function ShopPage() {
         if (value.trim()) setAddressError('')
       }} paymentMethod={paymentMethod} onPaymentChange={setPaymentMethod} onPlaceOrder={placeOrder} onEmptyCartAttempt={() => {
         setQuantityNotice({ message: 'Add products to your cart before placing an order.' })
-      }} onAddressError={setAddressError} orderMessage={orderMessage} addressError={addressError} isCheckingOut={isCheckingOut} />
+      }} onAddressError={setAddressError} orderMessage={orderMessage} addressError={addressError} isCheckingOut={isCheckingOut} storeSettings={storeSettings} storeSettingsError={storeSettingsError} />
       {quantityNotice && <div className={styles.quantityToast} role="status" aria-live="polite">{quantityNotice.message}</div>}
     </main>
   )

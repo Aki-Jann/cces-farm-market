@@ -1,7 +1,7 @@
 import { BrandLogo } from '../common/BrandLogo'
 import styles from './AdminSidebar.module.css'
 
-type AdminNavItem = 'dashboard' | 'orders' | 'products' | 'customers' | 'analytics'
+type AdminNavItem = 'dashboard' | 'orders' | 'products' | 'customers' | 'analytics' | 'account'
 
 const links: { key: AdminNavItem; label: string; href: string }[] = [
   { key: 'dashboard', label: 'DASHBOARD', href: '#/admin' },
@@ -23,7 +23,7 @@ export function AdminSidebar({ active }: { active: AdminNavItem }) {
           </a>
         ))}
       </div>
-      <a href="#/" className={styles.logout}>LOGOUT</a>
+      <a href="#/admin/account" className={active === 'account' ? styles.active : ''}>MY ACCOUNT</a>
     </nav>
   )
 }

@@ -58,6 +58,11 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
     // =========================================================================
     // 2. PRODUCTS COLLECTION
     // Path: products/{productId}
