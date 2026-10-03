@@ -1,6 +1,6 @@
 .page {
-  background: #f4f4f4;
-  color: #191919;
+  background: var(--color-canvas);
+  color: var(--color-text);
   display: flex;
   min-height: 100vh;
 }
@@ -11,9 +11,10 @@
 }
 
 .card {
-  background: #fff;
-  border: 1px solid #e2e7e3;
-  border-radius: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
   margin: 24px auto;
   max-width: 1080px;
   padding: 30px;

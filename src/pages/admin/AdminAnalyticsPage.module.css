@@ -1,6 +1,6 @@
 .page {
-  background: #f4f4f4;
-  color: #191919;
+  background: var(--color-canvas);
+  color: var(--color-text);
   display: flex;
   min-height: 100vh;
 }
@@ -29,17 +29,17 @@
 
 .metric,
 .panel {
-  background: #fff;
-  border-radius: 9px;
-  box-shadow: 0 3px 5px rgb(0 0 0 / 10%);
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
 }
 
 .metric {
   appearance: none;
-  border: 1px solid #e5ebe7;
+  border: 1px solid var(--color-border);
   border-top: 3px solid #017632;
-  border-radius: 12px;
-  box-shadow: 0 2px 7px rgb(26 63 41 / 6%);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
   gap: 9px;

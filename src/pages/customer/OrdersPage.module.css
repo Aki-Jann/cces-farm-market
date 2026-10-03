@@ -1,6 +1,6 @@
 .ordersPage {
-  background: #f4f4f4;
-  color: #191919;
+  background: var(--color-canvas);
+  color: var(--color-text);
   display: flex;
   min-height: 100vh;
 }
@@ -24,11 +24,11 @@
 .sidebar .activeNav { background: #017632; color: #fff; font-weight: 700; }
 
 .ordersContent { flex: 1; min-width: 0; }
-.orderPanel { background: #fff; margin: 31px 30px; min-height: calc(100vh - 150px); padding: 31px 14px; }
+.orderPanel { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-panel); box-shadow: var(--shadow-panel); margin: 20px 30px; min-height: calc(100vh - 150px); padding: 31px 14px; }
 .tableHeader, .orderRow { align-items: center; display: grid; gap: 12px; grid-template-columns: 1.4fr 1fr 1fr 1fr 1.2fr; text-align: center; }
 .tableHeader { border-bottom: 1px solid #d9d9d9; color: #6c7175; font-size: 12px; font-weight: 700; padding: 0 16px 14px; text-transform: uppercase; }
 .orderList { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
-.orderGroup { border: 1px solid #e2e7e3; border-radius: 6px; overflow: hidden; }
+.orderGroup { border: 1px solid var(--color-border); border-radius: var(--radius-control); overflow: hidden; }
 .orderRow { background: #fff; border: 0; cursor: pointer; font-size: 14px; min-height: 63px; padding: 16px; width: 100%; }
 .orderRow:hover, .orderRow:focus-visible { background: #f7faf8; outline: 0; }
 .green { color: #017632; }
@@ -50,13 +50,13 @@
 .clearSearchButton:hover { background: #015c27; }
 .clearSearchButton:focus-visible { outline: 2px solid #017632; outline-offset: 3px; }
 
-.details { background: #f7faf8; border-top: 1px solid #e2e7e3; padding: 18px; }
+.details { background: var(--color-surface-muted); border-top: 1px solid var(--color-border); padding: 18px; }
 .detailsHeading { align-items: center; display: flex; justify-content: space-between; margin-bottom: 14px; }
 .detailsHeading h2 { color: #017632; font-size: 17px; margin: 0; }
 .detailsHeading p { color: #6c7175; font-size: 12px; margin: 3px 0 0; }
 .detailsStatus { border-radius: 999px; font-size: 10px; font-weight: 700; padding: 6px 9px; white-space: nowrap; }
 .detailMeta { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 12px; }
-.detailMeta > div { background: #fff; border: 1px solid #e2e7e3; border-radius: 5px; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; }
+.detailMeta > div { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-control); display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; }
 .detailMeta span { color: #6c7175; font-size: 10px; font-weight: 700; }
 .detailMeta strong { font-size: 13px; }
 .detailNote { display: flex; flex-wrap: wrap; gap: 6px 10px; margin: 8px 0; }
@@ -80,7 +80,7 @@
   .sidebar .logo, .rule { display: none; }
   .sidebar a { font-size: 11px; margin: 0; padding: 8px; }
   .sidebar > a { margin-left: auto; }
-  .orderPanel { margin: 12px 6px; padding: 16px 8px; }
+  .orderPanel { margin: 20px 30px; padding: 16px 8px; }
   .tableHeader { display: none; }
   .orderRow { gap: 8px 10px; grid-template-areas: 'id status total' 'date payment payment'; grid-template-columns: minmax(0, 1fr) auto auto; padding: 12px; text-align: left; }
   .orderId { grid-area: id; overflow-wrap: anywhere; }

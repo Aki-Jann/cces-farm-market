@@ -1,6 +1,6 @@
 .page {
-  background: #f5f7f5;
-  color: #1f2b23;
+  background: var(--color-canvas);
+  color: var(--color-text);
   display: flex;
   min-height: 100vh;
 }
@@ -27,11 +27,11 @@
 
 .stat {
   align-items: center;
-  background: linear-gradient(135deg, #fff 0%, #fbfdfb 100%);
-  border: 1px solid #e3eae4;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-left: 3px solid var(--order-pending-text);
-  border-radius: 11px;
-  box-shadow: 0 5px 16px rgb(24 56 35 / 5%);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
   display: flex;
   gap: 13px;
   min-height: 0;
@@ -88,10 +88,10 @@
 }
 
 .ordersPanel {
-  background: #fff;
-  border: 1px solid #e3eae4;
-  border-radius: 12px;
-  box-shadow: 0 6px 20px rgb(24 56 35 / 5%);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
   display: flex;
   height: min(660px, calc(100vh - 250px));
   min-height: 360px;

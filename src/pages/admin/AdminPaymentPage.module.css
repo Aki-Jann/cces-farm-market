@@ -1,6 +1,6 @@
 .page {
-  background: #f5f7f5;
-  color: #1f2b23;
+  background: var(--color-canvas);
+  color: var(--color-text);
   display: flex;
   min-height: 100vh;
 }
@@ -26,11 +26,11 @@
 }
 
 .summaryCard {
-  background: linear-gradient(145deg, #fff 0%, #fbfdfb 100%);
-  border: 1px solid #e3eae4;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-left: 3px solid #16834a;
-  border-radius: 11px;
-  box-shadow: 0 5px 16px rgb(24 56 35 / 5%);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
   gap: 13px;
@@ -97,8 +97,10 @@
 }
 
 .tablePanel {
-  background: #fff;
-  border: 1px solid #e3eae4;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
   border-radius: 12px;
   box-shadow: 0 6px 20px rgb(24 56 35 / 5%);
   min-height: 420px;

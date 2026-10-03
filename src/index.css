@@ -2,8 +2,24 @@
 
 :root {
   font-family: 'DM Sans', Arial, sans-serif;
-  color: #191919;
-  background: #fff;
+  color: var(--color-text);
+  background: var(--color-canvas);
+  --color-canvas: #f5f7f5;
+  --color-surface: #fff;
+  --color-surface-muted: #f8faf8;
+  --color-text: #1f2b23;
+  --color-text-muted: #68766c;
+  --color-border: #e3eae4;
+  --color-border-strong: #d5e1d7;
+  --color-brand: #087b3b;
+  --color-brand-strong: #066431;
+  --color-brand-soft: #e9f5ec;
+  --color-focus: rgb(8 123 59 / 24%);
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-panel: 14px;
+  --shadow-card: 0 5px 18px rgb(24 56 35 / 5%);
+  --shadow-panel: 0 8px 24px rgb(24 56 35 / 6%);
   --order-pending-bg: #fff4d9;
   --order-pending-text: #956400;
   --order-confirmed-bg: #e8f1ff;
@@ -29,12 +45,28 @@ body,
   min-height: 100%;
 }
 
+body {
+  background: var(--color-canvas);
+  color: var(--color-text);
+}
+
 button,
 input {
   font: inherit;
 }
 
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
 button,
 a {
   -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: #d9eddf;
+  color: #183b28;
 }
