@@ -125,15 +125,21 @@ function ProductCard({
         if (canAddProduct) onChange(Math.min(quantity + 1, product.stock))
       }}
     >
-      <img src={product.image} alt={product.name} />
+      <div className={styles.productImage}>
+        <img src={product.image} alt={product.name} />
+        <span className={`${styles.stockBadge} ${canAddProduct ? styles.available : styles.unavailable}`}>
+          {isOutOfStock ? 'OUT OF STOCK' : product.isAvailable ? 'AVAILABLE' : 'UNAVAILABLE'}
+        </span>
+      </div>
       <div className={styles.productMeta}>
-        <div>
+        <div className={styles.productDetails}>
+          <small className={styles.categoryLabel}>{product.category.toUpperCase()}</small>
           <strong>{product.name}</strong>
-          <small>{product.category.toUpperCase()}</small>
+          <small className={styles.stockText}>{product.stock} {product.unit} in stock</small>
         </div>
         <div className={styles.productPrice}>
           <strong>{currency(product.price)}</strong>
-          <small>{product.stock}{product.unit} Stock</small>
+          <small>PER {product.unit}</small>
         </div>
       </div>
       {quantity > 0 ? (
