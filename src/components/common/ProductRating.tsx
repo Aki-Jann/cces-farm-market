@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '../../firebase/firestore'
+import { formatMonthDayYear } from '../../utils/dateFormat'
 import styles from './ProductRating.module.css'
 
 type Review = {
@@ -12,7 +13,7 @@ type Review = {
 }
 
 function formatReviewDate(timestamp: number) {
-  return timestamp ? new Date(timestamp).toLocaleDateString() : ''
+  return timestamp ? formatMonthDayYear(new Date(timestamp)) : ''
 }
 
 export function ProductRating({ productId, showReviews = false }: { productId?: string; showReviews?: boolean }) {

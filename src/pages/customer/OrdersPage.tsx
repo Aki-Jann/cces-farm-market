@@ -6,6 +6,7 @@ import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
+import { formatMonthDayYear } from '../../utils/dateFormat'
 import styles from './OrdersPage.module.css'
 
 type OrderStatus = 'DELIVERED' | 'PENDING' | 'CONFIRMED' | 'PACKED'
@@ -294,7 +295,7 @@ export function OrdersPage() {
           const loadedOrders = snapshot.docs.map((orderDocument) => {
             const data = orderDocument.data()
             const parsedDate = parseOrderDate(data.createdAt)
-            const date = parsedDate ? parsedDate.toLocaleDateString('en-US') : 'Pending'
+            const date = parsedDate ? formatMonthDayYear(parsedDate) : 'Pending'
             const createdAtTime = parsedDate ? parsedDate.getTime() : 0
             const items = Array.isArray(data.items) ? data.items : []
 

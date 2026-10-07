@@ -7,6 +7,7 @@ import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { storage } from '../../firebase/storage'
+import { formatMonthDayYear } from '../../utils/dateFormat'
 import styles from './AdminPaymentPage.module.css'
 
 type StorefrontSettings = {
@@ -298,11 +299,7 @@ function parseOrderDate(createdAt: unknown): Date | null {
 }
 
 function formatOrderDate(date: Date | null): string {
-  if (!date) return 'Pending'
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const year = date.getFullYear()
-  return `${month}-${day}-${year}`
+  return date ? formatMonthDayYear(date) : 'Pending'
 }
 
 function SummaryCard({ label, value }: { label: string; value: string }) {

@@ -35,11 +35,6 @@
   width: 160px;
 }
 
-.header > a :global(span),
-footer .logo :global(span) {
-  font-family: 'DM Sans', Arial, sans-serif;
-}
-
 .header nav {
   align-items: center;
   display: flex;
@@ -596,15 +591,6 @@ footer .logo :global(div) {
   width: 100%;
 }
 
-footer .logo :global(span) {
-  font-size: 27px;
-  white-space: nowrap;
-}
-
-footer .logo :global(small) {
-  font-size: 5px;
-}
-
 footer .details {
   display: flex;
   flex-wrap: wrap;
@@ -656,11 +642,7 @@ footer .details {
     width: 145px;
   }
 
-  .header > a :global(span) {
-    font-size: 21px;
-  }
-
-  .header nav a {
+    .header nav a {
     font-size: 9px;
     padding: 8px;
   }
@@ -847,10 +829,6 @@ footer .details {
   .header > a :global(div) {
     flex-basis: 132px;
     width: 132px;
-  }
-
-  .header > a :global(span) {
-    font-size: 18px;
   }
 
   .header nav a {

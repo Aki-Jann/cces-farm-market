@@ -8,6 +8,7 @@ import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import { storage } from '../../firebase/storage'
+import { formatMonthDayYear } from '../../utils/dateFormat'
 import styles from './AdminAccountPage.module.css'
 
 type AdminProfile = {
@@ -80,7 +81,7 @@ function displayBirthday(value: unknown) {
       ? new Date(value)
       : null
   return date && !Number.isNaN(date.getTime())
-    ? `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`
+    ? formatMonthDayYear(date)
     : 'Not provided'
 }
 

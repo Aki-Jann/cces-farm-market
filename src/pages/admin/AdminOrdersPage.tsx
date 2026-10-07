@@ -3,6 +3,7 @@ import { collection, onSnapshot, updateDoc, doc } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { db } from '../../firebase/firestore'
+import { formatMonthDayYearTime } from '../../utils/dateFormat'
 import styles from './AdminOrdersPage.module.css'
 
 type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PACKED' | 'DELIVERED'
@@ -150,7 +151,7 @@ export function AdminOrdersPage() {
           const rawStatus = typeof data.status === 'string' ? data.status.toUpperCase() : 'PENDING'
           const status = statusOrder.includes(rawStatus as OrderStatus) ? rawStatus as OrderStatus : 'PENDING'
           const parsedDate = parseOrderDate(data.createdAt)
-          const date = parsedDate ? parsedDate.toLocaleString('en-US') : 'Pending'
+          const date = parsedDate ? formatMonthDayYearTime(parsedDate) : 'Pending'
           const createdAtTime = parsedDate ? parsedDate.getTime() : 0
           const items = Array.isArray(data.items) ? data.items : []
 

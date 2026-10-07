@@ -6,6 +6,7 @@ import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
+import { formatMonthDayYear } from '../../utils/dateFormat'
 import styles from './AccountPage.module.css'
 
 type AccountData = {
@@ -21,8 +22,7 @@ type AccountData = {
 
 function formatBirthday(value: unknown) {
   if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
-    const date = value.toDate()
-    return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`
+    return formatMonthDayYear(value.toDate())
   }
   return 'Not provided'
 }

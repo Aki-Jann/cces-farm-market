@@ -1,4 +1,5 @@
 .logo {
+  background: transparent;
   color: #017632;
   text-align: center;
   width: 100%;
@@ -31,10 +32,8 @@
 }
 
 .compact span {
-  background: linear-gradient(48deg, #017632 1%, #aae044);
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
+  background: none;
+  color: #017632;
   font-size: 22.72px;
   line-height: 30.337px;
 }

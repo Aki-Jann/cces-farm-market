@@ -6,6 +6,7 @@ import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import styles from './AdminCustomersPage.module.css'
+import { formatMonthDayYear, formatMonthDayYearTime } from '../../utils/dateFormat'
 
 type Message = { id: string; text: string; timestamp: string; sender: 'customer' | 'admin' }
 type LoadedMessage = Message & { createdAt: unknown }
@@ -31,15 +32,14 @@ function currency(value: number) {
 
 function formatDate(value: unknown, fallback = 'Unknown') {
   if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
-    const date = value.toDate()
-    return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`
+    return formatMonthDayYear(value.toDate())
   }
   return fallback
 }
 
 function formatMessageTimestamp(value: unknown) {
   if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
-    return value.toDate().toLocaleString('en-US')
+    return formatMonthDayYearTime(value.toDate())
   }
   return 'Pending'
 }
