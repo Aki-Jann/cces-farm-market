@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { onAuthStateChanged, sendPasswordResetEmail } from 'firebase/auth'
+import { onAuthStateChanged, sendPasswordResetEmail, signOut } from 'firebase/auth'
 import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore'
 import { deleteObject, getDownloadURL, ref, uploadBytes, type StorageReference } from 'firebase/storage'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
@@ -100,6 +100,7 @@ export function AdminAccountPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isSavingSettings, setIsSavingSettings] = useState(false)
   const [isSendingReset, setIsSendingReset] = useState(false)
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [settingsError, setSettingsError] = useState('')
   const [settingsNotice, setSettingsNotice] = useState('')
   const [error, setError] = useState('')
@@ -250,6 +251,19 @@ export function AdminAccountPage() {
       setError('Unable to send a password reset link. Please try again.')
     } finally {
       setIsSendingReset(false)
+    }
+  }
+
+  async function logout() {
+    setIsLoggingOut(true)
+    setError('')
+    try {
+      await signOut(auth)
+      window.location.hash = '/login'
+    } catch (logoutError) {
+      console.error('Signing out of admin account failed:', logoutError)
+      setError('Unable to log out. Please try again.')
+      setIsLoggingOut(false)
     }
   }
 
@@ -427,10 +441,15 @@ export function AdminAccountPage() {
             <div className={styles.profileHeader}>
               <div className={styles.avatar} aria-hidden="true">{displayName(profile).charAt(0).toUpperCase()}</div>
               <div className={styles.identity}>
-                <h2>{displayName(profile)}</h2>
+                <div className={styles.identityTitle}>
+                  <h2>{displayName(profile)}</h2>
+                  <span className={styles.role}>ADMIN</span>
+                </div>
                 <p>{profile.email}</p>
               </div>
-              <span className={styles.role}>ADMIN</span>
+              <button className={styles.logout} type="button" disabled={isLoggingOut} onClick={() => void logout()}>
+                {isLoggingOut ? 'LOGGING OUT...' : 'LOG OUT'}
+              </button>
             </div>
 
             <div className={styles.sectionHeading}>

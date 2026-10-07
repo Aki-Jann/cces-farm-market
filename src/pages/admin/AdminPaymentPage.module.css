@@ -2,108 +2,146 @@
   background: var(--color-canvas);
   color: var(--color-text);
   display: flex;
+  height: 100vh;
   min-height: 100vh;
 }
 
 .content {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  min-height: 0;
   min-width: 0;
 }
 
 .dashboard {
+  box-sizing: border-box;
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 18px;
-  margin: 24px auto;
-  max-width: 1380px;
-  padding: 0 30px;
+  margin: 0 auto;
+  min-height: 0;
+  padding: 20px 30px;
+  width: 100%;
 }
 
-.summary {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.summaryCard {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-left: 3px solid #16834a;
-  border-radius: var(--radius-card);
+.pageIntro {
+  background: linear-gradient(115deg, #fff 0%, #f4faf5 100%);
+  border: 1px solid #dce9de;
+  border-radius: var(--radius-panel);
   box-shadow: var(--shadow-card);
-  display: flex;
-  flex-direction: column;
-  gap: 13px;
-  justify-content: space-between;
-  min-width: 0;
-  padding: 16px 18px;
-  transition: box-shadow 150ms ease, transform 150ms ease;
+  padding: 16px 20px;
 }
 
-.summaryCard:hover {
-  box-shadow: 0 9px 22px rgb(24 56 35 / 8%);
-  transform: translateY(-2px);
-}
-
-.summaryCard h2 {
-  align-items: center;
-  color: #647168;
-  display: flex;
+.pageIntro span {
+  color: #438259;
   font-size: 9px;
   font-weight: 700;
-  gap: 8px;
-  letter-spacing: .09em;
+  letter-spacing: .12em;
+}
+
+.pageIntro h2 {
+  color: #183b28;
+  font-size: 18px;
+  letter-spacing: -.02em;
+  margin: 4px 0 3px;
+}
+
+.pageIntro p {
+  color: #758178;
+  font-size: 11px;
   margin: 0;
 }
 
-.summaryCard h2::before {
-  background: #16834a;
-  border-radius: 50%;
-  content: "";
-  flex: 0 0 7px;
-  height: 7px;
-}
-
-.summaryCard strong {
-  color: #087b3b;
-  font-size: clamp(21px, 2.2vw, 30px);
-  letter-spacing: -.04em;
-  line-height: 1.1;
-  overflow-wrap: anywhere;
-}
-
-.summaryCard:nth-child(2) {
-  border-left-color: #4b7eb8;
-}
-
-.summaryCard:nth-child(2) h2::before {
-  background: #4b7eb8;
-}
-
-.summaryCard:nth-child(2) strong {
-  color: #426fa5;
-}
-
-.summaryCard:nth-child(3) {
-  border-left-color: var(--order-pending-text);
-}
-
-.summaryCard:nth-child(3) h2::before {
-  background: var(--order-pending-text);
-}
-
-.summaryCard:nth-child(3) strong {
-  color: var(--order-pending-text);
-}
-
-.tablePanel {
+.paymentPanel {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-panel);
   box-shadow: var(--shadow-panel);
-  border-radius: 12px;
-  box-shadow: 0 6px 20px rgb(24 56 35 / 5%);
-  min-height: 420px;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.methodFilters {
+  align-items: center;
+  background: #f7faf7;
+  border-bottom: 1px solid #e6ece7;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  padding: 12px 16px;
+}
+
+.filterLabel {
+  color: #758178;
+  flex: 0 0 auto;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+.filterButtons {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.filterButtons button {
+  align-items: center;
+  background: #f6f8f6;
+  border: 1px solid #e3e9e4;
+  border-radius: 999px;
+  color: #526157;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  gap: 8px;
+  min-height: 32px;
+  padding: 5px 11px;
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+}
+
+.filterButtons button:hover {
+  background: #edf6ef;
+  border-color: #bbd6c1;
+  color: #087b3b;
+}
+
+.filterButtons button:focus-visible {
+  outline: 3px solid rgb(1 118 50 / 22%);
+  outline-offset: 2px;
+}
+
+.filterButtons button span {
+  align-items: center;
+  background: rgb(255 255 255 / 75%);
+  border-radius: 999px;
+  color: inherit;
+  display: inline-flex;
+  font-size: 9px;
+  justify-content: center;
+  min-width: 18px;
+  padding: 2px 5px;
+}
+
+.filterButtons button.activeFilter {
+  background: #e8f4ea;
+  border-color: #9fc9a8;
+  color: #087b3b;
+}
+
+.tableViewport {
+  flex: 1;
+  min-height: 0;
   overflow-x: auto;
   padding: 8px 16px 16px;
   scrollbar-color: #c6d4c9 transparent;
@@ -228,241 +266,44 @@
   text-align: center;
 }
 
-.settingsPanel {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-panel);
-  box-shadow: var(--shadow-panel);
-  padding: 22px;
-}
-
-.settingsHeading h2 {
-  color: var(--color-text);
-  font-size: 14px;
-  letter-spacing: .06em;
-  margin: 0;
-}
-
-.settingsHeading p,
-.settingsMessage {
-  color: #758178;
-  font-size: 12px;
-  margin: 7px 0 0;
-}
-
-.pickupForm {
-  display: grid;
-  gap: 14px;
-  margin-top: 18px;
-}
-
-.pickupForm label,
-.paymentDetails label {
-  color: #526057;
-  display: grid;
-  font-size: 11px;
-  font-weight: 700;
-  gap: 6px;
-}
-
-.pickupForm input,
-.paymentDetails input {
-  background: #fff;
-  border: 1px solid #d8e1da;
-  border-radius: 7px;
-  color: var(--color-text);
-  font: inherit;
-  font-weight: 400;
-  min-height: 40px;
-  min-width: 0;
-  padding: 9px 11px;
-}
-
-.pickupForm input:focus,
-.paymentDetails input:focus {
-  border-color: #16834a;
-  outline: 3px solid rgb(22 131 74 / 13%);
-}
-
-.pickupSchedule,
-.qrSettings {
-  display: grid;
-  gap: 14px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.paymentDetails {
-  background: #f8faf8;
-  border: 1px solid #e4ebe5;
-  border-radius: 8px;
-  display: grid;
-  gap: 11px;
-  padding: 14px;
-}
-
-.paymentDetails > strong {
-  color: #315a3b;
-  font-size: 12px;
-}
-
-.pickupForm > button {
-  background: #16834a;
-  border: 0;
-  border-radius: 7px;
-  color: #fff;
-  cursor: pointer;
-  font-size: 10px;
-  font-weight: 800;
-  justify-self: start;
-  letter-spacing: .04em;
-  min-height: 40px;
-  padding: 0 16px;
-}
-
-.pickupForm > button:disabled {
-  cursor: wait;
-  opacity: .65;
-}
-
-.qrSettings {
-  margin-top: 18px;
-}
-
-.qrSetting {
-  align-items: center;
-  background: #f8faf8;
-  border: 1px solid #e4ebe5;
-  border-radius: 8px;
-  display: flex;
-  gap: 14px;
-  min-width: 0;
-  padding: 14px;
-}
-
-.qrPreview {
-  align-items: center;
-  background: #fff;
-  border: 1px solid #e4ebe5;
-  border-radius: 7px;
-  color: #758178;
-  display: flex;
-  flex: 0 0 92px;
-  font-size: 9px;
-  height: 92px;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.qrPreview img {
-  height: 100%;
-  object-fit: contain;
-  width: 100%;
-}
-
-.qrSetting > div:last-child {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-
-.qrSetting strong {
-  color: #315a3b;
-  font-size: 12px;
-}
-
-.uploadButton {
-  color: #087b3b;
-  cursor: pointer;
-  font-size: 10px;
-  font-weight: 800;
-  position: relative;
-}
-
-.uploadButton input {
-  height: 1px;
-  opacity: 0;
-  overflow: hidden;
-  position: absolute;
-  width: 1px;
-}
-
-.qrSetting small {
-  color: #758178;
-  font-size: 9px;
-}
-
-.settingsError,
-.settingsNotice {
-  border-radius: 7px;
-  font-size: 11px;
-  margin: 14px 0 0;
-  padding: 10px 12px;
-}
-
-.settingsError {
-  background: #fff0ee;
-  color: #a5352c;
-}
-
-.settingsNotice {
-  background: #edf7ef;
-  color: #28663a;
-}
-
 @media (max-width: 1050px) {
   .dashboard {
-    padding: 0 20px;
+    padding: 20px 30px;
   }
 
-  .summary {
-    gap: 9px;
-  }
-
-  .summaryCard {
-    padding: 14px;
-  }
 }
 
 @media (max-width: 700px) {
   .page {
     display: block;
+    height: auto;
   }
 
   .dashboard {
     gap: 12px;
-    margin: 16px;
-    padding: 0;
+    margin: 0;
+    padding: 20px 30px;
   }
 
-  .summary {
-    gap: 8px;
-    grid-template-columns: 1fr;
+  .pageIntro {
+    padding: 14px 15px;
   }
 
-  .summaryCard {
-    gap: 6px;
-    padding: 12px 14px;
+  .methodFilters {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 9px;
+    padding: 11px 12px;
   }
 
-  .summaryCard strong {
-    font-size: 22px;
+  .filterButtons {
+    flex: 0 0 auto;
+    width: 100%;
   }
 
-  .tablePanel {
+  .tableViewport {
     min-height: 300px;
     padding: 8px 10px 12px;
   }
 
-  .settingsPanel {
-    padding: 16px;
-  }
-
-  .pickupSchedule,
-  .qrSettings {
-    grid-template-columns: 1fr;
-  }
-
-  .qrSetting {
-    align-items: flex-start;
-  }
 }

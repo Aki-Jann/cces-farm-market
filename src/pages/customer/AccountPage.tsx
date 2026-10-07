@@ -153,7 +153,13 @@ export function AccountPage() {
         <section className={styles.card}>
           <div className={styles.profileHeader}>
             <div className={styles.avatar}>{accountName(account).charAt(0)}</div>
-            <div><h2>{accountName(account)}</h2><p>{account.email}</p></div>
+            <div className={styles.identity}>
+              <div className={styles.identityTitle}>
+                <h2>{accountName(account)}</h2>
+                <span className={styles.role}>CUSTOMER</span>
+              </div>
+              <p>{account.email}</p>
+            </div>
             <a href="#/" className={styles.logout}>LOG OUT</a>
           </div>
           <div className={styles.sectionHeading}>

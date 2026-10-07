@@ -66,14 +66,14 @@ function StatusTimeline({ status }: { status: OrderStatus }) {
     <div className={styles.timeline}>
       {statusOrder.map((item, index) => (
         <div className={`${styles.timelineStep} ${index <= currentIndex ? styles.reached : ''}`} key={item}>
-          <span>{index + 1}</span><strong>{item}</strong>{index < statusOrder.length - 1 && <i />}
+          <span>{index + 1}</span><strong>{item}</strong><i />
         </div>
       ))}
     </div>
   )
 }
 
-function OrderDetails({ order, onAdvance, onBack, isUpdating }: { order: Order; onAdvance: () => void; onBack: () => void; isUpdating: boolean }) {
+function OrderDetails({ order, onAdvance, onBack, isUpdating, isArchived }: { order: Order; onAdvance: () => void; onBack: () => void; isUpdating: boolean; isArchived: boolean }) {
   const { delivery, tax, total } = totals(order)
   const statusIndex = statusOrder.indexOf(order.status)
   const previousStatus = statusOrder[statusIndex - 1]
@@ -102,7 +102,7 @@ function OrderDetails({ order, onAdvance, onBack, isUpdating }: { order: Order; 
         <div className={styles.itemRow}><span>TAX 5%</span><span>-</span><span>{currency(tax)}</span><strong>{currency(tax)}</strong></div>
         <div className={styles.totalRow}><strong>TOTAL</strong><strong>{currency(total)}</strong></div>
       </div>
-      <div className={styles.detailFooter}>
+      {!isArchived && <div className={styles.detailFooter}>
         {previousStatus && (
           <button
             disabled={isUpdating}
@@ -124,7 +124,7 @@ function OrderDetails({ order, onAdvance, onBack, isUpdating }: { order: Order; 
             {isUpdating ? 'UPDATING...' : nextStatus}
           </button>
         )}
-      </div>
+      </div>}
     </section>
   )
 }
@@ -137,8 +137,15 @@ export function AdminOrdersPage() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [archive, setArchive] = useState(() => window.location.hash.replace(/^#\/?/, '') === 'admin/orders/archive')
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | null>(null)
+  const [showAllOrders, setShowAllOrders] = useState(false)
   useEffect(() => {
-    const syncArchiveState = () => setArchive(window.location.hash.replace(/^#\/?/, '') === 'admin/orders/archive')
+    const syncArchiveState = () => {
+      const isArchiveRoute = window.location.hash.replace(/^#\/?/, '') === 'admin/orders/archive'
+      setArchive(isArchiveRoute)
+      setStatusFilter(null)
+      setShowAllOrders(false)
+    }
     window.addEventListener('hashchange', syncArchiveState)
     return () => window.removeEventListener('hashchange', syncArchiveState)
   }, [])
@@ -202,8 +209,11 @@ export function AdminOrdersPage() {
   const visibleOrders = useMemo(() => {
     const query = search.trim().toLowerCase()
     return orders.filter((order) => {
-      const matchesArchive = archive ? order.status === 'DELIVERED' : order.status !== 'DELIVERED'
-      if (!matchesArchive) return false
+      if (statusFilter && order.status !== statusFilter) return false
+      if (!statusFilter && !showAllOrders) {
+        const matchesArchive = archive ? order.status === 'DELIVERED' : order.status !== 'DELIVERED'
+        if (!matchesArchive) return false
+      }
       if (!query) return true
       return (
         order.id.toLowerCase().includes(query) ||
@@ -211,9 +221,11 @@ export function AdminOrdersPage() {
         order.email.toLowerCase().includes(query)
       )
     })
-  }, [archive, orders, search])
+  }, [archive, orders, search, showAllOrders, statusFilter])
   const selected = visibleOrders.find((order) => order.id === selectedId) ?? visibleOrders[0]
   const counts = statusOrder.reduce<Record<OrderStatus, number>>((result, status) => ({ ...result, [status]: orders.filter((order) => order.status === status).length }), {} as Record<OrderStatus, number>)
+  const completedOrders = orders.filter((order) => order.status === 'DELIVERED')
+  const completedSales = completedOrders.reduce((sum, order) => sum + order.total, 0)
 
   async function updateSelectedStatus(direction: -1 | 1) {
     if (!selected) return
@@ -245,45 +257,105 @@ export function AdminOrdersPage() {
       <AdminSidebar active="orders" />
       <section className={styles.content}>
         <Header
-          title="ORDERS"
+          title={archive ? 'ORDER HISTORY' : 'ACTIVE ORDERS'}
           search={search}
           onSearchChange={(event) => setSearch(event.target.value)}
-          actions={<><button aria-current={!archive ? 'page' : undefined} type="button" onClick={() => setArchive(false)}>CURRENT ORDERS</button><button aria-current={archive ? 'page' : undefined} type="button" onClick={() => setArchive(true)}>ARCHIVE</button><a href="#/admin/payment">PAYMENT</a></>}
+          actions={<><a aria-current={!archive ? 'page' : undefined} href="#/admin/orders">ACTIVE ORDERS</a><a aria-current={archive ? 'page' : undefined} href="#/admin/orders/archive">ORDER HISTORY</a></>}
         />
         <div className={styles.dashboard}>
-          <div className={styles.stats}>{statusOrder.map((status) => <div className={styles.stat} key={status}><strong>{counts[status]}</strong><span>{status}</span></div>)}</div>
-          {error && orders.length > 0 && <p role="alert">{error}</p>}
-          <div className={styles.ordersPanel}>
-            {isLoading ? (
-              <p className={styles.empty}>Loading orders...</p>
-            ) : error && orders.length === 0 ? (
-              <p className={styles.empty} role="alert">{error}</p>
-            ) : visibleOrders.length === 0 ? (
-              <p className={styles.empty}>{search.trim() ? 'No orders match your search.' : 'No orders found.'}</p>
-            ) : (
-              <>
-                <aside className={styles.orderList}>
-                  {visibleOrders.map((order) => (
+          {archive ? (
+            <section className={styles.archiveSummary} aria-label="Completed orders summary">
+              <div>
+                <span className={styles.archiveEyebrow}>ORDER HISTORY</span>
+                <h2>Completed orders</h2>
+                <p>Review fulfilled orders and their details.</p>
+              </div>
+              <div className={styles.archiveMetrics}>
+                <div><strong>{completedOrders.length}</strong><span>COMPLETED ORDERS</span></div>
+                <div><strong>{currency(completedSales)}</strong><span>COMPLETED SALES</span></div>
+              </div>
+            </section>
+          ) : (
+            <section className={styles.archiveSummary} aria-label="Active orders summary">
+              <div>
+                <span className={styles.archiveEyebrow}>ORDER MANAGEMENT</span>
+                <h2>Active orders</h2>
+                <p>Track and manage orders still being fulfilled.</p>
+              </div>
+              <div className={styles.archiveMetrics}>
+                <div><strong>{orders.filter((order) => order.status !== 'DELIVERED').length}</strong><span>ACTIVE ORDERS</span></div>
+                <div><strong>{counts.PENDING}</strong><span>AWAITING CONFIRMATION</span></div>
+              </div>
+            </section>
+          )}
+          <div className={styles.ordersWorkspace}>
+            {!archive && (
+              <div className={styles.stats} aria-label="Filter orders by status">
+                <span className={styles.statusFilterLabel}>ORDER STATUS</span>
+                <div className={styles.statusFilters}>
+                  {statusOrder.map((status) => (
                     <button
-                      className={selected?.id === order.id ? styles.selected : ''}
+                      aria-pressed={statusFilter === status}
+                      className={statusFilter === status ? styles.activeStat : ''}
+                      key={status}
+                      onClick={() => { setStatusFilter((current) => current === status ? null : status); setShowAllOrders(false) }}
                       type="button"
-                      key={order.id}
-                      onClick={() => setSelectedId(order.id)}
                     >
-                      <div>
-                        <strong>{order.customer}</strong>
-                        <small>{order.id}</small>
-                        <small>{order.date}</small>
-                        <u>{order.email}</u>
-                      </div>
-                      <StatusBadge status={order.status} />
-                      <b>{currency(totals(order).total)}</b>
+                      {status} <span>{counts[status]}</span>
                     </button>
                   ))}
-                </aside>
-                {selected && <OrderDetails order={selected} onAdvance={advanceSelected} onBack={reverseSelected} isUpdating={isUpdating} />}
-              </>
+                  <button
+                    aria-pressed={showAllOrders && !statusFilter}
+                    className={showAllOrders && !statusFilter ? styles.activeStat : ''}
+                    onClick={() => { setStatusFilter(null); setShowAllOrders(true) }}
+                    type="button"
+                  >
+                    ALL ORDERS <span>{orders.length}</span>
+                  </button>
+                </div>
+              </div>
             )}
+            {error && orders.length > 0 && <p className={styles.workspaceError} role="alert">{error}</p>}
+            <div className={styles.ordersPanel}>
+              {isLoading ? (
+                <p className={styles.empty}>Loading orders...</p>
+              ) : error && orders.length === 0 ? (
+                <p className={styles.empty} role="alert">{error}</p>
+              ) : visibleOrders.length === 0 ? (
+                <p className={styles.empty}>{search.trim() ? 'No orders match your search.' : 'No orders found.'}</p>
+              ) : (
+                <>
+                  <aside className={styles.orderList}>
+                    <div className={styles.orderListHeader}>
+                      <div>
+                        <strong>{archive ? 'Completed orders' : statusFilter ? `${statusFilter} orders` : showAllOrders ? 'All orders' : 'Active queue'}</strong>
+                        <span>{archive ? 'FULFILLED' : 'NEWEST FIRST'}</span>
+                      </div>
+                      <b>{visibleOrders.length}</b>
+                    </div>
+                    {visibleOrders.map((order) => (
+                      <button
+                        className={selected?.id === order.id ? styles.selected : ''}
+                        type="button"
+                        key={order.id}
+                        onClick={() => setSelectedId(order.id)}
+                      >
+                        <div>
+                          <strong>{order.customer}</strong>
+                          <small>{order.id}</small>
+                          <small>{order.date}</small>
+                          <small className={styles.orderMeta}>{order.items.length} {order.items.length === 1 ? 'item' : 'items'} · {order.fulfillmentType === 'pickup' ? 'Pickup' : 'Delivery'}</small>
+                          {order.email && <u>{order.email}</u>}
+                        </div>
+                        <StatusBadge status={order.status} />
+                        <b>{currency(totals(order).total)}</b>
+                      </button>
+                    ))}
+                  </aside>
+                  {selected && <OrderDetails order={selected} onAdvance={advanceSelected} onBack={reverseSelected} isUpdating={isUpdating} isArchived={archive} />}
+                </>
+              )}
+            </div>
           </div>
         </div>
       </section>
