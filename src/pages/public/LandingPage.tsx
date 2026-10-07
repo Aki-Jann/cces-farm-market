@@ -56,9 +56,12 @@ export function LandingPage() {
       <header className={styles.header}>
         <a href="#top" aria-label="GreenMarket home"><BrandLogo compact /></a>
         <nav>
-          <a href="#shops">SHOP</a>
-          <a href="#about">ABOUT</a>
-          <a href="#/login" className={styles.loginLink}>LOG IN</a>
+          <a href="#shops">Shop</a>
+          <a href="#steps">Steps</a>
+          <a href="#community">Community</a>
+          <a href="#about">About</a>
+          <a href="#faq">FAQ</a>
+          <a href="#/login" className={styles.loginLink}>Log in</a>
         </nav>
       </header>
 
@@ -110,12 +113,68 @@ export function LandingPage() {
         </div>
       </section>
 
+      <section className={styles.howItWorks} id="steps">
+        <p className={styles.sectionEyebrow}>FROM FARM TO YOUR TABLE</p>
+        <h2>Fresh food, in a few simple steps</h2>
+        <div className={styles.stepGrid}>
+          <article className={styles.stepCard}>
+            <span>01</span>
+            <h3>Explore the harvest</h3>
+            <p>Browse seasonal produce and see what local growers have available.</p>
+          </article>
+          <article className={styles.stepCard}>
+            <span>02</span>
+            <h3>Place your order</h3>
+            <p>Add your favorites to the cart and choose pickup or delivery at checkout.</p>
+          </article>
+          <article className={styles.stepCard}>
+            <span>03</span>
+            <h3>Enjoy local freshness</h3>
+            <p>Collect your order or have it delivered, then share feedback with the farm.</p>
+          </article>
+        </div>
+        <a className={styles.sectionButton} href="#shops">EXPLORE THE HARVEST</a>
+      </section>
+
+      <section className={styles.community} id="community">
+        <div className={styles.communityCopy}>
+          <p className={styles.sectionEyebrow}>GROWN CLOSE TO HOME</p>
+          <h2>Every order helps local farming grow</h2>
+          <p>GreenMarket brings growers and buyers together in one place. Find seasonal produce, connect directly with the farm, and make local shopping part of your routine.</p>
+          <a href="#about">MEET THE FARMING COMMUNITY</a>
+        </div>
+        <div className={styles.communityNote}>
+          <span aria-hidden="true">“</span>
+          <blockquote>Buying nearby makes it easier to know where our food comes from and who grew it.</blockquote>
+          <small>Sample community note — illustrative content</small>
+        </div>
+      </section>
+
       <section className={styles.story} id="about">
         <h2>AGRICULTORES DE LA PAZ</h2>
         <p className={styles.storyLabel}>OUR STORY</p>
         <img src={storyImage} alt="Agricultores de la Paz community" />
         <p className={styles.storyText}>We are the Agricultores De La Paz, a community of growers working together to bring our harvest directly to buyers. Farming is our livelihood, but selling our produce has always been a challenge. Through this platform, we can share our crops at fair prices, reduce waste, and reach more people who value fresh, local food.</p>
         <button type="button" onClick={() => { window.location.hash = '/login' }}>ORDER DIRECTLY FROM US</button>
+      </section>
+
+      <section className={styles.faq} id="faq">
+        <p className={styles.sectionEyebrow}>GOOD TO KNOW</p>
+        <h2>Frequently asked questions</h2>
+        <div className={styles.faqList}>
+          <details>
+            <summary>How do I place an order?</summary>
+            <p>Create an account, browse the shop, add products to your cart, then select pickup or delivery at checkout.</p>
+          </details>
+          <details>
+            <summary>When can I pick up my order?</summary>
+            <p>Available pickup days and hours are shown in checkout and may vary based on the farm’s current schedule.</p>
+          </details>
+          <details>
+            <summary>Can I pay online?</summary>
+            <p>Where available, checkout shows the seller’s supported online payment options and payment instructions.</p>
+          </details>
+        </div>
       </section>
 
       <footer>

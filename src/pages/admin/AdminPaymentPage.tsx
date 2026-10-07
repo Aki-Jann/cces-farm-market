@@ -1,64 +1,144 @@
-import { useEffect, useMemo, useState } from 'react'
-import { collection, doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { FormEvent } from 'react'
+import { collection, doc, getDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
+import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
+import { deleteObject, getDownloadURL, ref, uploadBytes } from 'firebase/storage'
 import { storage } from '../../firebase/storage'
 import styles from './AdminPaymentPage.module.css'
 
-type CheckoutSettings = {
-  pickupAddress: string
+type StorefrontSettings = {
+  pickupLocation: string
+  pickupDays: string
+  pickupHours: string
+  gcashAccountName: string
+  gcashAccountNumber: string
   gcashQrUrl: string
+  gcashQrPath: string
+  mayaAccountName: string
+  mayaAccountNumber: string
   mayaQrUrl: string
+  mayaQrPath: string
 }
 
-const checkoutSettingsRef = doc(db, 'storeSettings', 'checkout')
+const storefrontSettingsRef = doc(db, 'settings', 'storefront')
+const emptyStorefrontSettings: StorefrontSettings = {
+  pickupLocation: '',
+  pickupDays: '',
+  pickupHours: '',
+  gcashAccountName: '',
+  gcashAccountNumber: '',
+  gcashQrUrl: '',
+  gcashQrPath: '',
+  mayaAccountName: '',
+  mayaAccountNumber: '',
+  mayaQrUrl: '',
+  mayaQrPath: '',
+}
 
 function CheckoutSettingsPanel() {
-  const [settings, setSettings] = useState<CheckoutSettings>({ pickupAddress: '', gcashQrUrl: '', mayaQrUrl: '' })
-  const [pickupAddress, setPickupAddress] = useState('')
+  const [settings, setSettings] = useState<StorefrontSettings>(emptyStorefrontSettings)
+  const [draft, setDraft] = useState<StorefrontSettings>(emptyStorefrontSettings)
   const [isLoading, setIsLoading] = useState(true)
-  const [isSavingPickup, setIsSavingPickup] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [uploadingMethod, setUploadingMethod] = useState<'GCASH' | 'MAYA' | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const draftIsDirty = useRef(false)
+  const legacyMigrationStarted = useRef(false)
 
-  useEffect(() => onSnapshot(checkoutSettingsRef, (snapshot) => {
-    const data = snapshot.data()
-    const loadedSettings = {
-      pickupAddress: typeof data?.pickupAddress === 'string' ? data.pickupAddress : '',
-      gcashQrUrl: typeof data?.gcashQrUrl === 'string' ? data.gcashQrUrl : '',
-      mayaQrUrl: typeof data?.mayaQrUrl === 'string' ? data.mayaQrUrl : '',
+  useEffect(() => onSnapshot(
+    storefrontSettingsRef,
+    (snapshot) => {
+      const data = snapshot.data()
+      const loadedSettings: StorefrontSettings = {
+        pickupLocation: typeof data?.pickupLocation === 'string' ? data.pickupLocation : '',
+        pickupDays: typeof data?.pickupDays === 'string' ? data.pickupDays : '',
+        pickupHours: typeof data?.pickupHours === 'string' ? data.pickupHours : '',
+        gcashAccountName: typeof data?.gcashAccountName === 'string' ? data.gcashAccountName : '',
+        gcashAccountNumber: typeof data?.gcashAccountNumber === 'string' ? data.gcashAccountNumber : '',
+        gcashQrUrl: typeof data?.gcashQrUrl === 'string' ? data.gcashQrUrl : '',
+        gcashQrPath: typeof data?.gcashQrPath === 'string' ? data.gcashQrPath : '',
+        mayaAccountName: typeof data?.mayaAccountName === 'string' ? data.mayaAccountName : '',
+        mayaAccountNumber: typeof data?.mayaAccountNumber === 'string' ? data.mayaAccountNumber : '',
+        mayaQrUrl: typeof data?.mayaQrUrl === 'string' ? data.mayaQrUrl : '',
+        mayaQrPath: typeof data?.mayaQrPath === 'string' ? data.mayaQrPath : '',
+      }
+      setSettings(loadedSettings)
+      if (!draftIsDirty.current) setDraft(loadedSettings)
+      setError('')
+      setIsLoading(false)
+      if (!legacyMigrationStarted.current) {
+        legacyMigrationStarted.current = true
+        void getDoc(doc(db, 'storeSettings', 'checkout'))
+          .then(async (legacySnapshot) => {
+            if (!legacySnapshot.exists()) return
+            const legacyData = legacySnapshot.data()
+            const migratedSettings: Partial<StorefrontSettings> = {}
+            if (!loadedSettings.pickupLocation && typeof legacyData.pickupAddress === 'string') {
+              migratedSettings.pickupLocation = legacyData.pickupAddress
+            }
+            if (!loadedSettings.gcashQrUrl && typeof legacyData.gcashQrUrl === 'string') {
+              migratedSettings.gcashQrUrl = legacyData.gcashQrUrl
+            }
+            if (!loadedSettings.mayaQrUrl && typeof legacyData.mayaQrUrl === 'string') {
+              migratedSettings.mayaQrUrl = legacyData.mayaQrUrl
+            }
+            if (Object.keys(migratedSettings).length > 0) {
+              await setDoc(storefrontSettingsRef, migratedSettings, { merge: true })
+            }
+          })
+          .catch((migrationError) => {
+            console.error('Migrating legacy checkout settings failed:', migrationError)
+            setError('Unable to migrate existing checkout settings. Please review and save them here.')
+          })
+      }
+    },
+    (loadError) => {
+      console.error('Loading storefront settings failed:', loadError)
+      setError('Unable to load pickup and payment settings.')
+      setIsLoading(false)
     }
-    setSettings(loadedSettings)
-    setPickupAddress(loadedSettings.pickupAddress)
-    setIsLoading(false)
-  }, (loadError) => {
-    console.error('Loading checkout settings failed:', loadError)
-    setError('Unable to load pickup and payment settings.')
-    setIsLoading(false)
-  }), [])
+  ), [])
 
-  async function savePickupAddress(event: React.FormEvent<HTMLFormElement>) {
+  function updateField(field: keyof StorefrontSettings, value: string) {
+    draftIsDirty.current = true
+    setDraft((current) => ({ ...current, [field]: value }))
+    setError('')
+    setNotice('')
+  }
+
+  async function saveStorefrontSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const value = pickupAddress.trim()
-    if (!value) {
+    if (!draft.pickupLocation.trim()) {
       setError('Enter a pickup location before saving.')
       return
     }
 
-    setIsSavingPickup(true)
+    setIsSaving(true)
     setError('')
     setNotice('')
+    const savedSettings = {
+      pickupLocation: draft.pickupLocation.trim(),
+      pickupDays: draft.pickupDays.trim(),
+      pickupHours: draft.pickupHours.trim(),
+      gcashAccountName: draft.gcashAccountName.trim(),
+      gcashAccountNumber: draft.gcashAccountNumber.trim(),
+      mayaAccountName: draft.mayaAccountName.trim(),
+      mayaAccountNumber: draft.mayaAccountNumber.trim(),
+    }
     try {
-      await setDoc(checkoutSettingsRef, { pickupAddress: value, updatedAt: serverTimestamp() }, { merge: true })
-      setNotice('Pickup location saved.')
+      await setDoc(storefrontSettingsRef, { ...savedSettings, updatedAt: serverTimestamp() }, { merge: true })
+      setDraft((current) => ({ ...current, ...savedSettings }))
+      draftIsDirty.current = false
+      setNotice('Pickup and payment details saved.')
     } catch (saveError) {
-      console.error('Saving pickup location failed:', saveError)
-      setError('Unable to save the pickup location.')
+      console.error('Saving storefront settings failed:', saveError)
+      setError('Unable to save pickup and payment details.')
     } finally {
-      setIsSavingPickup(false)
+      setIsSaving(false)
     }
   }
 
@@ -76,16 +156,56 @@ function CheckoutSettingsPanel() {
     setUploadingMethod(method)
     setError('')
     setNotice('')
+    let uploadedRef: ReturnType<typeof ref> | null = null
     try {
-      const extension = file.type.slice('image/'.length)
-      const imageRef = ref(storage, `payment-qr-codes/${method.toLowerCase()}/current.${extension}`)
-      const uploadedImage = await uploadBytes(imageRef, file, { contentType: file.type })
+      const user = auth.currentUser
+      if (!user) throw new Error('An admin must be signed in to upload payment QR codes.')
+      const extension = file.type === 'image/jpeg' ? 'jpg' : file.type.split('/')[1]
+      const storagePath = `payment-qr/${method.toLowerCase()}/${user.uid}/${crypto.randomUUID()}.${extension}`
+      uploadedRef = ref(storage, storagePath)
+      const uploadedImage = await uploadBytes(uploadedRef, file, { contentType: file.type })
       const imageUrl = await getDownloadURL(uploadedImage.ref)
-      const field = method === 'GCASH' ? 'gcashQrUrl' : 'mayaQrUrl'
-      await setDoc(checkoutSettingsRef, { [field]: imageUrl, updatedAt: serverTimestamp() }, { merge: true })
+      const provider = method === 'GCASH' ? 'gcash' : 'maya'
+      const oldPath = settings[`${provider}QrPath`]
+      const savedDetails = {
+        pickupLocation: draft.pickupLocation.trim(),
+        pickupDays: draft.pickupDays.trim(),
+        pickupHours: draft.pickupHours.trim(),
+        gcashAccountName: draft.gcashAccountName.trim(),
+        gcashAccountNumber: draft.gcashAccountNumber.trim(),
+        mayaAccountName: draft.mayaAccountName.trim(),
+        mayaAccountNumber: draft.mayaAccountNumber.trim(),
+      }
+      await setDoc(storefrontSettingsRef, {
+        ...savedDetails,
+        [`${provider}QrUrl`]: imageUrl,
+        [`${provider}QrPath`]: storagePath,
+        updatedAt: serverTimestamp(),
+      }, { merge: true })
+      setDraft((current) => ({
+        ...current,
+        ...savedDetails,
+        [`${provider}QrUrl`]: imageUrl,
+        [`${provider}QrPath`]: storagePath,
+      }))
+      draftIsDirty.current = false
+      if (oldPath && oldPath !== storagePath) {
+        try {
+          await deleteObject(ref(storage, oldPath))
+        } catch (deleteError) {
+          console.error('Removing replaced payment QR image failed:', deleteError)
+        }
+      }
       setNotice(`${method === 'GCASH' ? 'GCash' : 'Maya'} QR code uploaded.`)
     } catch (uploadError) {
       console.error('Uploading payment QR code failed:', uploadError)
+      if (uploadedRef) {
+        try {
+          await deleteObject(uploadedRef)
+        } catch (cleanupError) {
+          console.error('Cleaning up an unused payment QR image failed:', cleanupError)
+        }
+      }
       setError('Unable to upload the QR code. Please try again.')
     } finally {
       setUploadingMethod(null)
@@ -95,13 +215,31 @@ function CheckoutSettingsPanel() {
   return (
     <section className={styles.settingsPanel} aria-labelledby="checkout-settings-title">
       <div className={styles.settingsHeading}>
-        <div><h2 id="checkout-settings-title">CUSTOMER CHECKOUT DETAILS</h2><p>Set the pickup location and payment QR codes shown during checkout.</p></div>
+        <div><h2 id="checkout-settings-title">CUSTOMER CHECKOUT DETAILS</h2><p>Set the pickup location, schedule, payment details, and QR codes shown during checkout.</p></div>
       </div>
       {isLoading ? <p className={styles.settingsMessage}>Loading checkout settings...</p> : (
         <>
-          <form className={styles.pickupForm} onSubmit={savePickupAddress}>
-            <label htmlFor="pickup-address">Pickup location</label>
-            <div><input id="pickup-address" value={pickupAddress} onChange={(event) => setPickupAddress(event.target.value)} placeholder="Enter farm address or pickup instructions" /><button type="submit" disabled={isSavingPickup}>{isSavingPickup ? 'SAVING...' : 'SAVE LOCATION'}</button></div>
+          <form className={styles.pickupForm} onSubmit={(event) => void saveStorefrontSettings(event)}>
+            <label>Pickup location<input value={draft.pickupLocation} onChange={(event) => updateField('pickupLocation', event.target.value)} placeholder="Enter farm address or pickup instructions" /></label>
+            <div className={styles.pickupSchedule}>
+              <label>Pickup days<input value={draft.pickupDays} onChange={(event) => updateField('pickupDays', event.target.value)} placeholder="For example: Saturday–Sunday" /></label>
+              <label>Pickup hours<input value={draft.pickupHours} onChange={(event) => updateField('pickupHours', event.target.value)} placeholder="For example: 8 AM–1 PM" /></label>
+            </div>
+            <div className={styles.qrSettings}>
+              {(['GCASH', 'MAYA'] as const).map((method) => {
+                const provider = method === 'GCASH' ? 'gcash' : 'maya'
+                const accountNameField = `${provider}AccountName` as const
+                const accountNumberField = `${provider}AccountNumber` as const
+                return (
+                  <div className={styles.paymentDetails} key={method}>
+                    <strong>{method === 'GCASH' ? 'GCash' : 'Maya'} details</strong>
+                    <label>Account name<input value={draft[accountNameField]} onChange={(event) => updateField(accountNameField, event.target.value)} placeholder="Account holder" /></label>
+                    <label>Account number<input inputMode="tel" value={draft[accountNumberField]} onChange={(event) => updateField(accountNumberField, event.target.value)} placeholder="Account number" /></label>
+                  </div>
+                )
+              })}
+            </div>
+            <button type="submit" disabled={isSaving}>{isSaving ? 'SAVING...' : 'SAVE PICKUP & PAYMENT DETAILS'}</button>
           </form>
           <div className={styles.qrSettings}>
             {(['GCASH', 'MAYA'] as const).map((method) => {

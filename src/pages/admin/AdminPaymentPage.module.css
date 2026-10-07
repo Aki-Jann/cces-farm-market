@@ -228,6 +228,187 @@
   text-align: center;
 }
 
+.settingsPanel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-panel);
+  padding: 22px;
+}
+
+.settingsHeading h2 {
+  color: var(--color-text);
+  font-size: 14px;
+  letter-spacing: .06em;
+  margin: 0;
+}
+
+.settingsHeading p,
+.settingsMessage {
+  color: #758178;
+  font-size: 12px;
+  margin: 7px 0 0;
+}
+
+.pickupForm {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.pickupForm label,
+.paymentDetails label {
+  color: #526057;
+  display: grid;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 6px;
+}
+
+.pickupForm input,
+.paymentDetails input {
+  background: #fff;
+  border: 1px solid #d8e1da;
+  border-radius: 7px;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 400;
+  min-height: 40px;
+  min-width: 0;
+  padding: 9px 11px;
+}
+
+.pickupForm input:focus,
+.paymentDetails input:focus {
+  border-color: #16834a;
+  outline: 3px solid rgb(22 131 74 / 13%);
+}
+
+.pickupSchedule,
+.qrSettings {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.paymentDetails {
+  background: #f8faf8;
+  border: 1px solid #e4ebe5;
+  border-radius: 8px;
+  display: grid;
+  gap: 11px;
+  padding: 14px;
+}
+
+.paymentDetails > strong {
+  color: #315a3b;
+  font-size: 12px;
+}
+
+.pickupForm > button {
+  background: #16834a;
+  border: 0;
+  border-radius: 7px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+  justify-self: start;
+  letter-spacing: .04em;
+  min-height: 40px;
+  padding: 0 16px;
+}
+
+.pickupForm > button:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.qrSettings {
+  margin-top: 18px;
+}
+
+.qrSetting {
+  align-items: center;
+  background: #f8faf8;
+  border: 1px solid #e4ebe5;
+  border-radius: 8px;
+  display: flex;
+  gap: 14px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.qrPreview {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e4ebe5;
+  border-radius: 7px;
+  color: #758178;
+  display: flex;
+  flex: 0 0 92px;
+  font-size: 9px;
+  height: 92px;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.qrPreview img {
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+.qrSetting > div:last-child {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.qrSetting strong {
+  color: #315a3b;
+  font-size: 12px;
+}
+
+.uploadButton {
+  color: #087b3b;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+  position: relative;
+}
+
+.uploadButton input {
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+}
+
+.qrSetting small {
+  color: #758178;
+  font-size: 9px;
+}
+
+.settingsError,
+.settingsNotice {
+  border-radius: 7px;
+  font-size: 11px;
+  margin: 14px 0 0;
+  padding: 10px 12px;
+}
+
+.settingsError {
+  background: #fff0ee;
+  color: #a5352c;
+}
+
+.settingsNotice {
+  background: #edf7ef;
+  color: #28663a;
+}
+
 @media (max-width: 1050px) {
   .dashboard {
     padding: 0 20px;
@@ -270,5 +451,18 @@
   .tablePanel {
     min-height: 300px;
     padding: 8px 10px 12px;
+  }
+
+  .settingsPanel {
+    padding: 16px;
+  }
+
+  .pickupSchedule,
+  .qrSettings {
+    grid-template-columns: 1fr;
+  }
+
+  .qrSetting {
+    align-items: flex-start;
   }
 }

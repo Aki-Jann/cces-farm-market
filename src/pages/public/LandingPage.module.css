@@ -27,7 +27,12 @@
 }
 
 .header > a {
-  flex: 0 0 auto;
+  flex: 0 0 160px;
+  width: 160px;
+}
+
+.header > a :global(div) {
+  width: 160px;
 }
 
 .header > a :global(span),
@@ -48,6 +53,8 @@ footer .logo :global(span) {
   font-weight: 700;
   letter-spacing: .04em;
   padding: 10px 14px;
+  text-transform: uppercase;
+  white-space: nowrap;
   transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
 }
 
@@ -217,6 +224,153 @@ footer .logo :global(span) {
   scroll-margin-top: 4rem;
 }
 
+.howItWorks {
+  background: #fff;
+  padding: clamp(52px, 7vw, 88px) clamp(20px, 6vw, 86px);
+  scroll-margin-top: 4rem;
+  text-align: center;
+}
+
+.sectionEyebrow {
+  color: var(--color-brand);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  margin: 0 0 10px;
+  text-align: center;
+}
+
+.howItWorks h2,
+.community h2,
+.faq h2 {
+  color: #183b28;
+  font-size: clamp(27px, 4vw, 42px);
+  letter-spacing: -.025em;
+  line-height: 1.18;
+  margin: 0 auto 32px;
+  text-align: center;
+}
+
+.stepGrid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0 auto;
+  max-width: 1120px;
+}
+
+.stepCard {
+  background: #f7faf7;
+  border: 1px solid #e3ece4;
+  border-radius: var(--radius-panel);
+  padding: 24px;
+  text-align: left;
+}
+
+.stepCard > span {
+  align-items: center;
+  background: #e8f3e9;
+  border-radius: 50%;
+  color: var(--color-brand);
+  display: flex;
+  font-size: 12px;
+  font-weight: 800;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}
+
+.stepCard h3 {
+  color: #263d2d;
+  font-size: 16px;
+  margin: 18px 0 8px;
+}
+
+.stepCard p,
+.communityCopy > p:not(.sectionEyebrow) {
+  color: #617066;
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0;
+}
+
+.sectionButton {
+  background: var(--color-brand);
+  border-radius: var(--radius-control);
+  color: white;
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  margin-top: 28px;
+  padding: 13px 18px;
+  text-decoration: none;
+}
+
+.sectionButton:hover {
+  background: var(--color-brand-strong);
+}
+
+.community {
+  align-items: center;
+  background: #f1f7f2;
+  display: grid;
+  gap: clamp(28px, 6vw, 76px);
+  grid-template-columns: minmax(0, 1fr) minmax(260px, .75fr);
+  padding: clamp(48px, 7vw, 84px) clamp(20px, 10vw, 144px);
+  scroll-margin-top: 4rem;
+}
+
+.communityCopy .sectionEyebrow {
+  text-align: left;
+}
+
+.community h2 {
+  margin: 0 0 16px;
+  text-align: left;
+}
+
+.communityCopy > a {
+  color: var(--color-brand);
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  margin-top: 22px;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+
+.communityNote {
+  background: #fff;
+  border: 1px solid #e0e9e1;
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-card);
+  padding: 24px;
+}
+
+.communityNote > span {
+  color: #78a77f;
+  display: block;
+  font-family: Georgia, serif;
+  font-size: 54px;
+  height: 38px;
+  line-height: 1;
+}
+
+.communityNote blockquote {
+  color: #34473a;
+  font-family: Georgia, serif;
+  font-size: 18px;
+  line-height: 1.6;
+  margin: 12px 0 18px;
+}
+
+.communityNote small {
+  color: #758178;
+  font-size: 10px;
+}
+
 .products h2,
 .story h2 {
   color: #183b28;
@@ -383,6 +537,44 @@ footer .logo :global(span) {
   font-size: 10px;
 }
 
+.faq {
+  background: var(--color-canvas);
+  padding: clamp(48px, 7vw, 80px) 20px;
+  scroll-margin-top: 4rem;
+}
+
+.faq h2 {
+  margin-bottom: 26px;
+}
+
+.faqList {
+  display: grid;
+  gap: 10px;
+  margin: 0 auto;
+  max-width: 820px;
+}
+
+.faqList details {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  padding: 16px 18px;
+}
+
+.faqList summary {
+  color: #2f4535;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.faqList details p {
+  color: #617066;
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 12px 0 0;
+}
+
 footer {
   align-items: center;
   background: #f1f7f2;
@@ -393,9 +585,23 @@ footer {
 }
 
 footer .logo {
-  flex: 0 0 auto;
+  flex: 0 0 200px;
   margin-right: auto;
-  max-width: 200px;
+  max-width: 100%;
+  width: 200px;
+}
+
+footer .logo :global(div) {
+  width: 100%;
+}
+
+footer .logo :global(span) {
+  font-size: 27px;
+  white-space: nowrap;
+}
+
+footer .logo :global(small) {
+  font-size: 5px;
 }
 
 footer .details {
@@ -421,11 +627,23 @@ footer span {
 
   .header nav {
     gap: 2px;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
 
-  .header .logo {
-    transform: scale(.72);
-    transform-origin: left center;
+  .header nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .header > a,
+  .header > a :global(div) {
+    flex-basis: 145px;
+    width: 145px;
+  }
+
+  .header > a :global(span) {
+    font-size: 21px;
   }
 
   .header nav a {
@@ -506,6 +724,28 @@ footer span {
     padding: 48px 16px;
   }
 
+  .stepGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .stepCard {
+    padding: 18px;
+  }
+
+  .community {
+    gap: 24px;
+    grid-template-columns: 1fr;
+    padding: 48px 20px;
+  }
+
+  .community h2 {
+    font-size: clamp(25px, 7vw, 34px);
+  }
+
+  .communityNote {
+    padding: 20px;
+  }
+
   .products h2,
   .story h2 {
     font-size: clamp(25px, 7vw, 34px);
@@ -578,11 +818,36 @@ footer span {
   }
 
   footer .logo {
+    flex-basis: 190px;
     margin: 0 auto;
+    width: 190px;
   }
 }
 
 @media (max-width: 390px) {
+  .header {
+    padding-inline: 10px;
+  }
+
+  .header > a,
+  .header > a :global(div) {
+    flex-basis: 132px;
+    width: 132px;
+  }
+
+  .header > a :global(span) {
+    font-size: 18px;
+  }
+
+  .header nav a {
+    font-size: 8px;
+    padding-inline: 5px;
+  }
+
+  .header .loginLink {
+    padding-inline: 8px;
+  }
+
   .hero {
     min-height: 620px;
   }
