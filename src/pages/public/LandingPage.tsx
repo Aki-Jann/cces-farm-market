@@ -178,13 +178,19 @@ export function LandingPage() {
       </section>
 
       <footer>
-        <div className={styles.logo}>
+        <a className={styles.logo} href="#top" aria-label="GreenMarket — back to top">
           <BrandLogo compact />
-        </div>
+        </a>
         <div className={styles.details}>
-          <span>cces@adzu.edu.ph</span>
-          <span>+63 992 091 8674</span>
-          <span>Ateneo de Zamboanga University, La Purisima St., Zamboanga City 7000, Philippines</span>
+          <a href="mailto:cces@adzu.edu.ph">cces@adzu.edu.ph</a>
+          <a href="tel:+639920918674">+63 992 091 8674</a>
+          <a
+            href="https://www.google.com/maps/search/?api=1&query=Ateneo+de+Zamboanga+University%2C+La+Purisima+St.%2C+Zamboanga+City+7000%2C+Philippines"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Ateneo de Zamboanga University, La Purisima St., Zamboanga City 7000, Philippines
+          </a>
         </div>
       </footer>
     </main> 

@@ -588,6 +588,7 @@ footer .logo {
   flex: 0 0 200px;
   margin-right: auto;
   max-width: 100%;
+  text-decoration: none;
   width: 200px;
 }
 
@@ -613,10 +614,23 @@ footer .details {
   text-align: right;
 }
 
-footer span {
+.details a {
   color: #52685a;
   font-size: 10px;
   line-height: 1.6;
+  text-decoration: none;
+  text-underline-offset: 3px;
+}
+
+.details a:hover {
+  color: var(--color-brand);
+  text-decoration: underline;
+}
+
+.details a:focus-visible {
+  border-radius: 3px;
+  outline: 3px solid rgb(1 118 50 / 22%);
+  outline-offset: 3px;
 }
 
 @media (max-width: 760px) {
