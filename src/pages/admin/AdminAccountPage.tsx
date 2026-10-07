@@ -16,6 +16,7 @@ type AdminProfile = {
   contactNumber: string
   address: string
   email: string
+  birthday: string
 }
 
 type StoreSettings = {
@@ -70,6 +71,17 @@ function validQrFile(file: File) {
 
 function displayName(profile: AdminProfile) {
   return `${profile.firstName} ${profile.lastName}`.trim() || 'Admin'
+}
+
+function displayBirthday(value: unknown) {
+  const date = value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function'
+    ? value.toDate()
+    : typeof value === 'string'
+      ? new Date(value)
+      : null
+  return date && !Number.isNaN(date.getTime())
+    ? `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`
+    : 'Not provided'
 }
 
 export function AdminAccountPage() {
@@ -133,6 +145,7 @@ export function AdminAccountPage() {
             contactNumber: typeof data.contactNumber === 'string' ? data.contactNumber : '',
             address: typeof data.address === 'string' ? data.address : '',
             email: user.email ?? (typeof data.email === 'string' ? data.email : ''),
+            birthday: displayBirthday(data.birthday),
           }
           setProfile(loadedProfile)
           setIsEditing((currentlyEditing) => {
@@ -446,6 +459,7 @@ export function AdminAccountPage() {
                 <div><dt>Email Address</dt><dd>{profile.email || 'Not provided'}</dd></div>
                 <div><dt>Contact Number</dt><dd>{profile.contactNumber || 'Not provided'}</dd></div>
                 <div><dt>Address</dt><dd>{profile.address || 'Not provided'}</dd></div>
+                <div><dt>Birthday</dt><dd>{profile.birthday}</dd></div>
               </dl>
             )}
 

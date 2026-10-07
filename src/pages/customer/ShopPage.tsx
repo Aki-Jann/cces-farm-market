@@ -682,6 +682,15 @@ export function ShopPage() {
 
   async function placeOrder({ fulfillmentType, sellerNotes, receiptFile }: CheckoutDetails) {
     if (cartItems.length === 0) return
+    if (fulfillmentType === 'pickup' && !storeSettings.pickupLocation.trim()) {
+      setOrderMessage('Pickup location is not configured yet. Please contact the seller.')
+      return
+    }
+    const paymentQrUrl = paymentMethod === 'GCASH' ? storeSettings.gcashQrUrl : storeSettings.mayaQrUrl
+    if (paymentMethod !== 'COD' && !paymentQrUrl) {
+      setOrderMessage('The selected payment QR code is not configured yet. Please contact the seller.')
+      return
+    }
     const addressForOrder = fulfillmentType === 'delivery' ? deliveryAddress.trim() : ''
     if (fulfillmentType === 'delivery' && !addressForOrder) {
       setAddressError('Delivery address is required.')

@@ -23,7 +23,9 @@ export function AdminSidebar({ active }: { active: AdminNavItem }) {
           </a>
         ))}
       </div>
-      <a href="#/admin/account" className={active === 'account' ? styles.active : ''}>MY ACCOUNT</a>
+      <a className={active === 'account' ? styles.active : ''} href="#/admin/account">
+        MY ACCOUNT
+      </a>
     </nav>
   )
 }
