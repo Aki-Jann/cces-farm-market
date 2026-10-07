@@ -6,6 +6,7 @@ import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import styles from './AdminCustomersPage.module.css'
+import { formatMonthDayYear, formatMonthDayYearTime } from '../../utils/dateFormat'
 
 type Message = { id: string; text: string; timestamp: string; sender: 'customer' | 'admin' }
 type LoadedMessage = Message & { createdAt: unknown }
@@ -31,15 +32,14 @@ function currency(value: number) {
 
 function formatDate(value: unknown, fallback = 'Unknown') {
   if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
-    const date = value.toDate()
-    return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`
+    return formatMonthDayYear(value.toDate())
   }
   return fallback
 }
 
 function formatMessageTimestamp(value: unknown) {
   if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
-    return value.toDate().toLocaleString('en-US')
+    return formatMonthDayYearTime(value.toDate())
   }
   return 'Pending'
 }
@@ -321,5 +321,5 @@ export function AdminCustomersPage() {
     }
   }
 
-  return <main className={styles.page}><AdminSidebar active="customers" /><section className={styles.content}><Header title="CUSTOMERS" search={search} onSearchChange={(event) => setSearch(event.target.value)} />{isLoading ? <div className={styles.workspace}><p>Loading customers...</p></div> : error && customers.length === 0 ? <div className={styles.workspace}><p role="alert">{error}</p></div> : !selected ? <div className={styles.workspace}><p>{search.trim() ? 'No customer profiles match your search.' : 'No customer profiles found.'}</p></div> : <div className={styles.workspace}><CustomerList customers={visibleCustomers} selectedId={selected.id} onSelect={(id) => { setSelectedId(id); setTab('profile') }} /><section className={styles.details}><CustomerHeader customer={selected} onChangeCustomerType={(customerType) => void updateCustomerProfile('customerType', customerType)} /><nav className={styles.tabs}><button className={tab === 'profile' ? styles.activeTab : ''} type="button" onClick={() => setTab('profile')}>PROFILE</button><button className={tab === 'messages' ? styles.activeTab : ''} type="button" onClick={() => setTab('messages')}>MESSAGES</button></nav>{tab === 'profile' ? <Profile key={selected.id} customer={selected} isSaving={isSaving} onSaveNotes={(notes) => updateCustomerProfile('farmNotes', notes)} /> : <Messages key={selected.id} customer={selected} />}</section></div>}</section></main>
+  return <main className={styles.page}><AdminSidebar active="customers" /><section className={styles.content}><Header title="CUSTOMERS" search={search} onSearchChange={(event) => setSearch(event.target.value)} /><section className={styles.pageIntro} aria-label="Customers overview"><span>COMMUNITY DIRECTORY</span><h2>Customer relationships</h2><p>Review customer profiles, preferences, and conversations in one place.</p></section>{isLoading ? <div className={styles.workspace}><p>Loading customers...</p></div> : error && customers.length === 0 ? <div className={styles.workspace}><p role="alert">{error}</p></div> : !selected ? <div className={styles.workspace}><p>{search.trim() ? 'No customer profiles match your search.' : 'No customer profiles found.'}</p></div> : <div className={styles.workspace}><CustomerList customers={visibleCustomers} selectedId={selected.id} onSelect={(id) => { setSelectedId(id); setTab('profile') }} /><section className={styles.details}><CustomerHeader customer={selected} onChangeCustomerType={(customerType) => void updateCustomerProfile('customerType', customerType)} /><nav className={styles.tabs}><button className={tab === 'profile' ? styles.activeTab : ''} type="button" onClick={() => setTab('profile')}>PROFILE</button><button className={tab === 'messages' ? styles.activeTab : ''} type="button" onClick={() => setTab('messages')}>MESSAGES</button></nav>{tab === 'profile' ? <Profile key={selected.id} customer={selected} isSaving={isSaving} onSaveNotes={(notes) => updateCustomerProfile('farmNotes', notes)} /> : <Messages key={selected.id} customer={selected} />}</section></div>}</section></main>
 }

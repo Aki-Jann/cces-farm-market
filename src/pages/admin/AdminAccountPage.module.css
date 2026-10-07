@@ -2,23 +2,29 @@
   background: var(--color-canvas);
   color: var(--color-text);
   display: flex;
+  height: 100vh;
   min-height: 100vh;
 }
 
 .content {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  min-height: 0;
   min-width: 0;
 }
 
 .card {
+  box-sizing: border-box;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-panel);
   box-shadow: var(--shadow-panel);
-  margin: 24px auto;
-  max-width: 1080px;
+  flex: 1;
+  margin: 20px 30px;
+  min-height: 0;
+  overflow-y: auto;
   padding: 30px;
-  width: calc(100% - 48px);
 }
 
 .profileHeader {
@@ -45,6 +51,13 @@
   min-width: 0;
 }
 
+.identityTitle {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
 .identity h2 {
   font-size: 22px;
   margin: 0;
@@ -64,8 +77,30 @@
   color: #017632;
   font-size: 11px;
   font-weight: 700;
-  margin-left: auto;
   padding: 7px 10px;
+}
+
+.logout {
+  background: #fff0ee;
+  border: 0;
+  border-radius: 5px;
+  color: #b42318;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  margin-left: auto;
+  padding: 9px 15px;
+}
+
+.logout:hover:not(:disabled),
+.logout:focus-visible {
+  background: #fde6e2;
+  outline: 0;
+}
+
+.logout:disabled {
+  cursor: wait;
+  opacity: .6;
 }
 
 .sectionHeading,
@@ -336,12 +371,12 @@
 @media (max-width: 700px) {
   .page {
     display: block;
+    height: auto;
   }
 
   .card {
-    margin: 12px 8px;
+    margin: 20px 30px;
     padding: 20px 16px;
-    width: auto;
   }
 
   .profileHeader {
@@ -358,6 +393,10 @@
 
   .identity h2 {
     font-size: 18px;
+  }
+
+  .role {
+    margin-left: auto;
   }
 
   .sectionHeading,

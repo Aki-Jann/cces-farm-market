@@ -8,7 +8,7 @@ import { db } from '../../firebase/firestore'
 import { productImageKey, productImages, resolveProductImage } from '../../utils/productImages'
 import styles from './AdminProductsPage.module.css'
 
-type ProductCategory = 'VEGETABLES' | 'FRUITS' | 'GRAINS' | 'FLOWERS'
+type ProductCategory = string
 type Product = {
   id: string
   name: string
@@ -106,7 +106,19 @@ function emptyDraft(): ProductDraft {
   return { name: '', category: 'VEGETABLES', price: 100, stock: 0, unit: 'KG', image: imageOptions[0].value, rawImageUrl: '', available: true }
 }
 
-function ProductCard({ product, selected, onEdit }: { product: Product; selected: boolean; onEdit: () => void }) {
+function ProductCard({
+  product,
+  selected,
+  isUpdating,
+  onEdit,
+  onToggleAvailability,
+}: {
+  product: Product
+  selected: boolean
+  isUpdating: boolean
+  onEdit: () => void
+  onToggleAvailability: () => void
+}) {
   const isOutOfStock = product.stock <= 0
   const availabilityClass = isOutOfStock || !product.available ? styles.unavailable : styles.available
   const availabilityLabel = isOutOfStock ? 'OUT OF STOCK' : product.available ? 'AVAILABLE' : 'UNAVAILABLE'
@@ -126,7 +138,17 @@ function ProductCard({ product, selected, onEdit }: { product: Product; selected
         </div>
         <div className={styles.price}><strong>{currency(product.price)}</strong><small>PER {product.unit}</small></div>
       </div>
-      <button className={styles.editButton} type="button" onClick={onEdit}>EDIT PRODUCT</button>
+      <div className={styles.productActions}>
+        <button className={styles.editButton} type="button" onClick={onEdit}>EDIT / RESTOCK</button>
+        <button
+          className={styles.listingButton}
+          disabled={isUpdating}
+          type="button"
+          onClick={onToggleAvailability}
+        >
+          {isUpdating ? 'UPDATING...' : product.available ? 'UNLIST' : 'LIST PRODUCT'}
+        </button>
+      </div>
     </article>
   )
 }
@@ -137,6 +159,7 @@ function ProductForm({
   hasSelectedPhoto,
   isSaving,
   error,
+  categoryOptions,
   onChange,
   onFileSelect,
   onSubmit,
@@ -147,12 +170,14 @@ function ProductForm({
   hasSelectedPhoto: boolean
   isSaving: boolean
   error: string
+  categoryOptions: string[]
   onChange: (draft: ProductDraft) => void
   onFileSelect: (file: File) => void
   onSubmit: (event: FormEvent<HTMLFormElement>) => void
   onCancel: () => void
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [newCategory, setNewCategory] = useState('')
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -160,6 +185,13 @@ function ProductForm({
       onFileSelect(file)
     }
     event.target.value = ''
+  }
+
+  function addCategory() {
+    const category = newCategory.trim().toUpperCase()
+    if (!category) return
+    onChange({ ...draft, category })
+    setNewCategory('')
   }
 
   return (
@@ -199,10 +231,18 @@ function ProductForm({
         <input required value={draft.name} placeholder="e.g. TOMATO" onChange={(event) => onChange({ ...draft, name: event.target.value.toUpperCase() })} />
       </label>
       <fieldset><legend>CATEGORY</legend><div className={styles.categoryGrid}>
-        {categories.map((category) => <button className={draft.category === category ? styles.selectedChip : ''} type="button" key={category} onClick={() => onChange({ ...draft, category })}>{category}</button>)}
+        {[...new Set([...categoryOptions, draft.category])].map((category) => <button className={draft.category === category ? styles.selectedChip : ''} type="button" key={category} onClick={() => onChange({ ...draft, category })}>{category}</button>)}
+      </div><div className={styles.newCategory}>
+        <input aria-label="New category name" maxLength={40} value={newCategory} placeholder="Add a category" onChange={(event) => setNewCategory(event.target.value)} onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            addCategory()
+          }
+        }} />
+        <button type="button" onClick={addCategory} disabled={!newCategory.trim()}>ADD CATEGORY</button>
       </div></fieldset>
       <div className={styles.formRow}>
-        <label>STOCK<input min="0" required type="number" value={draft.stock} onChange={(event) => onChange({ ...draft, stock: Number(event.target.value) })} /></label>
+        <label>STOCK / RESTOCK QUANTITY<input min="0" required type="number" value={draft.stock} onChange={(event) => onChange({ ...draft, stock: Number(event.target.value) })} /></label>
       </div>
       <fieldset><legend>PRICE</legend><div className={styles.priceOptions}>
         {[100, 200, 300].map((price) => <button className={draft.price === price ? styles.selectedChip : ''} type="button" key={price} onClick={() => onChange({ ...draft, price })}>₱{price}.00</button>)}
@@ -220,23 +260,30 @@ export function AdminProductsPage() {
   const [error, setError] = useState('')
   const [salesError, setSalesError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [updatingProductIds, setUpdatingProductIds] = useState<Set<string>>(() => new Set())
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [draft, setDraft] = useState<ProductDraft>(emptyDraft())
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('ALL')
   const productDocsForBackfill = useRef<Array<{ id: string; data: Record<string, unknown> }> | null>(null)
   const orderDocsForBackfill = useRef<Array<Record<string, unknown>> | null>(null)
   const salesBackfillStarted = useRef(false)
   const selectedProduct = products.find((product) => product.id === selectedId)
+  const categoryOptions = useMemo(() => {
+    const customCategories = [...new Set(products.map((product) => product.category)
+      .filter((category) => category && !categories.includes(category as typeof categories[number])))]
+      .sort((a, b) => a.localeCompare(b))
+    return [...categories, ...customCategories]
+  }, [products])
   const visibleProducts = useMemo(() => {
     const query = search.trim().toLowerCase()
-    if (!query) return products
     return products.filter((product) =>
-      product.name.toLowerCase().includes(query) ||
-      product.category.toLowerCase().includes(query)
+      (selectedCategory === 'ALL' || product.category === selectedCategory) &&
+      (!query || product.name.toLowerCase().includes(query) || product.category.toLowerCase().includes(query))
     )
-  }, [products, search])
+  }, [products, search, selectedCategory])
 
   useEffect(() => {
     async function backfillSalesCounts() {
@@ -306,7 +353,7 @@ export function AdminProductsPage() {
           return {
             id: product.id,
             name: typeof data.name === 'string' ? data.name : '',
-            category: categories.includes(data.category) ? data.category : 'VEGETABLES',
+            category: typeof data.category === 'string' && data.category.trim() ? data.category.trim().toUpperCase() : 'VEGETABLES',
             price: typeof data.price === 'number' ? data.price : 0,
             stock: typeof data.stock === 'number' ? data.stock : 0,
             unit: typeof data.unit === 'string' ? data.unit : 'KG',
@@ -366,6 +413,25 @@ export function AdminProductsPage() {
     setSelectedId(null)
     setSelectedFile(null)
     setError('')
+  }
+
+  async function toggleAvailability(product: Product) {
+    if (updatingProductIds.has(product.id)) return
+    setError('')
+    setUpdatingProductIds((current) => new Set(current).add(product.id))
+    try {
+      await updateDoc(doc(db, 'products', product.id), { isAvailable: !product.available })
+      setProducts((current) => current.map((item) => item.id === product.id ? { ...item, available: !product.available } : item))
+    } catch (updateError) {
+      console.error('Updating product availability failed:', updateError)
+      setError(`Unable to ${product.available ? 'unlist' : 'list'} ${product.name}. Please try again.`)
+    } finally {
+      setUpdatingProductIds((current) => {
+        const next = new Set(current)
+        next.delete(product.id)
+        return next
+      })
+    }
   }
 
   function handleFileSelect(file: File) {
@@ -473,18 +539,44 @@ export function AdminProductsPage() {
         <div className={`${styles.workspace} ${isFormOpen ? styles.workspaceWithForm : ''}`}>
           <section className={`${styles.grid} ${isFormOpen ? styles.gridWithForm : styles.gridList}`}>
             <div className={styles.catalogHeader}>
-              <div><span>MARKET INVENTORY</span><h2>Products</h2><p>{products.length} product{products.length === 1 ? '' : 's'} in your catalog</p></div>
+              <div><span>MARKET MANAGEMENT</span><h2>Product catalog</h2><p>Manage listings, prices, and availability · {products.length} product{products.length === 1 ? '' : 's'}</p></div>
               <button className={styles.addButton} type="button" onClick={startAdd}><span aria-hidden="true">+</span> ADD PRODUCT</button>
             </div>
-            {visibleProducts.map((product) => <ProductCard key={product.id} product={product} selected={selectedId === product.id} onEdit={() => startEdit(product)} />)}
+            <nav className={styles.categoryFilters} aria-label="Filter products by category">
+              {['ALL', ...categoryOptions].map((category) => {
+                const count = category === 'ALL' ? products.length : products.filter((product) => product.category === category).length
+                return (
+                  <button
+                    aria-pressed={selectedCategory === category}
+                    className={selectedCategory === category ? styles.activeCategoryFilter : ''}
+                    key={category}
+                    onClick={() => setSelectedCategory(category)}
+                    type="button"
+                  >
+                    {category} <span>{count}</span>
+                  </button>
+                )
+              })}
+            </nav>
+            {visibleProducts.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                selected={selectedId === product.id}
+                isUpdating={updatingProductIds.has(product.id)}
+                onEdit={() => startEdit(product)}
+                onToggleAvailability={() => void toggleAvailability(product)}
+              />
+            ))}
             {isLoading && <p className={styles.empty}>Loading products...</p>}
             {!isLoading && error && !isFormOpen && <p className={styles.empty} role="alert">{error}</p>}
             {!isLoading && salesError && <p className={styles.empty} role="alert">{salesError}</p>}
-            {!isLoading && !error && visibleProducts.length === 0 && <p className={styles.empty}>{search.trim() ? 'No products match your search.' : 'No products found.'}</p>}
+            {!isLoading && !error && visibleProducts.length === 0 && <p className={styles.empty}>{search.trim() ? 'No products match your search and category filters.' : selectedCategory !== 'ALL' ? `No products in ${selectedCategory}.` : 'No products found.'}</p>}
           </section>
           {isFormOpen && (
             <ProductForm
               draft={draft}
+              categoryOptions={categoryOptions}
               editing={Boolean(selectedId)}
               hasSelectedPhoto={Boolean(selectedFile)}
               isSaving={isSaving}

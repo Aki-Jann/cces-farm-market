@@ -15,6 +15,36 @@
   min-width: 0;
 }
 
+.pageIntro {
+  background: linear-gradient(115deg, #fff 0%, #f4faf5 100%);
+  border: 1px solid #dce9de;
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-card);
+  flex: 0 0 auto;
+  margin: 20px 30px 0;
+  padding: 16px 20px;
+}
+
+.pageIntro span {
+  color: #438259;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .12em;
+}
+
+.pageIntro h2 {
+  color: #183b28;
+  font-size: 18px;
+  letter-spacing: -.02em;
+  margin: 4px 0 3px;
+}
+
+.pageIntro p {
+  color: #758178;
+  font-size: 11px;
+  margin: 0;
+}
+
 .workspace {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -22,7 +52,7 @@
   box-shadow: var(--shadow-panel);
   display: flex;
   flex: 1;
-  margin: 20px 30px;
+  margin: 12px 30px 20px;
   min-height: 0;
   overflow: hidden;
 }
@@ -570,14 +600,23 @@
 @media (max-width: 700px) {
   .page {
     display: block;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
   }
 
   .content {
-    height: 100vh;
+    display: block;
+    height: auto;
+  }
+
+  .pageIntro {
+    margin: 20px 30px 0;
+    padding: 14px 15px;
   }
 
   .workspace {
-    margin: 20px 30px;
+    margin: 12px 30px 20px;
   }
 
   .customerList {

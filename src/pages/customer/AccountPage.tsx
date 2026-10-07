@@ -6,6 +6,7 @@ import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
+import { formatMonthDayYear } from '../../utils/dateFormat'
 import styles from './AccountPage.module.css'
 
 type AccountData = {
@@ -21,8 +22,7 @@ type AccountData = {
 
 function formatBirthday(value: unknown) {
   if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
-    const date = value.toDate()
-    return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}/${date.getFullYear()}`
+    return formatMonthDayYear(value.toDate())
   }
   return 'Not provided'
 }
@@ -153,7 +153,13 @@ export function AccountPage() {
         <section className={styles.card}>
           <div className={styles.profileHeader}>
             <div className={styles.avatar}>{accountName(account).charAt(0)}</div>
-            <div><h2>{accountName(account)}</h2><p>{account.email}</p></div>
+            <div className={styles.identity}>
+              <div className={styles.identityTitle}>
+                <h2>{accountName(account)}</h2>
+                <span className={styles.role}>CUSTOMER</span>
+              </div>
+              <p>{account.email}</p>
+            </div>
             <a href="#/" className={styles.logout}>LOG OUT</a>
           </div>
           <div className={styles.sectionHeading}>

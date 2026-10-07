@@ -135,6 +135,97 @@
   width: 100%;
 }
 
+.dateInputGroup {
+  position: relative;
+  width: 100%;
+}
+
+.dateTextInput {
+  padding-right: 44px !important;
+}
+
+.hiddenDatePicker {
+  height: 1px !important;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  width: 1px !important;
+}
+
+.calendarButton {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  color: #017632;
+  cursor: pointer;
+  display: inline-flex;
+  height: 30px;
+  justify-content: center;
+  padding: 5px;
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 30px;
+}
+
+.calendarButton:hover {
+  background: var(--color-brand-soft);
+}
+
+.calendarButton:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.calendarButton svg {
+  fill: none;
+  height: 18px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  width: 18px;
+}
+
+.hiddenDatePicker::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(27%) sepia(88%) saturate(1023%) hue-rotate(93deg) brightness(91%) contrast(103%);
+}
+
+.inputWithAction {
+  position: relative;
+  width: 100%;
+}
+
+.inputWithAction input {
+  padding-right: 58px;
+}
+
+.passwordToggle {
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: var(--color-brand);
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  padding: 5px;
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.passwordToggle:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
 .field input::placeholder {
   color: #89958c;
   opacity: 1;
@@ -273,7 +364,6 @@
 
 .registerCard .authLogo {
   margin-bottom: -2px;
-  transform: scale(.82);
 }
 
 .registerCard .authHeading h1 {
@@ -421,10 +511,6 @@
 
   .registerCard {
     gap: 8px;
-  }
-
-  .registerCard .authLogo {
-    transform: scale(.68);
   }
 
   .registerFields {

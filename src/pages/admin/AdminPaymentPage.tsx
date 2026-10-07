@@ -1,125 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { collection, doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
+import { collection, onSnapshot } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { db } from '../../firebase/firestore'
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage'
-import { storage } from '../../firebase/storage'
+import { formatMonthDayYear } from '../../utils/dateFormat'
 import styles from './AdminPaymentPage.module.css'
-
-type CheckoutSettings = {
-  pickupAddress: string
-  gcashQrUrl: string
-  mayaQrUrl: string
-}
-
-const checkoutSettingsRef = doc(db, 'storeSettings', 'checkout')
-
-function CheckoutSettingsPanel() {
-  const [settings, setSettings] = useState<CheckoutSettings>({ pickupAddress: '', gcashQrUrl: '', mayaQrUrl: '' })
-  const [pickupAddress, setPickupAddress] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
-  const [isSavingPickup, setIsSavingPickup] = useState(false)
-  const [uploadingMethod, setUploadingMethod] = useState<'GCASH' | 'MAYA' | null>(null)
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
-
-  useEffect(() => onSnapshot(checkoutSettingsRef, (snapshot) => {
-    const data = snapshot.data()
-    const loadedSettings = {
-      pickupAddress: typeof data?.pickupAddress === 'string' ? data.pickupAddress : '',
-      gcashQrUrl: typeof data?.gcashQrUrl === 'string' ? data.gcashQrUrl : '',
-      mayaQrUrl: typeof data?.mayaQrUrl === 'string' ? data.mayaQrUrl : '',
-    }
-    setSettings(loadedSettings)
-    setPickupAddress(loadedSettings.pickupAddress)
-    setIsLoading(false)
-  }, (loadError) => {
-    console.error('Loading checkout settings failed:', loadError)
-    setError('Unable to load pickup and payment settings.')
-    setIsLoading(false)
-  }), [])
-
-  async function savePickupAddress(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const value = pickupAddress.trim()
-    if (!value) {
-      setError('Enter a pickup location before saving.')
-      return
-    }
-
-    setIsSavingPickup(true)
-    setError('')
-    setNotice('')
-    try {
-      await setDoc(checkoutSettingsRef, { pickupAddress: value, updatedAt: serverTimestamp() }, { merge: true })
-      setNotice('Pickup location saved.')
-    } catch (saveError) {
-      console.error('Saving pickup location failed:', saveError)
-      setError('Unable to save the pickup location.')
-    } finally {
-      setIsSavingPickup(false)
-    }
-  }
-
-  async function uploadQrCode(method: 'GCASH' | 'MAYA', file: File | undefined) {
-    if (!file) return
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setError('QR codes must be JPG, PNG, or WebP images.')
-      return
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setError('QR code images must be 5 MB or smaller.')
-      return
-    }
-
-    setUploadingMethod(method)
-    setError('')
-    setNotice('')
-    try {
-      const extension = file.type.slice('image/'.length)
-      const imageRef = ref(storage, `payment-qr-codes/${method.toLowerCase()}/current.${extension}`)
-      const uploadedImage = await uploadBytes(imageRef, file, { contentType: file.type })
-      const imageUrl = await getDownloadURL(uploadedImage.ref)
-      const field = method === 'GCASH' ? 'gcashQrUrl' : 'mayaQrUrl'
-      await setDoc(checkoutSettingsRef, { [field]: imageUrl, updatedAt: serverTimestamp() }, { merge: true })
-      setNotice(`${method === 'GCASH' ? 'GCash' : 'Maya'} QR code uploaded.`)
-    } catch (uploadError) {
-      console.error('Uploading payment QR code failed:', uploadError)
-      setError('Unable to upload the QR code. Please try again.')
-    } finally {
-      setUploadingMethod(null)
-    }
-  }
-
-  return (
-    <section className={styles.settingsPanel} aria-labelledby="checkout-settings-title">
-      <div className={styles.settingsHeading}>
-        <div><h2 id="checkout-settings-title">CUSTOMER CHECKOUT DETAILS</h2><p>Set the pickup location and payment QR codes shown during checkout.</p></div>
-      </div>
-      {isLoading ? <p className={styles.settingsMessage}>Loading checkout settings...</p> : (
-        <>
-          <form className={styles.pickupForm} onSubmit={savePickupAddress}>
-            <label htmlFor="pickup-address">Pickup location</label>
-            <div><input id="pickup-address" value={pickupAddress} onChange={(event) => setPickupAddress(event.target.value)} placeholder="Enter farm address or pickup instructions" /><button type="submit" disabled={isSavingPickup}>{isSavingPickup ? 'SAVING...' : 'SAVE LOCATION'}</button></div>
-          </form>
-          <div className={styles.qrSettings}>
-            {(['GCASH', 'MAYA'] as const).map((method) => {
-              const url = method === 'GCASH' ? settings.gcashQrUrl : settings.mayaQrUrl
-              const title = method === 'GCASH' ? 'GCash QR code' : 'Maya QR code'
-              return <div className={styles.qrSetting} key={method}>
-                <div className={styles.qrPreview}>{url ? <img src={url} alt={`${title} preview`} /> : <span>No QR uploaded</span>}</div>
-                <div><strong>{title}</strong><label className={styles.uploadButton}>{uploadingMethod === method ? 'UPLOADING...' : url ? 'REPLACE IMAGE' : 'UPLOAD IMAGE'}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploadingMethod !== null} onChange={(event) => { void uploadQrCode(method, event.target.files?.[0]); event.currentTarget.value = '' }} /></label><small>JPG, PNG, or WebP, up to 5 MB.</small></div>
-              </div>
-            })}
-          </div>
-        </>
-      )}
-      {error && <p className={styles.settingsError} role="alert">{error}</p>}
-      {notice && <p className={styles.settingsNotice} role="status">{notice}</p>}
-    </section>
-  )
-}
 
 type PaymentRecord = {
   firestoreId: string
@@ -131,9 +16,6 @@ type PaymentRecord = {
   method: string
   paymentReceiptUrl: string
   amount: number
-  // Firestore orders collection does not contain a separate payment status field.
-  // We track the order fulfillment status here to calculate pending order totals.
-  fulfillmentStatus: string
   createdAtDate: Date | null
 }
 
@@ -160,20 +42,12 @@ function parseOrderDate(createdAt: unknown): Date | null {
 }
 
 function formatOrderDate(date: Date | null): string {
-  if (!date) return 'Pending'
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const year = date.getFullYear()
-  return `${month}-${day}-${year}`
+  return date ? formatMonthDayYear(date) : 'Pending'
 }
 
-function SummaryCard({ label, value }: { label: string; value: string }) {
-  return (
-    <article className={styles.summaryCard}>
-      <h2>{label}</h2>
-      <strong>{value}</strong>
-    </article>
-  )
+function normalizePaymentMethod(method: string): string {
+  const normalized = method.trim().toUpperCase()
+  return normalized === 'PAYMAYA' ? 'MAYA' : normalized
 }
 
 function PaymentTable({
@@ -181,14 +55,16 @@ function PaymentTable({
   isLoading,
   error,
   search,
+  selectedMethod,
 }: {
   records: PaymentRecord[]
   isLoading: boolean
   error: string
   search: string
+  selectedMethod: string | null
 }) {
   return (
-    <section className={styles.tablePanel}>
+    <div className={styles.tableViewport}>
       <div className={styles.table} role="table" aria-label="Payment records">
         <div className={styles.tableRowHeader} role="row">
           <strong>ORDER</strong>
@@ -205,7 +81,7 @@ function PaymentTable({
           <p className={styles.empty} role="alert">{error}</p>
         ) : records.length === 0 ? (
           <p className={styles.empty}>
-            {search.trim() ? 'No payment records match your search.' : 'No payment records found.'}
+            {search.trim() || selectedMethod ? 'No payment records match these filters.' : 'No payment records found.'}
           </p>
         ) : (
           records.map((payment) => (
@@ -227,7 +103,7 @@ function PaymentTable({
           ))
         )}
       </div>
-    </section>
+    </div>
   )
 }
 
@@ -236,6 +112,7 @@ export function AdminPaymentPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
+  const [selectedMethod, setSelectedMethod] = useState<string | null>(null)
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -255,10 +132,8 @@ export function AdminPaymentPage() {
           })
 
           const method = typeof data.paymentMethod === 'string' && data.paymentMethod.trim()
-            ? data.paymentMethod.trim().toUpperCase()
+            ? normalizePaymentMethod(data.paymentMethod)
             : 'CASH'
-
-          const rawStatus = typeof data.status === 'string' ? data.status.trim() : 'pending'
 
           return {
             firestoreId: orderDoc.id,
@@ -270,7 +145,6 @@ export function AdminPaymentPage() {
             method,
             paymentReceiptUrl: typeof data.paymentReceiptUrl === 'string' ? data.paymentReceiptUrl : '',
             amount: typeof data.total === 'number' && !isNaN(data.total) ? data.total : 0,
-            fulfillmentStatus: rawStatus,
             createdAtDate: parsedDate,
           }
         })
@@ -298,52 +172,73 @@ export function AdminPaymentPage() {
 
   const visiblePayments = useMemo(() => {
     const query = search.trim().toLowerCase()
-    if (!query) return payments
     return payments.filter((payment) =>
-      payment.orderId.toLowerCase().includes(query) ||
-      payment.customer.toLowerCase().includes(query) ||
-      payment.customerEmail.toLowerCase().includes(query)
+      (!selectedMethod || payment.method === selectedMethod) &&
+      (!query ||
+        payment.orderId.toLowerCase().includes(query) ||
+        payment.customer.toLowerCase().includes(query) ||
+        payment.customerEmail.toLowerCase().includes(query))
     )
-  }, [payments, search])
-
-  const collected = payments.reduce((sum, payment) => sum + payment.amount, 0)
-  const pending = payments
-  .filter((payment) => {
-    const method = payment.method.toUpperCase()
-    const status = payment.fulfillmentStatus.toUpperCase()
-
-    if (method === 'COD') {
-      return status !== 'DELIVERED'
-    }
-
-    return status === 'PENDING'
-  })
-  .reduce((sum, payment) => sum + payment.amount, 0)
-  const average = payments.length > 0 ? collected / payments.length : 0
+  }, [payments, search, selectedMethod])
+  const paymentMethods = useMemo(() => [...new Set(['COD', 'GCASH', 'MAYA', ...payments.map((payment) => payment.method)])]
+    .sort((a, b) => {
+      const methodOrder = ['COD', 'GCASH', 'MAYA', 'CASH']
+      const aOrder = methodOrder.indexOf(a)
+      const bOrder = methodOrder.indexOf(b)
+      if (aOrder === -1 && bOrder === -1) return a.localeCompare(b)
+      if (aOrder === -1) return 1
+      if (bOrder === -1) return -1
+      return aOrder - bOrder
+    }), [payments])
 
   return (
     <main className={styles.page}>
-      <AdminSidebar active="orders" />
+      <AdminSidebar active="payments" />
       <section className={styles.content}>
         <Header
-          title="ORDERS"
+          title="PAYMENTS"
           search={search}
           onSearchChange={(event) => setSearch(event.target.value)}
-          actions={<><a href="#/admin/orders">CURRENT ORDERS</a><a href="#/admin/orders/archive">ARCHIVE</a><a aria-current="page" href="#/admin/payment">PAYMENT</a></>}
         />
         <div className={styles.dashboard}>
-          <CheckoutSettingsPanel />
-          <section className={styles.summary}>
-            <SummaryCard label="TOTAL COLLECTED" value={currency(collected)} />
-            <SummaryCard label="AVG TRANSACTION" value={currency(average)} />
-            <SummaryCard label="PENDING REVENUE" value={currency(pending)} />
+          <section className={styles.pageIntro} aria-label="Payments overview">
+            <span>TRANSACTION REVIEW</span>
+            <h2>Payment records</h2>
+            <p>Review order payment methods, submitted receipts, and transaction amounts.</p>
           </section>
-          <PaymentTable
-            records={visiblePayments}
-            isLoading={isLoading}
-            error={error}
-            search={search}
-          />
+          <section className={styles.paymentPanel} aria-label="Payment records and filters">
+            <nav className={styles.methodFilters} aria-label="Filter payments by method">
+              <span className={styles.filterLabel}>PAYMENT METHOD</span>
+              <div className={styles.filterButtons}>
+                <button
+                  aria-pressed={selectedMethod === null}
+                  className={selectedMethod === null ? styles.activeFilter : ''}
+                  onClick={() => setSelectedMethod(null)}
+                  type="button"
+                >
+                  ALL <span>{payments.length}</span>
+                </button>
+                {paymentMethods.map((method) => (
+                  <button
+                    aria-pressed={selectedMethod === method}
+                    className={selectedMethod === method ? styles.activeFilter : ''}
+                    key={method}
+                    onClick={() => setSelectedMethod((current) => current === method ? null : method)}
+                    type="button"
+                  >
+                    {method} <span>{payments.filter((payment) => payment.method === method).length}</span>
+                  </button>
+                ))}
+              </div>
+            </nav>
+            <PaymentTable
+              records={visiblePayments}
+              isLoading={isLoading}
+              error={error}
+              search={search}
+              selectedMethod={selectedMethod}
+            />
+          </section>
         </div>
       </section>
     </main>

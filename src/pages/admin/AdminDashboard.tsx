@@ -5,6 +5,7 @@ import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
+import { formatMonthDayYear } from '../../utils/dateFormat'
 import styles from './AdminDashboard.module.css'
 
 type RevenuePoint = { day: string; amount: number; isToday: boolean; fill: 'green' | 'today' | 'empty' }
@@ -381,12 +382,7 @@ export function AdminDashboard() {
 
   const currentHour = new Date().getHours()
   const greeting = currentHour < 12 ? 'Good morning' : currentHour < 18 ? 'Good afternoon' : 'Good evening'
-  const todayLabel = new Intl.DateTimeFormat('en-PH', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date())
+  const todayLabel = formatMonthDayYear(new Date())
 
   return (
     <main className={styles.page}>
