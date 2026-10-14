@@ -11,12 +11,12 @@ import { storage } from '../../firebase/storage'
 import { productImages, resolveProductImage } from '../../utils/productImages'
 import styles from './ShopPage.module.css'
 
-type Category = 'All' | 'Vegetables' | 'Fruits' | 'Grains' | 'Flowers'
+type Category = string
 
 type Product = {
   id: string
   name: string
-  category: Exclude<Category, 'All'>
+  category: string
   price: number
   stock: number
   unit: string
@@ -45,7 +45,7 @@ type StoreSettings = {
   mayaQrUrl: string
 }
 
-const categories: Category[] = ['All', 'Vegetables', 'Fruits', 'Grains', 'Flowers']
+const defaultCategories = ['VEGETABLES', 'FRUITS', 'GRAINS', 'FLOWERS']
 const defaultStoreSettings: StoreSettings = {
   pickupLocation: '',
   pickupDays: '',
@@ -510,6 +510,15 @@ export function ShopPage() {
   const [quantityNotice, setQuantityNotice] = useState<{ message: string } | null>(null)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const cartOwnerId = useRef<string | null>(null)
+  const cartQuantitiesRef = useRef<Record<string, number>>({})
+
+  function updateCartQuantities(
+    update: Record<string, number> | ((current: Record<string, number>) => Record<string, number>)
+  ) {
+    const next = typeof update === 'function' ? update(cartQuantitiesRef.current) : update
+    cartQuantitiesRef.current = next
+    setQuantities(next)
+  }
 
   useEffect(() => {
     const userId = cartOwnerId.current
@@ -546,7 +555,7 @@ export function ShopPage() {
       if (!user) {
         if (isMounted) {
           cartOwnerId.current = null
-          setQuantities({})
+          updateCartQuantities({})
           setDeliveryAddress('')
           setStoreSettings(defaultStoreSettings)
           setStoreSettingsError('')
@@ -557,7 +566,7 @@ export function ShopPage() {
       }
 
       cartOwnerId.current = user.uid
-      setQuantities(readSavedCart(user.uid))
+      updateCartQuantities(readSavedCart(user.uid))
       unsubscribeStoreSettings = onSnapshot(
         doc(db, 'settings', 'storefront'),
         (snapshot) => {
@@ -607,14 +616,14 @@ export function ShopPage() {
           const loadedProducts = snapshot.docs.flatMap((product) => {
             const data = product.data()
             const name = typeof data.name === 'string' ? data.name.toUpperCase() : ''
-            const rawCategory = typeof data.category === 'string' ? data.category.toLowerCase() : ''
-            const categoryName = rawCategory.charAt(0).toUpperCase() + rawCategory.slice(1)
-            if (!categories.includes(categoryName as Category) || categoryName === 'All') return []
+            const categoryName = typeof data.category === 'string' && data.category.trim()
+              ? data.category.trim().toUpperCase()
+              : 'VEGETABLES'
 
             return [{
               id: product.id,
               name,
-              category: categoryName as Exclude<Category, 'All'>,
+              category: categoryName,
               price: typeof data.price === 'number' ? data.price : 0,
               stock: typeof data.stock === 'number' ? data.stock : 0,
               unit: typeof data.unit === 'string' ? data.unit : 'KG',
@@ -623,6 +632,16 @@ export function ShopPage() {
               sold: typeof data.sold === 'number' && Number.isFinite(data.sold) ? data.sold : 0,
             }]
           })
+          const availableProductIds = new Set(loadedProducts.filter((product) => product.isAvailable).map((product) => product.id))
+          const nextQuantities = Object.fromEntries(
+            Object.entries(cartQuantitiesRef.current).filter(([productId, quantity]) =>
+              quantity > 0 && availableProductIds.has(productId)
+            )
+          )
+          if (Object.keys(nextQuantities).length < Object.keys(cartQuantitiesRef.current).filter((productId) => cartQuantitiesRef.current[productId] > 0).length) {
+            setQuantityNotice({ message: 'An unavailable product was removed from your cart.' })
+          }
+          updateCartQuantities(nextQuantities)
           setProducts(loadedProducts)
           setError('')
           setIsLoading(false)
@@ -648,11 +667,15 @@ export function ShopPage() {
   const visibleProducts = useMemo(() => {
     const query = search.trim().toLowerCase()
     return products.filter((product) => {
-      const matchesCategory = category === 'All' || product.category === category
+      const matchesCategory = product.isAvailable && (category === 'All' || product.category === category)
       const matchesSearch = !query || product.name.toLowerCase().includes(query)
       return matchesCategory && matchesSearch
     })
   }, [category, products, search])
+  const productCategories = useMemo(() => [...new Set([
+    ...defaultCategories,
+    ...products.filter((product) => product.isAvailable).map((product) => product.category),
+  ])], [products])
 
   const cartItems = products
     .filter((product) => (quantities[product.id] ?? 0) > 0)
@@ -672,7 +695,7 @@ export function ShopPage() {
     }
     if (quantity > 0 && (!product.isAvailable || product.stock <= 0)) return
 
-    setQuantities((current) => {
+    updateCartQuantities((current) => {
       const next = { ...current }
       if (quantity <= 0) delete next[id]
       else next[id] = Math.min(quantity, product.stock)
@@ -806,7 +829,7 @@ export function ShopPage() {
       } catch (storageError) {
         console.error('Clearing saved cart failed:', storageError)
       }
-      setQuantities({})
+      updateCartQuantities({})
       window.location.hash = '/orders'
     } catch (checkoutError) {
       console.error('Checkout failed:', checkoutError)
@@ -837,7 +860,7 @@ export function ShopPage() {
           title="SHOP"
           search={search}
           onSearchChange={(event) => setSearch(event.target.value)}
-          secondary={<div className={styles.categories}>{categories.map((item) => (
+          secondary={<div className={styles.categories}>{['All', ...productCategories].map((item) => (
             <button type="button" className={category === item ? styles.activeCategory : ''} key={item} onClick={() => setCategory(item)}>
               {item.toUpperCase()}
             </button>
@@ -877,7 +900,7 @@ export function ShopPage() {
           )}
         </div>
       </section>
-      <Cart items={cartItems} onChange={updateQuantity} onClearAll={() => setQuantities({})} address={deliveryAddress} onAddressChange={(value) => {
+      <Cart items={cartItems} onChange={updateQuantity} onClearAll={() => updateCartQuantities({})} address={deliveryAddress} onAddressChange={(value) => {
         setDeliveryAddress(value)
         if (value.trim()) setAddressError('')
       }} paymentMethod={paymentMethod} onPaymentChange={setPaymentMethod} onPlaceOrder={placeOrder} onEmptyCartAttempt={() => {

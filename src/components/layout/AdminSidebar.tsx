@@ -1,11 +1,12 @@
 import { BrandLogo } from '../common/BrandLogo'
 import styles from './AdminSidebar.module.css'
 
-type AdminNavItem = 'dashboard' | 'orders' | 'products' | 'customers' | 'analytics' | 'account'
+type AdminNavItem = 'dashboard' | 'orders' | 'payments' | 'products' | 'customers' | 'analytics' | 'account'
 
 const links: { key: AdminNavItem; label: string; href: string }[] = [
   { key: 'dashboard', label: 'DASHBOARD', href: '#/admin' },
   { key: 'orders', label: 'ORDERS', href: '#/admin/orders' },
+  { key: 'payments', label: 'PAYMENTS', href: '#/admin/payment' },
   { key: 'products', label: 'PRODUCTS', href: '#/admin/products' },
   { key: 'customers', label: 'CUSTOMERS', href: '#/admin/customers' },
   { key: 'analytics', label: 'ANALYTICS', href: '#/admin/analytics' },

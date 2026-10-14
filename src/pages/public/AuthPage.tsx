@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth'
 import { Timestamp, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
@@ -31,6 +31,22 @@ type RegistrationFields = {
 
 type RegistrationErrors = Partial<Record<keyof RegistrationFields, string>>
 
+function formatDateInput(value: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  return match ? `${match[2]}/${match[3]}/${match[1]}` : value
+}
+
+function parseDateInput(value: string) {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(value)
+  if (!match) return value
+  const [, month, day, year] = match
+  const date = new Date(Number(year), Number(month) - 1, Number(day))
+  if (date.getFullYear() !== Number(year) || date.getMonth() !== Number(month) - 1 || date.getDate() !== Number(day)) {
+    return value
+  }
+  return `${year}-${month}-${day}`
+}
+
 function validateRegistrationFields(fields: RegistrationFields): RegistrationErrors {
   const errors: RegistrationErrors = {}
   const normalizedPhone = fields.contactNumber.replace(/[\s()-]/g, '')
@@ -52,11 +68,97 @@ function validateRegistrationFields(fields: RegistrationFields): RegistrationErr
   return errors
 }
 
-function Field({ label, placeholder, type = 'text', value, onChange, error }: FieldProps) {
+function DateField({
+  label,
+  value = '',
+  onChange,
+  error,
+}: {
+  label: string
+  value?: string
+  onChange?: (value: string) => void
+  error?: string
+}) {
+  const pickerRef = useRef<HTMLInputElement>(null)
+  const [dateText, setDateText] = useState(() => formatDateInput(value))
+  const errorId = `${label.replace(/\s+/g, '-').toLowerCase()}-error`
+
   return (
     <label className={styles.field}>
       <span>{label}</span>
-      <input type={type} placeholder={placeholder} value={value} onChange={onChange} aria-invalid={Boolean(error)} aria-describedby={error ? `${label.replace(/\s+/g, '-').toLowerCase()}-error` : undefined} />
+      <div className={styles.dateInputGroup}>
+        <input
+          className={styles.dateTextInput}
+          type="text"
+          inputMode="numeric"
+          placeholder="MM/DD/YYYY"
+          value={dateText}
+          onChange={(event) => {
+            const nextText = event.target.value
+            setDateText(nextText)
+            onChange?.(parseDateInput(nextText))
+          }}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
+        />
+        <input
+          ref={pickerRef}
+          className={styles.hiddenDatePicker}
+          type="date"
+          lang="en-US"
+          value={/^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ''}
+          onChange={(event) => {
+            setDateText(formatDateInput(event.target.value))
+            onChange?.(event.target.value)
+          }}
+          tabIndex={-1}
+          aria-hidden="true"
+        />
+        <button
+          className={styles.calendarButton}
+          type="button"
+          aria-label={`Choose ${label.toLowerCase()}`}
+          onClick={() => {
+            const picker = pickerRef.current
+            if (!picker) return
+            if ('showPicker' in picker && typeof picker.showPicker === 'function') picker.showPicker()
+            else picker.click()
+          }}
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <rect x="3.5" y="5" width="17" height="16" rx="2" />
+            <path d="M16 3v4M8 3v4M4 10h16" />
+          </svg>
+        </button>
+      </div>
+      {error && <small className={styles.fieldError} id={errorId}>{error}</small>}
+    </label>
+  )
+}
+
+function Field({ label, placeholder, type = 'text', value, onChange, error }: FieldProps) {
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false)
+  const isPassword = type === 'password'
+
+  return (
+    <label className={styles.field}>
+      <span>{label}</span>
+      {isPassword ? (
+        <div className={styles.inputWithAction}>
+          <input type={isPasswordVisible ? 'text' : 'password'} placeholder={placeholder} value={value} onChange={onChange} aria-invalid={Boolean(error)} aria-describedby={error ? `${label.replace(/\s+/g, '-').toLowerCase()}-error` : undefined} />
+          <button
+            className={styles.passwordToggle}
+            type="button"
+            aria-label={`${isPasswordVisible ? 'Hide' : 'Show'} ${label.toLowerCase()}`}
+            aria-pressed={isPasswordVisible}
+            onClick={() => setIsPasswordVisible((visible) => !visible)}
+          >
+            {isPasswordVisible ? 'HIDE' : 'SHOW'}
+          </button>
+        </div>
+      ) : (
+        <input type={type} placeholder={placeholder} value={value} onChange={onChange} aria-invalid={Boolean(error)} aria-describedby={error ? `${label.replace(/\s+/g, '-').toLowerCase()}-error` : undefined} />
+      )}
       {error && <small className={styles.fieldError} id={`${label.replace(/\s+/g, '-').toLowerCase()}-error`}>{error}</small>}
     </label>
   )
@@ -249,7 +351,7 @@ export function AuthPage({ type }: { type: AuthType }) {
             <Field label="Email Address" placeholder="name@example.com" type="email" value={registrationFields.email} onChange={updateRegistrationField('email')} error={showRegistrationErrors ? registrationErrors.email : undefined} />
             <Field label="Contact Number" placeholder="09XX XXX XXXX" value={registrationFields.contactNumber} onChange={updateRegistrationField('contactNumber')} error={showRegistrationErrors ? registrationErrors.contactNumber : undefined} />
             <Field label="Address" placeholder="Zone I, Zamboanga City, Philippines" value={registrationFields.address} onChange={updateRegistrationField('address')} error={showRegistrationErrors ? registrationErrors.address : undefined} />
-            <Field label="Birthday" type="date" value={registrationFields.birthday} onChange={updateRegistrationField('birthday')} error={showRegistrationErrors ? registrationErrors.birthday : undefined} />
+            <DateField label="Birthday" value={registrationFields.birthday} onChange={(birthday) => setRegistrationFields((current) => ({ ...current, birthday }))} error={showRegistrationErrors ? registrationErrors.birthday : undefined} />
             <Field label="Password" placeholder="Enter Password" type="password" value={registrationFields.password} onChange={updateRegistrationField('password')} error={showRegistrationErrors ? registrationErrors.password : undefined} />
             <Field label="Confirm Password" placeholder="Re-enter Password" type="password" value={registrationFields.confirmPassword} onChange={updateRegistrationField('confirmPassword')} error={showRegistrationErrors ? registrationErrors.confirmPassword : undefined} />
             <div className={styles.registerAction}>

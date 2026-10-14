@@ -6,16 +6,18 @@ import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
+import { formatMonthDayYear, formatMonthDayYearTime } from '../../utils/dateFormat'
 import styles from './MessagesPage.module.css'
 
-type Message = { id: string; text: string; timestamp: string; sender: 'customer' | 'market' }
-type LoadedMessage = Message & { createdAt: unknown }
+type Message = { id: string; text: string; timestamp: string; sender: 'customer' | 'market'; dayDivider?: string }
+type LoadedMessage = Omit<Message, 'dayDivider'> & { createdAt: Date | null }
 
-function formatTimestamp(value: unknown) {
+function parseMessageDate(value: unknown): Date | null {
   if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
-    return value.toDate().toLocaleString('en-US')
+    const date = value.toDate()
+    return date instanceof Date && !Number.isNaN(date.getTime()) ? date : null
   }
-  return 'Pending'
+  return null
 }
 
 export function MessagesPage() {
@@ -50,24 +52,35 @@ export function MessagesPage() {
 
       const messagesQuery = query(collection(db, 'conversations', user.uid, 'messages'))
       unsubscribeMessages = onSnapshot(messagesQuery, (snapshot) => {
-        const loadedMessages = snapshot.docs
+        const sortedMessages = snapshot.docs
           .map((messageDocument): LoadedMessage => {
             const data = messageDocument.data()
+            const createdAt = parseMessageDate(data.createdAt)
             return {
               id: messageDocument.id,
               sender: data.senderRole === 'customer' ? 'customer' : 'market',
               text: typeof data.text === 'string' ? data.text : '',
-              timestamp: formatTimestamp(data.createdAt),
-              createdAt: data.createdAt,
+              timestamp: createdAt ? formatMonthDayYearTime(createdAt) : 'Pending',
+              createdAt,
             }
           })
           .filter((message) => message.text)
           .sort((first, second) => {
-            const firstTime = first.createdAt && typeof first.createdAt === 'object' && 'toDate' in first.createdAt && typeof first.createdAt.toDate === 'function' ? first.createdAt.toDate().getTime() : 0
-            const secondTime = second.createdAt && typeof second.createdAt === 'object' && 'toDate' in second.createdAt && typeof second.createdAt.toDate === 'function' ? second.createdAt.toDate().getTime() : 0
+            const firstTime = first.createdAt?.getTime() ?? 0
+            const secondTime = second.createdAt?.getTime() ?? 0
             return firstTime - secondTime
           })
-          .map(({ id, sender, text, timestamp }) => ({ id, sender, text, timestamp }))
+        let previousDay = ''
+        const loadedMessages = sortedMessages.map(({ createdAt, ...message }) => {
+          const currentDay = createdAt
+            ? `${createdAt.getFullYear()}-${createdAt.getMonth()}-${createdAt.getDate()}`
+            : ''
+          const dayDivider = createdAt && currentDay !== previousDay
+            ? formatMonthDayYear(createdAt)
+            : undefined
+          if (currentDay) previousDay = currentDay
+          return { ...message, ...(dayDivider ? { dayDivider } : {}) }
+        })
         setMessages(loadedMessages)
         setIsLoading(false)
         setError('')
@@ -147,11 +160,18 @@ export function MessagesPage() {
                   <span>Your conversation with GreenMarket will appear here.</span>
                 </div>
               ) : messages.map((message) => (
-                <article className={`${styles.message} ${message.sender === 'customer' ? styles.outgoing : styles.incoming}`} key={message.id}>
-                  <span className={styles.senderLabel}>{message.sender === 'customer' ? 'You' : 'GreenMarket'}</span>
-                  <p>{message.text}</p>
-                  <time>{message.timestamp}</time>
-                </article>
+                <div className={styles.messageGroup} key={message.id}>
+                  {message.dayDivider && (
+                    <div className={styles.dayDivider} role="separator" aria-label={`Messages from ${message.dayDivider}`}>
+                      <span>{message.dayDivider}</span>
+                    </div>
+                  )}
+                  <article className={`${styles.message} ${message.sender === 'customer' ? styles.outgoing : styles.incoming}`}>
+                    <span className={styles.senderLabel}>{message.sender === 'customer' ? 'You' : 'GreenMarket'}</span>
+                    <p>{message.text}</p>
+                    <time>{message.timestamp}</time>
+                  </article>
+                </div>
               ))}
             </div>
             {error && messages.length > 0 && <p className={styles.sendError} role="alert">{error}</p>}
