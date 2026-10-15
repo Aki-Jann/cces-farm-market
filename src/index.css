@@ -14,6 +14,7 @@
   --color-brand: #087b3b;
   --color-brand-strong: #066431;
   --color-brand-soft: #e9f5ec;
+  --page-gutter: clamp(16px, 3.8vw, 30px);
   --color-focus: rgb(8 123 59 / 24%);
   --radius-control: 8px;
   --radius-card: 12px;

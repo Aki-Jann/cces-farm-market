@@ -57,7 +57,7 @@
 .registerCanvas {
   height: 100dvh;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
   padding: 10px;
 }
 
@@ -454,7 +454,7 @@
 
   .authCard,
   .registerCard {
-    padding: 20px 30px;
+    padding: 20px 16px;
   }
 
   .field > span {
@@ -476,12 +476,15 @@
   }
 
   .registerCanvas {
-    padding: 10px;
+    align-items: flex-start;
+    height: auto;
+    min-height: 100dvh;
+    padding: 64px 12px 20px;
   }
 
   .registerCard {
     gap: 10px;
-    padding: 20px 30px;
+    padding: 20px 16px;
   }
 
   .registerFields {
@@ -501,6 +504,12 @@
   .homeButton {
     font-size: 9px;
     padding: 8px 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .registerFields {
+    grid-template-columns: 1fr;
   }
 }
 

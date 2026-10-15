@@ -15,10 +15,9 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-panel);
   box-shadow: var(--shadow-panel);
-  margin: 20px 30px;
+  margin: 20px var(--page-gutter);
   min-height: 0;
   padding: 30px;
-  width: calc(100% - 60px);
 }
 
 .profileHeader {
@@ -241,9 +240,9 @@
   }
 
   .card {
-    margin: 20px 30px;
+    margin: 20px var(--page-gutter);
     padding: 20px 16px;
-    width: calc(100% - 60px);
+    width: auto;
   }
 
   .profileHeader {

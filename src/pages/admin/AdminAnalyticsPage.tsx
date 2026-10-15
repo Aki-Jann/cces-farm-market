@@ -406,7 +406,7 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
                 </div>
               </>
             ) : activePanel === 'category-sales' ? (
-              <div className={styles.dataList}>
+              <div className={`${styles.dataList} ${styles.categorySalesList}`}>
                 <div className={styles.dataListHeading}><span>CATEGORY</span><span>SHARE OF SALES</span><span>SALES VALUE</span></div>
                 {analytics.categories.map((category) => <div className={styles.categoryDetailRow} key={category.label}><i style={{ background: category.color }} /><strong>{category.label}</strong><span className={styles.categoryShare}><i style={{ width: `${category.percentage}%`, background: category.color }} /></span><b>{category.percentage}%</b><strong>{currency(category.value)}</strong></div>)}
               </div>

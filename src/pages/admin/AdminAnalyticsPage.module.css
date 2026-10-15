@@ -23,7 +23,7 @@
   margin: 0 auto;
   min-height: 0;
   overflow-y: auto;
-  padding: 20px 30px;
+  padding: 20px var(--page-gutter);
   width: 100%;
 }
 
@@ -108,6 +108,7 @@
   font-weight: 700;
   letter-spacing: 0.045em;
   line-height: 1.35;
+  min-width: 0;
 }
 
 .metricIcon {
@@ -172,7 +173,8 @@
 
 .panelClickHint {
   justify-content: flex-end;
-  margin-top: 10px;
+  margin-top: auto;
+  padding-top: 10px;
 }
 
 .metricAction span,
@@ -189,7 +191,7 @@
 
 .chartGrid,
 .lowerGrid {
-  align-items: start;
+  align-items: stretch;
   display: grid;
   gap: 16px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -201,7 +203,9 @@
   color: inherit;
   cursor: pointer;
   font: inherit;
-  align-self: start;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
   min-height: 0;
   padding: 17px 18px 14px;
   text-align: left;
@@ -225,6 +229,7 @@
   display: grid;
   gap: 14px;
   grid-template-columns: 130px minmax(0, 1fr);
+  min-width: 0;
 }
 
 .donut {
@@ -262,7 +267,10 @@
 
 .donut strong {
   color: #173555;
-  font-size: 15px;
+  font-size: clamp(12px, 1.1vw, 15px);
+  font-variant-numeric: tabular-nums;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   margin-top: 4px;
 }
 
@@ -291,6 +299,7 @@
   flex: 1;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
 .legend small {
@@ -302,6 +311,8 @@
   color: #303a34;
   font-size: 12px;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .chartFootnote {
@@ -324,6 +335,7 @@
   display: grid;
   gap: 10px;
   grid-template-columns: 40px minmax(0, 1fr) auto;
+  min-width: 0;
 }
 
 .inventoryItem img,
@@ -338,6 +350,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  gap: 2px;
 }
 
 .inventoryInfo strong,
@@ -358,6 +371,8 @@
   color: #303a34;
   font-size: 11px;
   text-align: right;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 .inventoryTrack,
@@ -368,6 +383,7 @@
   margin-top: 5px;
   overflow: hidden;
   width: 100%;
+  flex: 0 0 auto;
 }
 
 .inventoryTrack i,
@@ -465,22 +481,26 @@
 }
 
 .dataListHeading,
-.dataRow,
+.dataRow {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.15fr) minmax(0, 1fr) minmax(0, 0.7fr);
+  padding: 10px 14px;
+}
+
 .categoryDetailRow {
   align-items: center;
   display: grid;
   gap: 10px;
-  grid-template-columns: 1.1fr 1fr 0.8fr 0.8fr;
+  grid-template-columns: 10px minmax(0, 1fr) minmax(0, 2fr) minmax(0, 0.5fr) minmax(0, 1fr);
   padding: 10px 14px;
 }
 
-.dataListHeading,
-.dataRow {
-  min-width: 600px;
-}
 
-.categoryDetailRow {
-  min-width: 650px;
+.dataListHeading,
+.dataRow, .categoryDetailRow {
+  min-width: 600px;
 }
 
 .dataListHeading {
@@ -491,11 +511,39 @@
   letter-spacing: 0.04em;
 }
 
+.dataListHeading > span:nth-child(3),
+.dataRow > :nth-child(3) {
+  text-align: right;
+}
+
+.dataListHeading > span:last-child,
+.dataRow > :last-child {
+  text-align: right;
+}
+
 .dataRow,
 .categoryDetailRow {
   border-top: 1px solid #edf0ed;
   color: #4b554f;
   font-size: 12px;
+  min-height: 48px;
+}
+
+.categorySalesList .dataListHeading {
+  grid-template-columns: 10px minmax(0, 1fr) minmax(0, 2fr) minmax(0, 0.5fr) minmax(0, 1fr);
+}
+
+.categorySalesList .dataListHeading > span:nth-child(1) {
+  grid-column: 2;
+}
+
+.categorySalesList .dataListHeading > span:nth-child(2) {
+  grid-column: 3 / 5;
+}
+
+.categorySalesList .dataListHeading > span:nth-child(3) {
+  grid-column: 5;
+  text-align: right;
 }
 
 .dataRow > strong,
@@ -505,6 +553,10 @@
   color: #183b28;
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+
+.dataRow > strong:first-child {
+  text-align: left;
 }
 
 .detailProduct {
@@ -577,6 +629,13 @@
   }
 }
 
+@media (max-width: 900px) {
+  .chartGrid,
+  .lowerGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 700px) {
   .page {
     display: block;
@@ -586,7 +645,7 @@
   .dashboard {
     gap: 12px;
     margin: 0;
-    padding: 20px 30px;
+    padding: 20px var(--page-gutter);
   }
 
   .chartGrid,

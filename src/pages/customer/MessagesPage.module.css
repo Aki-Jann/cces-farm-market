@@ -25,7 +25,7 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  margin: 20px 30px;
+  margin: 20px var(--page-gutter);
   min-height: 0;
   overflow: hidden;
 }
@@ -319,12 +319,12 @@
   }
 
   .content {
-    height: calc(100dvh - 48px);
+    height: calc(100dvh - 54px);
   }
 
   .messaging {
     border-radius: 13px;
-    margin: 20px 30px;
+    margin: 16px var(--page-gutter);
   }
 
   .conversationHeader {

@@ -92,7 +92,7 @@
   display: grid;
   gap: 16px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  padding: 20px 30px;
+  padding: 20px var(--page-gutter);
 }
 
 .productCard {
@@ -1085,7 +1085,7 @@
 
   .productGrid {
     gap: 10px;
-    padding: 20px 30px;
+    padding: 20px var(--page-gutter);
   }
 
   .productCard {
