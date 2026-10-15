@@ -149,7 +149,7 @@ function getProductFallbackImage(name: string): string {
   return apple
 }
 
-export function AdminAnalyticsPage() {
+export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cces_admin' }) {
   const [search, setSearch] = useState('')
   const [activePanel, setActivePanel] = useState<AnalyticsPanel | null>(null)
   const [orders, setOrders] = useState<FirestoreOrder[]>([])
@@ -383,7 +383,7 @@ export function AdminAnalyticsPage() {
 
   return (
     <main className={styles.page}>
-      <AdminSidebar active="analytics" />
+      <AdminSidebar active="analytics" role={role} />
       <section className={styles.content}>
         <Header title="ANALYTICS" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
         {activePanel ? (

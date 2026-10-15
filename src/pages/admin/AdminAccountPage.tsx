@@ -85,8 +85,9 @@ function displayBirthday(value: unknown) {
     : 'Not provided'
 }
 
-export function AdminAccountPage() {
+export function AdminAccountPage({ role = 'farmer' }: { role?: 'farmer' | 'cces_admin' }) {
   const [profile, setProfile] = useState<AdminProfile | null>(null)
+  const [isCcesAdmin, setIsCcesAdmin] = useState(role === 'cces_admin')
   const [draft, setDraft] = useState<AdminProfile | null>(null)
   const [storeSettings, setStoreSettings] = useState<StoreSettings>(emptyStoreSettings)
   const [storeSettingsDraft, setStoreSettingsDraft] = useState<StoreSettings>(emptyStoreSettings)
@@ -120,6 +121,7 @@ export function AdminAccountPage() {
 
       if (!user) {
         if (isMounted) {
+          setIsCcesAdmin(false)
           setError('Please log in to manage your admin account.')
           setIsLoading(false)
           setIsSettingsLoading(false)
@@ -132,8 +134,9 @@ export function AdminAccountPage() {
         doc(db, 'users', user.uid),
         (snapshot) => {
           if (!isMounted) return
-          if (!snapshot.exists() || snapshot.data().role !== 'admin') {
+          if (!snapshot.exists() || (snapshot.data().role !== 'admin' && snapshot.data().role !== 'cces_admin')) {
             setProfile(null)
+            setIsCcesAdmin(false)
             setError('An admin account profile could not be found.')
             setIsLoading(false)
             setIsSettingsLoading(false)
@@ -141,6 +144,8 @@ export function AdminAccountPage() {
           }
 
           const data = snapshot.data()
+          const ccesAdmin = data.role === 'cces_admin'
+          setIsCcesAdmin(ccesAdmin)
           const loadedProfile: AdminProfile = {
             firstName: typeof data.firstName === 'string' ? data.firstName : '',
             lastName: typeof data.lastName === 'string' ? data.lastName : '',
@@ -156,6 +161,11 @@ export function AdminAccountPage() {
           })
           setError('')
           setIsLoading(false)
+          if (ccesAdmin) {
+            setHasLoadedSettings(false)
+            setIsSettingsLoading(false)
+            return
+          }
           if (!unsubscribeSettings) {
             unsubscribeSettings = onSnapshot(
               doc(db, 'settings', 'storefront'),
@@ -429,7 +439,7 @@ export function AdminAccountPage() {
 
   return (
     <main className={styles.page}>
-      <AdminSidebar active="account" />
+      <AdminSidebar active="account" role={role} />
       <section className={styles.content}>
         <Header title="MY ACCOUNT" />
         {isLoading ? (
@@ -443,7 +453,7 @@ export function AdminAccountPage() {
               <div className={styles.identity}>
                 <div className={styles.identityTitle}>
                   <h2>{displayName(profile)}</h2>
-                  <span className={styles.role}>ADMIN</span>
+                  <span className={styles.role}>{isCcesAdmin ? 'CCES ADMIN' : 'FARMER'}</span>
                 </div>
                 <p>{profile.email}</p>
               </div>
@@ -455,7 +465,7 @@ export function AdminAccountPage() {
             <div className={styles.sectionHeading}>
               <div>
                 <h3>Personal information</h3>
-                <p>Manage the details associated with your admin account.</p>
+                <p>Manage the details associated with your account.</p>
               </div>
               {!isEditing && <button type="button" onClick={() => { setDraft(profile); setError(''); setNotice(''); setIsEditing(true) }}>EDIT PROFILE</button>}
             </div>
@@ -495,7 +505,7 @@ export function AdminAccountPage() {
             {error && <p className={styles.error} role="alert">{error}</p>}
             {notice && <p className={styles.notice} role="status">{notice}</p>}
 
-            <section className={styles.storeSettings} aria-labelledby="store-settings-heading">
+            {!isCcesAdmin && <section className={styles.storeSettings} aria-labelledby="store-settings-heading">
               <div className={styles.sectionHeading}>
                 <div>
                   <h3 id="store-settings-heading">Pickup &amp; payment settings</h3>
@@ -522,7 +532,7 @@ export function AdminAccountPage() {
                   </div>
                 </form>
               )}
-            </section>
+            </section>}
           </section>
         )}
       </section>

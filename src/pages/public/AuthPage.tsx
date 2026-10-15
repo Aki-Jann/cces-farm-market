@@ -242,6 +242,11 @@ export function AuthPage({ type }: { type: AuthType }) {
         return
       }
 
+      if (role === 'cces_admin') {
+        window.location.hash = '/admin/analytics'
+        return
+      }
+
       setLoginError('Your account has an invalid role. Please contact support.')
     } catch (error) {
       console.error('Login failed:', error)

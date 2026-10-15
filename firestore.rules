@@ -16,6 +16,12 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin';
     }
 
+    function isCcesAdmin() {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'cces_admin';
+    }
+
     function isCustomer() {
       return isAuthenticated()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
@@ -95,9 +101,9 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      allow get: if isAdmin()
+      allow get: if isAdmin() || isCcesAdmin()
         || isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow list: if isAdmin()
+      allow list: if isAdmin() || isCcesAdmin()
         || isAuthenticated() && resource.data.userId == request.auth.uid;
 
       // Order contents and totals must be verified by trusted server code.
@@ -160,7 +166,7 @@ service cloud.firestore {
     }
 
     match /settings/storefront {
-      allow get: if isAuthenticated();
+      allow get: if isAdmin() || isCustomer();
       allow list: if false;
       allow create, update, delete: if isAdmin();
     }

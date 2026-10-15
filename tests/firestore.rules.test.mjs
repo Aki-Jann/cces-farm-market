@@ -6,7 +6,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing'
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore'
 
 const projectId = 'demo-cces-farm-market'
 const rules = await readFile(new URL('../firestore.rules', import.meta.url), 'utf8')
@@ -27,6 +27,7 @@ beforeEach(async () => {
       setDoc(doc(db, 'users/customer-a'), { role: 'customer' }),
       setDoc(doc(db, 'users/customer-b'), { role: 'customer' }),
       setDoc(doc(db, 'users/admin-a'), { role: 'admin' }),
+      setDoc(doc(db, 'users/cces-admin-a'), { role: 'cces_admin' }),
       setDoc(doc(db, 'products/product-a'), { name: 'Carrots', stock: 10, sold: 0 }),
       setDoc(doc(db, 'orders/order-a'), {
         userId: 'customer-a',
@@ -77,6 +78,26 @@ test('customers cannot directly create orders', async () => {
 test('admins can update order status', async () => {
   const db = environment.authenticatedContext('admin-a').firestore()
   await assertSucceeds(updateDoc(doc(db, 'orders/order-a'), { status: 'confirmed' }))
+})
+
+test('CCES admins can read the analytics order data but cannot manage records', async () => {
+  const db = environment.authenticatedContext('cces-admin-a').firestore()
+  await assertSucceeds(getDocs(collection(db, 'orders')))
+  await assertSucceeds(getDoc(doc(db, 'products/product-a')))
+  await assertSucceeds(getDoc(doc(db, 'users/cces-admin-a')))
+  await assertFails(getDocs(collection(db, 'users')))
+  await assertFails(updateDoc(doc(db, 'orders/order-a'), { status: 'confirmed' }))
+  await assertFails(updateDoc(doc(db, 'products/product-a'), { stock: 0 }))
+  await assertFails(getDoc(doc(db, 'settings', 'storefront')))
+  await assertFails(getDoc(doc(db, 'storeSettings', 'checkout')))
+  await assertFails(getDoc(doc(db, 'conversations/customer-b')))
+})
+
+test('CCES admins can update only their own account fields', async () => {
+  const db = environment.authenticatedContext('cces-admin-a').firestore()
+  await assertSucceeds(updateDoc(doc(db, 'users/cces-admin-a'), { firstName: 'Casey' }))
+  await assertFails(updateDoc(doc(db, 'users/cces-admin-a'), { role: 'admin' }))
+  await assertFails(getDoc(doc(db, 'users/admin-a')))
 })
 
 test('customers cannot read another customer order or conversation', async () => {

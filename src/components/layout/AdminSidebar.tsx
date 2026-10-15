@@ -12,13 +12,17 @@ const links: { key: AdminNavItem; label: string; href: string }[] = [
   { key: 'analytics', label: 'ANALYTICS', href: '#/admin/analytics' },
 ]
 
-export function AdminSidebar({ active }: { active: AdminNavItem }) {
+export function AdminSidebar({ active, role = 'farmer' }: { active: AdminNavItem; role?: 'farmer' | 'cces_admin' }) {
+  const visibleLinks = role === 'cces_admin'
+    ? links.filter((link) => link.key === 'analytics')
+    : links
+
   return (
     <nav className={styles.sidebar} aria-label="Admin navigation">
       <div className={styles.top}>
         <div className={styles.logo}><BrandLogo compact /></div>
         <div className={styles.rule} />
-        {links.map((link) => (
+        {visibleLinks.map((link) => (
           <a className={active === link.key ? styles.active : ''} href={link.href} key={link.key}>
             {link.label}
           </a>

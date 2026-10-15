@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { onAuthStateChanged } from 'firebase/auth'
+import { doc, getDoc } from 'firebase/firestore'
 import { AuthPage } from './pages/public/AuthPage'
 import { LandingPage } from './pages/public/LandingPage'
 import { ShopPage } from './pages/customer/ShopPage'
@@ -12,7 +14,40 @@ import { AdminProductsPage } from './pages/admin/AdminProductsPage'
 import { AdminCustomersPage } from './pages/admin/AdminCustomersPage'
 import { AdminAnalyticsPage } from './pages/admin/AdminAnalyticsPage'
 import { AdminAccountPage } from './pages/admin/AdminAccountPage'
+import { auth } from './firebase/auth'
+import { db } from './firebase/firestore'
 export type Route = 'landing' | 'shop' | 'orders' | 'messages' | 'account' | 'admin' | 'admin-orders' | 'admin-payment' | 'admin-products' | 'admin-customers' | 'admin-analytics' | 'admin-account' | 'login' | 'register' | 'forgot-password'
+type UserRole = 'customer' | 'admin' | 'cces_admin'
+
+const protectedRoutes: Route[] = [
+  'shop',
+  'orders',
+  'messages',
+  'account',
+  'admin',
+  'admin-orders',
+  'admin-payment',
+  'admin-products',
+  'admin-customers',
+  'admin-analytics',
+  'admin-account',
+]
+
+function canAccessRoute(role: UserRole | null, route: Route) {
+  if (role === 'customer') {
+    return ['shop', 'orders', 'messages', 'account'].includes(route)
+  }
+  if (role === 'admin') {
+    return ['admin', 'admin-orders', 'admin-payment', 'admin-products', 'admin-customers', 'admin-analytics', 'admin-account'].includes(route)
+  }
+  return role === 'cces_admin' && ['admin-analytics', 'admin-account'].includes(route)
+}
+
+function homeForRole(role: UserRole | null) {
+  if (role === 'customer') return '/shop'
+  if (role === 'cces_admin') return '/admin/analytics'
+  return role === 'admin' ? '/admin' : '/login'
+}
 
 function getRoute(): Route {
   const path = window.location.hash.replace(/^#\/?/, '')
@@ -35,12 +70,59 @@ function getRoute(): Route {
 
 function App() {
   const [route, setRoute] = useState<Route>(getRoute)
+  const [role, setRole] = useState<UserRole | null>(null)
+  const [authResolved, setAuthResolved] = useState(false)
 
   useEffect(() => {
     const handleHashChange = () => setRoute(getRoute())
     window.addEventListener('hashchange', handleHashChange)
     return () => window.removeEventListener('hashchange', handleHashChange)
   }, [])
+
+  useEffect(() => {
+    let isMounted = true
+    let requestId = 0
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      const currentRequest = ++requestId
+      if (!user) {
+        if (isMounted) {
+          setRole(null)
+          setAuthResolved(true)
+        }
+        return
+      }
+
+      setAuthResolved(false)
+      setRole(null)
+      try {
+        const profile = await getDoc(doc(db, 'users', user.uid))
+        if (!isMounted || currentRequest !== requestId) return
+        const storedRole = profile.exists() ? profile.data().role : null
+        setRole(storedRole === 'customer' || storedRole === 'admin' || storedRole === 'cces_admin' ? storedRole : null)
+      } catch (error) {
+        console.error('Loading authenticated user role failed:', error)
+        if (isMounted && currentRequest === requestId) setRole(null)
+      } finally {
+        if (isMounted && currentRequest === requestId) setAuthResolved(true)
+      }
+    })
+
+    return () => {
+      isMounted = false
+      unsubscribe()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!authResolved || !protectedRoutes.includes(route)) return
+    if (!canAccessRoute(role, route)) {
+      window.location.hash = homeForRole(role)
+    }
+  }, [authResolved, role, route])
+
+  if (protectedRoutes.includes(route) && (!authResolved || !canAccessRoute(role, route))) {
+    return null
+  }
 
   if (route === 'landing') {
     return <LandingPage />
@@ -63,7 +145,7 @@ function App() {
   }
 
   if (route === 'admin-account') {
-    return <AdminAccountPage />
+    return <AdminAccountPage role={role === 'cces_admin' ? 'cces_admin' : 'farmer'} />
   }
 
   if (route === 'admin') {
@@ -87,7 +169,7 @@ function App() {
   }
 
   if (route === 'admin-analytics') {
-    return <AdminAnalyticsPage />
+    return <AdminAnalyticsPage role={role === 'cces_admin' ? 'cces_admin' : 'farmer'} />
   }
 
   return <AuthPage type={route} />
