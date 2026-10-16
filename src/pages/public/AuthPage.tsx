@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth'
+import { createUserWithEmailAndPassword, deleteUser, sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth'
+import type { User } from 'firebase/auth'
 import { Timestamp, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
 import { BrandLogo } from '../../components/common/BrandLogo'
 import { auth } from '../../firebase/auth'
@@ -308,10 +309,15 @@ export function AuthPage({ type }: { type: AuthType }) {
     setShowRegistrationErrors(true)
     if (!isRegistrationValid) return
     const birthdayDate = new Date(`${registrationFields.birthday}T00:00:00`)
+    let createdUser: User | null = null
+    let profileRef: ReturnType<typeof doc> | null = null
+    let profileSaved = false
 
     try {
       const credential = await createUserWithEmailAndPassword(auth, registrationFields.email, registrationFields.password)
-      await setDoc(doc(db, 'users', credential.user.uid), {
+      createdUser = credential.user
+      profileRef = doc(db, 'users', credential.user.uid)
+      await setDoc(profileRef, {
         firstName: registrationFields.firstName,
         lastName: registrationFields.lastName,
         email: registrationFields.email,
@@ -323,8 +329,19 @@ export function AuthPage({ type }: { type: AuthType }) {
         farmNotes: '',
         createdAt: serverTimestamp(),
       })
+      profileSaved = true
       window.location.hash = '/shop'
     } catch (error) {
+      let cleanupFailed = false
+      if (createdUser && profileRef && !profileSaved) {
+        try {
+          const profileSnapshot = await getDoc(profileRef)
+          if (!profileSnapshot.exists()) await deleteUser(createdUser)
+        } catch (cleanupError) {
+          cleanupFailed = true
+          console.error('Rolling back incomplete registration failed:', cleanupError)
+        }
+      }
       console.error('Registration failed:', error)
       const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : ''
       const messages: Record<string, string> = {
@@ -333,7 +350,9 @@ export function AuthPage({ type }: { type: AuthType }) {
         'auth/weak-password': 'Choose a stronger password.',
         'auth/network-request-failed': 'A network error occurred. Check your connection and try again.',
       }
-      setRegistrationError(messages[String(code)] ?? 'Unable to create your account. Please try again.')
+      setRegistrationError(cleanupFailed
+        ? 'Account setup could not be fully completed. Please contact support before trying again.'
+        : messages[String(code)] ?? 'Unable to create your account. Please try again.')
     }
   }
 

@@ -6,7 +6,7 @@ import { db } from '../../firebase/firestore'
 import { formatMonthDayYearTime } from '../../utils/dateFormat'
 import styles from './AdminOrdersPage.module.css'
 
-type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PACKED' | 'DELIVERED'
+type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PACKED' | 'DELIVERED' | 'CANCELLED'
 type OrderItem = { name: string; quantity: number; price: number }
 type Order = {
   firestoreId: string

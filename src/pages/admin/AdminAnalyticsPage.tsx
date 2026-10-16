@@ -219,7 +219,8 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
   }, [])
 
   const analytics: AnalyticsData = useMemo(() => {
-    const totalRevenue = orders.reduce((sum, order) => sum + (typeof order.total === 'number' ? order.total : 0), 0)
+    const salesOrders = orders.filter((order) => order.status.toLowerCase() !== 'cancelled')
+    const totalRevenue = salesOrders.reduce((sum, order) => sum + (typeof order.total === 'number' ? order.total : 0), 0)
 
     const productMap = new Map<string, Product>()
     const productLookupByName = new Map<string, string>()
@@ -245,7 +246,7 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
     let grainSales = 0
     let flowersSales = 0
 
-    orders.forEach((order) => {
+    salesOrders.forEach((order) => {
       order.items.forEach((item) => {
         const qty = typeof item.quantity === 'number' ? item.quantity : 0
         const price = typeof item.price === 'number' ? item.price : 0
@@ -312,7 +313,7 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
     const allProducts = Array.from(productMap.values())
     const top = [...allProducts].sort((a, b) => b.sold - a.sold || a.name.localeCompare(b.name)).slice(0, 5)
     const underperforming = [...allProducts].sort((a, b) => a.sold - b.sold || a.name.localeCompare(b.name)).slice(0, 5)
-    const unitsSold = orders.reduce((sum, order) => sum + order.items.reduce((orderSum, item) => {
+    const unitsSold = salesOrders.reduce((sum, order) => sum + order.items.reduce((orderSum, item) => {
       const quantity = typeof item.quantity === 'number' && Number.isFinite(item.quantity) && item.quantity > 0
         ? item.quantity
         : 0

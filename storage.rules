@@ -43,8 +43,11 @@ service firebase.storage {
 
     match /payment-receipts/{userId}/{orderId}/{fileName} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
-      allow create, update: if isAuthenticated() && request.auth.uid == userId && isValidImage();
-      allow delete: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow create: if resource == null && isAuthenticated() && request.auth.uid == userId && isValidImage();
+      allow delete: if isAdmin()
+        || isAuthenticated()
+          && request.auth.uid == userId
+          && !firestore.exists(/databases/(default)/documents/orders/$(orderId));
     }
   }
 }

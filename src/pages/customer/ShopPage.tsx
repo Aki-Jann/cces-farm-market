@@ -229,7 +229,7 @@ function Cart({
   const cartItemPointerStart = useRef<{ x: number; y: number } | null>(null)
   const didSwipeCartItem = useRef(false)
   const subtotal = items.reduce((sum, item) => sum + item.quantity * item.price, 0)
-  const delivery = subtotal > 0 ? 100 : 0
+  const delivery = fulfillmentType === 'delivery' && subtotal > 0 ? 100 : 0
   const tax = subtotal * 0.05
   const total = subtotal + delivery + tax
   const paymentProviderName = paymentMethod === 'GCASH' ? 'GCash' : 'Maya'
@@ -509,6 +509,7 @@ export function ShopPage() {
   const [orderMessage, setOrderMessage] = useState('')
   const [quantityNotice, setQuantityNotice] = useState<{ message: string } | null>(null)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
+  const isSubmittingOrder = useRef(false)
   const cartOwnerId = useRef<string | null>(null)
   const cartQuantitiesRef = useRef<Record<string, number>>({})
 
@@ -704,7 +705,11 @@ export function ShopPage() {
   }
 
   async function placeOrder({ fulfillmentType, sellerNotes, receiptFile }: CheckoutDetails) {
-    if (cartItems.length === 0) return
+    if (isSubmittingOrder.current || cartItems.length === 0) return
+    if (cartItems.length > 5) {
+      setOrderMessage('Orders can include up to 5 different products. Remove an item and try again.')
+      return
+    }
     if (fulfillmentType === 'pickup' && !storeSettings.pickupLocation.trim()) {
       setOrderMessage('Pickup location is not configured yet. Please contact the seller.')
       return
@@ -738,91 +743,106 @@ export function ShopPage() {
       return
     }
 
+    isSubmittingOrder.current = true
     setIsCheckingOut(true)
     setOrderMessage('')
     let uploadedReceiptRef: StorageReference | null = null
+    let orderCreated = false
 
     try {
-      const profileSnapshot = await getDoc(doc(db, 'users', user.uid))
-      if (!profileSnapshot.exists()) {
-        setOrderMessage('Your customer profile could not be found. Please contact support.')
-        return
-      }
-
-      const profile = profileSnapshot.data()
-      const subtotal = cartItems.reduce((sum, item) => sum + item.quantity * item.price, 0)
-      const deliveryFee = fulfillmentType === 'delivery' && subtotal > 0 ? 100 : 0
-      const tax = subtotal * 0.05
-      const total = subtotal + deliveryFee + tax
-      const items = cartItems.map((item) => ({
-        productId: item.id,
-        name: item.name,
-        price: Number(item.price),
-        quantity: Number(item.quantity),
-        unit: item.unit,
-      }))
-
       const orderRef = doc(collection(db, 'orders'))
-      let paymentReceiptUrl = ''
-      if (receiptFile) {
+      if (receiptFile && paymentMethod !== 'COD') {
         uploadedReceiptRef = ref(storage, `payment-receipts/${user.uid}/${orderRef.id}/${Date.now()}-${receiptFile.name}`)
-        const uploadedReceipt = await uploadBytes(uploadedReceiptRef, receiptFile, { contentType: receiptFile.type })
-        paymentReceiptUrl = await getDownloadURL(uploadedReceipt.ref)
+        await uploadBytes(uploadedReceiptRef, receiptFile, { contentType: receiptFile.type })
       }
       const productRefs = cartItems.map((item) => ({
         item,
         ref: doc(db, 'products', item.id),
       }))
+      const profileRef = doc(db, 'users', user.uid)
+      const subtotal = cartItems.reduce((sum, item) => sum + item.quantity * item.price, 0)
+      const deliveryFee = fulfillmentType === 'delivery' && subtotal > 0 ? 100 : 0
+      const tax = subtotal * 0.05
+      const items = cartItems.map((item) => ({
+        productId: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        unit: item.unit,
+      }))
+      let paymentReceiptUrl = ''
+      if (uploadedReceiptRef) {
+        paymentReceiptUrl = await getDownloadURL(uploadedReceiptRef)
+      }
 
-      await runTransaction(db, async (transaction) => {
-        const productSnapshots = await Promise.all(productRefs.map(({ ref }) => transaction.get(ref)))
-
-        productSnapshots.forEach((productSnapshot, index) => {
-          const { item, ref } = productRefs[index]
-          if (!productSnapshot.exists()) {
-            throw new Error('PRODUCT_NOT_FOUND')
+      try {
+        await runTransaction(db, async (transaction) => {
+          const [profileSnapshot, ...productSnapshots] = await Promise.all([
+            transaction.get(profileRef),
+            ...productRefs.map(({ ref }) => transaction.get(ref)),
+          ])
+          if (!profileSnapshot.exists() || profileSnapshot.data().role !== 'customer') {
+            throw new Error('CUSTOMER_PROFILE_REQUIRED')
           }
+          productSnapshots.forEach((productSnapshot, index) => {
+            const { item, ref } = productRefs[index]
+            if (!productSnapshot.exists()) throw new Error('PRODUCT_NOT_FOUND')
+            const product = productSnapshot.data()
+            const stock = typeof product.stock === 'number' ? product.stock : 0
+            if (product.isAvailable !== true || item.quantity > stock) {
+              throw new Error('INSUFFICIENT_STOCK')
+            }
+            if (typeof product.price !== 'number' || product.price !== item.price) {
+              throw new Error('PRICE_CHANGED')
+            }
+            const sold = typeof product.sold === 'number' && Number.isFinite(product.sold)
+              ? product.sold
+              : 0
+            transaction.update(ref, {
+              stock: stock - item.quantity,
+              sold: sold + item.quantity,
+              checkoutOrderId: orderRef.id,
+              checkoutQuantity: item.quantity,
+              checkoutAction: 'sale',
+              checkoutItemIndex: index,
+            })
+          })
 
-          const productData = productSnapshot.data()
-          const stock = typeof productData.stock === 'number' ? productData.stock : 0
-          if (productData.isAvailable !== true || item.quantity > stock) {
-            throw new Error('INSUFFICIENT_STOCK')
-          }
-
-          const remainingStock = stock - item.quantity
-          const sold = typeof productData.sold === 'number' && Number.isFinite(productData.sold)
-            ? productData.sold
-            : 0
-          transaction.update(ref, {
-            stock: remainingStock,
-            sold: sold + item.quantity,
+          const profile = profileSnapshot.data()
+          transaction.set(orderRef, {
+            orderNumber: `ORD-${Date.now()}`,
+            userId: user.uid,
+            customerName: `${typeof profile.firstName === 'string' ? profile.firstName : ''} ${typeof profile.lastName === 'string' ? profile.lastName : ''}`.trim(),
+            customerEmail: typeof profile.email === 'string' ? profile.email : user.email ?? '',
+            items,
+            subtotal,
+            deliveryFee,
+            tax,
+            total: subtotal + deliveryFee + tax,
+            paymentMethod,
+            paymentStatus: paymentMethod === 'COD' ? 'unpaid' : 'awaiting_verification',
+            status: 'pending',
+            fulfillmentType,
+            deliveryAddress: fulfillmentType === 'pickup'
+              ? storeSettings.pickupLocation
+              : addressForOrder,
+            pickupHours: fulfillmentType === 'pickup' ? storeSettings.pickupHours : '',
+            pickupDays: fulfillmentType === 'pickup' ? storeSettings.pickupDays : '',
+            sellerNotes,
+            paymentReceiptUrl,
+            createdAt: serverTimestamp(),
           })
         })
-
-        transaction.set(orderRef, {
-          orderNumber: `ORD-${Date.now()}`,
-          userId: user.uid,
-          customerName: `${typeof profile.firstName === 'string' ? profile.firstName : ''} ${typeof profile.lastName === 'string' ? profile.lastName : ''}`.trim(),
-          customerEmail: typeof profile.email === 'string' ? profile.email : user.email ?? '',
-          items,
-          subtotal: Number(subtotal),
-          deliveryFee: Number(deliveryFee),
-          tax: Number(tax),
-          total: Number(total),
-          paymentMethod,
-          paymentStatus: paymentMethod === 'COD' ? 'unpaid' : 'awaiting_verification',
-          status: 'pending',
-          fulfillmentType,
-          deliveryAddress: fulfillmentType === 'pickup'
-            ? storeSettings.pickupLocation || 'Pickup location to be confirmed by the seller.'
-            : addressForOrder,
-          pickupHours: fulfillmentType === 'pickup' ? storeSettings.pickupHours : '',
-          pickupDays: fulfillmentType === 'pickup' ? storeSettings.pickupDays : '',
-          sellerNotes,
-          paymentReceiptUrl,
-          createdAt: serverTimestamp(),
-        })
-      })
+        orderCreated = true
+      } catch (transactionError) {
+        try {
+          const persistedOrder = await getDoc(orderRef)
+          orderCreated = persistedOrder.exists() && persistedOrder.data().userId === user.uid
+        } catch (verificationError) {
+          console.error('Verifying transaction result failed:', verificationError)
+        }
+        if (!orderCreated) throw transactionError
+      }
 
       try {
         localStorage.removeItem(`cces-farm-market-cart:${user.uid}`)
@@ -833,21 +853,32 @@ export function ShopPage() {
       window.location.hash = '/orders'
     } catch (checkoutError) {
       console.error('Checkout failed:', checkoutError)
-      if (uploadedReceiptRef) {
+      if (uploadedReceiptRef && !orderCreated) {
         try {
           await deleteObject(uploadedReceiptRef)
         } catch (cleanupError) {
           console.error('Cleaning up unused payment receipt failed:', cleanupError)
         }
       }
-      if (checkoutError instanceof Error && checkoutError.message === 'PRODUCT_NOT_FOUND') {
+      const errorCode = typeof checkoutError === 'object' && checkoutError !== null && 'code' in checkoutError
+        && typeof checkoutError.code === 'string'
+        ? checkoutError.code
+        : ''
+      if (checkoutError instanceof Error && checkoutError.message === 'CUSTOMER_PROFILE_REQUIRED') {
+        setOrderMessage('Your customer profile could not be found. Please contact support.')
+      } else if (checkoutError instanceof Error && checkoutError.message === 'PRODUCT_NOT_FOUND') {
         setOrderMessage('One or more products are no longer available.')
       } else if (checkoutError instanceof Error && checkoutError.message === 'INSUFFICIENT_STOCK') {
         setOrderMessage('The requested quantity is no longer available. Please review your cart.')
+      } else if (checkoutError instanceof Error && checkoutError.message === 'PRICE_CHANGED') {
+        setOrderMessage('A product price changed. Review your cart and try again.')
+      } else if (errorCode === 'permission-denied') {
+        setOrderMessage('Your order could not be authorized. Refresh your cart and try again.')
       } else {
         setOrderMessage('Unable to place your order. Please try again.')
       }
     } finally {
+      isSubmittingOrder.current = false
       setIsCheckingOut(false)
     }
   }

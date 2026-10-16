@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { collection, onSnapshot } from 'firebase/firestore'
+import { collection, doc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
+import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import { formatMonthDayYear } from '../../utils/dateFormat'
 import styles from './AdminPaymentPage.module.css'
@@ -15,8 +16,139 @@ type PaymentRecord = {
   items: string[]
   method: string
   paymentReceiptUrl: string
+  paymentStatus: string
+  orderStatus: string
   amount: number
   createdAtDate: Date | null
+}
+
+function PaymentReviewActions({ payment }: { payment: PaymentRecord }) {
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [message, setMessage] = useState('')
+
+  async function reviewPayment(decision: 'approve' | 'reject') {
+    if (decision === 'reject' && !window.confirm(
+      'Reject this receipt and cancel the pending order? Its inventory will be returned to stock.'
+    )) {
+      return
+    }
+
+    setIsUpdating(true)
+    setMessage('')
+    try {
+      const reviewerId = auth.currentUser?.uid
+      if (!reviewerId) throw new Error('Log in again before reviewing this payment.')
+      const orderRef = doc(db, 'orders', payment.firestoreId)
+      await runTransaction(db, async (transaction) => {
+        const orderSnapshot = await transaction.get(orderRef)
+        if (!orderSnapshot.exists()) throw new Error('The order could not be found.')
+        const order = orderSnapshot.data()
+        if (order.paymentStatus !== 'awaiting_verification') {
+          throw new Error('This payment has already been reviewed.')
+        }
+
+        if (decision === 'approve') {
+          transaction.update(orderRef, {
+            paymentStatus: 'paid',
+            paymentVerifiedAt: serverTimestamp(),
+            paymentVerifiedBy: reviewerId,
+          })
+          return
+        }
+
+        if (order.status !== 'pending') {
+          throw new Error('Only pending orders can be cancelled after a payment is rejected.')
+        }
+        if (!Array.isArray(order.items) || order.items.length === 0 || order.items.length > 5) {
+          throw new Error('The order items are invalid; inventory was not changed.')
+        }
+        const items = order.items.map((item) => {
+          if (
+            !item ||
+            typeof item !== 'object' ||
+            typeof item.productId !== 'string' ||
+            !item.productId ||
+            !Number.isInteger(item.quantity) ||
+            item.quantity < 1
+          ) {
+            throw new Error('The order items are invalid; inventory was not changed.')
+          }
+          return { productId: item.productId, quantity: item.quantity }
+        })
+        if (new Set(items.map((item) => item.productId)).size !== items.length) {
+          throw new Error('The order contains duplicate products; inventory was not changed.')
+        }
+
+        const productRefs = items.map(({ productId }) => doc(db, 'products', productId))
+        const productSnapshots = await Promise.all(productRefs.map((productRef) => transaction.get(productRef)))
+        productSnapshots.forEach((productSnapshot, index) => {
+          if (!productSnapshot.exists()) {
+            throw new Error('Inventory could not be restored because a product is missing.')
+          }
+          const item = items[index]
+          const product = productSnapshot.data()
+          const stock = typeof product.stock === 'number' && Number.isFinite(product.stock)
+            ? product.stock
+            : 0
+          const sold = typeof product.sold === 'number' && Number.isFinite(product.sold)
+            ? product.sold
+            : 0
+          transaction.update(productRefs[index], {
+            stock: stock + item.quantity,
+            sold: Math.max(0, sold - item.quantity),
+            checkoutOrderId: orderRef.id,
+            checkoutQuantity: item.quantity,
+            checkoutAction: 'refund',
+          })
+        })
+        transaction.update(orderRef, {
+          status: 'cancelled',
+          paymentStatus: 'rejected',
+          paymentRejectedAt: serverTimestamp(),
+          paymentRejectedBy: reviewerId,
+        })
+      })
+      setMessage(decision === 'approve'
+        ? 'Payment verified.'
+        : 'Payment rejected. The order was cancelled and inventory restored.')
+    } catch (reviewError) {
+      console.error('Reviewing online payment failed:', reviewError)
+      setMessage(reviewError instanceof Error
+        ? reviewError.message
+        : 'Unable to update payment status. Please try again.')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  if (payment.paymentStatus !== 'awaiting_verification' || !payment.paymentReceiptUrl) return null
+
+  return (
+    <>
+      <span className={styles.reviewActions}>
+        <button
+          type="button"
+          className={styles.reviewButton}
+          disabled={isUpdating}
+          onClick={() => void reviewPayment('approve')}
+        >
+          {isUpdating ? 'UPDATING...' : 'VERIFY'}
+        </button>
+        <button
+          type="button"
+          className={`${styles.reviewButton} ${styles.rejectButton}`}
+          disabled={isUpdating || payment.orderStatus !== 'pending'}
+          onClick={() => void reviewPayment('reject')}
+        >
+          REJECT & CANCEL
+        </button>
+      </span>
+      {payment.orderStatus !== 'pending' && (
+        <span className={styles.reviewMessage}>Only pending orders can be rejected.</span>
+      )}
+      {message && <span className={styles.reviewMessage} role="status">{message}</span>}
+    </>
+  )
 }
 
 function currency(value: number) {
@@ -72,7 +204,7 @@ function PaymentTable({
           <strong>DATE</strong>
           <strong>ITEMS</strong>
           <strong>METHOD</strong>
-          <strong>DIGITAL RECEIPT</strong>
+          <strong>DIGITAL RECEIPT / REVIEW</strong>
           <strong>AMOUNT</strong>
         </div>
         {isLoading ? (
@@ -97,6 +229,8 @@ function PaymentTable({
                     ? <a href={payment.paymentReceiptUrl} target="_blank" rel="noreferrer" aria-label={`View payment receipt for order ${payment.orderId}`}><img src={payment.paymentReceiptUrl} alt={`Payment receipt for order ${payment.orderId}`} /><span>View receipt</span></a>
                     : <span className={styles.receiptMissing}>Not uploaded</span>
                   : <span className={styles.receiptNotRequired}>Not required</span>}
+                <span className={styles.paymentStatus}>{payment.paymentStatus.replaceAll('_', ' ')}</span>
+                <PaymentReviewActions payment={payment} />
               </span>
               <strong>{currency(payment.amount)}</strong>
             </div>
@@ -144,6 +278,8 @@ export function AdminPaymentPage() {
             items,
             method,
             paymentReceiptUrl: typeof data.paymentReceiptUrl === 'string' ? data.paymentReceiptUrl : '',
+            paymentStatus: typeof data.paymentStatus === 'string' ? data.paymentStatus : 'unpaid',
+            orderStatus: typeof data.status === 'string' ? data.status : 'pending',
             amount: typeof data.total === 'number' && !isNaN(data.total) ? data.total : 0,
             createdAtDate: parsedDate,
           }

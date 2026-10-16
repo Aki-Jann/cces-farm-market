@@ -9,7 +9,7 @@ import { db } from '../../firebase/firestore'
 import { formatMonthDayYear } from '../../utils/dateFormat'
 import styles from './OrdersPage.module.css'
 
-type OrderStatus = 'DELIVERED' | 'PENDING' | 'CONFIRMED' | 'PACKED'
+type OrderStatus = 'DELIVERED' | 'PENDING' | 'CONFIRMED' | 'PACKED' | 'CANCELLED'
 type OrderStatusFilter = 'ALL' | OrderStatus
 
 const orderFilters: { value: OrderStatusFilter; label: string }[] = [
@@ -18,6 +18,7 @@ const orderFilters: { value: OrderStatusFilter; label: string }[] = [
   { value: 'CONFIRMED', label: 'Confirmed' },
   { value: 'PACKED', label: 'Packed' },
   { value: 'DELIVERED', label: 'Delivered' },
+  { value: 'CANCELLED', label: 'Cancelled' },
 ]
 
 type Order = {
@@ -299,7 +300,9 @@ export function OrdersPage() {
             const createdAtTime = parsedDate ? parsedDate.getTime() : 0
             const items = Array.isArray(data.items) ? data.items : []
 
-            const status: OrderStatus = data.status === 'delivered'
+            const status: OrderStatus = data.status === 'cancelled'
+              ? 'CANCELLED'
+              : data.status === 'delivered'
               ? 'DELIVERED'
               : data.status === 'confirmed'
                 ? 'CONFIRMED'
