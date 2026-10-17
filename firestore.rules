@@ -334,6 +334,8 @@ service cloud.firestore {
       allow create: if validOrderCreate(orderId);
 
       allow update: if isAdmin()
+          && resource.data.status in ['pending', 'confirmed', 'packed', 'delivered']
+          && resource.data.get('paymentStatus', '') != 'rejected'
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
           && request.resource.data.status in ['pending', 'confirmed', 'packed', 'delivered']
           && (
@@ -352,6 +354,19 @@ service cloud.firestore {
           && resource.data.paymentMethod in ['GCASH', 'MAYA']
           && resource.data.paymentReceiptUrl is string
           && resource.data.paymentReceiptUrl.size() > 0
+          && request.resource.data.paymentStatus == 'paid'
+          && request.resource.data.paymentVerifiedAt == request.time
+          && request.resource.data.paymentVerifiedBy == request.auth.uid
+        || isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'paymentStatus', 'paymentVerifiedAt', 'paymentVerifiedBy'
+          ])
+          && request.resource.data.diff(resource.data).affectedKeys().hasAll([
+            'paymentStatus', 'paymentVerifiedAt', 'paymentVerifiedBy'
+          ])
+          && resource.data.paymentMethod == 'COD'
+          && resource.data.paymentStatus == 'unpaid'
+          && resource.data.status in ['pending', 'confirmed', 'packed', 'delivered']
           && request.resource.data.paymentStatus == 'paid'
           && request.resource.data.paymentVerifiedAt == request.time
           && request.resource.data.paymentVerifiedBy == request.auth.uid

@@ -3,6 +3,7 @@ import { collection, onSnapshot } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { db } from '../../firebase/firestore'
+import { isOrderEligibleForFinancialTotals } from '../../utils/orderFinancials'
 import { resolveProductImage } from '../../utils/productImages'
 import apple from '../../assets/shop-apple.png'
 import banana from '../../assets/shop-banana.png'
@@ -16,6 +17,7 @@ type CategorySale = { label: string; value: number; percentage: number; color: s
 type AnalyticsPanel = 'order-value' | 'units-sold' | 'products-listed' | 'out-of-stock' | 'category-sales' | 'inventory' | 'top-products' | 'underperforming'
 type AnalyticsData = {
   totalRevenue: number
+  financialOrders: FirestoreOrder[]
   unitsSold: number
   listedProducts: number
   outOfStockProducts: number
@@ -35,7 +37,7 @@ type OrderItem = {
   unit?: string
 }
 
-type FirestoreOrder = { id: string; orderNumber: string; customerName: string; status: string; total: number; items: OrderItem[] }
+type FirestoreOrder = { id: string; orderNumber: string; customerName: string; status: string; paymentStatus: string; total: number; items: OrderItem[] }
 
 type FirestoreProduct = {
   id: string
@@ -168,6 +170,7 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
             orderNumber: typeof data.orderNumber === 'string' ? data.orderNumber : docSnap.id,
             customerName: typeof data.customerName === 'string' ? data.customerName : 'Customer',
             status: typeof data.status === 'string' ? data.status : 'pending',
+            paymentStatus: typeof data.paymentStatus === 'string' ? data.paymentStatus : '',
             total: typeof data.total === 'number' ? data.total : 0,
             items: Array.isArray(data.items)
               ? data.items.map((item) => {
@@ -219,7 +222,7 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
   }, [])
 
   const analytics: AnalyticsData = useMemo(() => {
-    const salesOrders = orders.filter((order) => order.status.toLowerCase() !== 'cancelled')
+    const salesOrders = orders.filter(isOrderEligibleForFinancialTotals)
     const totalRevenue = salesOrders.reduce((sum, order) => sum + (typeof order.total === 'number' ? order.total : 0), 0)
 
     const productMap = new Map<string, Product>()
@@ -328,6 +331,7 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
 
     return {
       totalRevenue,
+      financialOrders: salesOrders,
       unitsSold,
       listedProducts,
       outOfStockProducts,
@@ -398,10 +402,10 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
             </div>
             {activePanel === 'order-value' ? (
               <>
-                <div className={styles.detailSummary}><span>Total value across {orders.length} orders</span><strong>{currency(analytics.totalRevenue)}</strong></div>
+                <div className={styles.detailSummary}><span>Total value across {analytics.financialOrders.length} paid orders</span><strong>{currency(analytics.totalRevenue)}</strong></div>
                 <div className={styles.dataList}>
                   <div className={styles.dataListHeading}><span>ORDER</span><span>CUSTOMER</span><span>ITEMS</span><span>ORDER VALUE</span></div>
-                  {orders.length === 0 ? <p className={styles.emptyState}>No orders yet.</p> : orders.map((order) => (
+                  {analytics.financialOrders.length === 0 ? <p className={styles.emptyState}>No paid orders yet.</p> : analytics.financialOrders.map((order) => (
                     <div className={styles.dataRow} key={order.id}><strong>{order.orderNumber}</strong><span>{order.customerName}</span><span>{order.items.reduce((sum, item) => sum + (item.quantity ?? 0), 0)} units</span><b>{currency(order.total)}</b></div>
                   ))}
                 </div>
@@ -434,7 +438,7 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
             <MetricCard label="OUT OF STOCK" value={analytics.outOfStockProducts.toLocaleString()} detail="Products that may need restocking" icon="stock" onClick={() => openPanel('out-of-stock')} />
           </div>
           <div className={styles.chartGrid}>
-            <CategoryChart categories={analytics.categories} total={orders.length} onClick={() => openPanel('category-sales')} />
+            <CategoryChart categories={analytics.categories} total={analytics.financialOrders.length} onClick={() => openPanel('category-sales')} />
             <InventoryChart products={analytics.inventory} onClick={() => openPanel('inventory')} />
           </div>
           <div className={styles.lowerGrid}>

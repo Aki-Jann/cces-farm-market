@@ -403,6 +403,11 @@ a.inventoryRow:focus-visible {
   color: var(--order-delivered-text);
 }
 
+.status.cancelled {
+  background: #fff1ee;
+  color: #9f342a;
+}
+
 @media (max-width: 1050px) {
   .dashboard {
     padding: 20px var(--page-gutter);

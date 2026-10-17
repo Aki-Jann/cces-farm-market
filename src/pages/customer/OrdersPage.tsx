@@ -300,13 +300,16 @@ export function OrdersPage() {
             const createdAtTime = parsedDate ? parsedDate.getTime() : 0
             const items = Array.isArray(data.items) ? data.items : []
 
-            const status: OrderStatus = data.status === 'cancelled'
+            const rawStatus = typeof data.status === 'string' ? data.status.toLowerCase() : ''
+            const paymentStatus = typeof data.paymentStatus === 'string' ? data.paymentStatus.toLowerCase() : ''
+            const status: OrderStatus = rawStatus === 'cancelled' || rawStatus === 'canceled' ||
+              rawStatus === 'rejected' || paymentStatus === 'rejected'
               ? 'CANCELLED'
-              : data.status === 'delivered'
+              : rawStatus === 'delivered'
               ? 'DELIVERED'
-              : data.status === 'confirmed'
+              : rawStatus === 'confirmed'
                 ? 'CONFIRMED'
-                : data.status === 'packed'
+                : rawStatus === 'packed'
                   ? 'PACKED'
                   : 'PENDING'
 
