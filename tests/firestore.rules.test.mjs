@@ -198,7 +198,7 @@ function customerOrder(orderId, overrides = {}) {
 }
 
 function receiptUrl(userId, orderId) {
-  return `https://firebasestorage.googleapis.com/v0/b/cces-farm-market.firebasestorage.app/o/payment-receipts%2F${userId}%2F${orderId}%2Freceipt.png?alt=media&token=test-token`
+  return `https://res.cloudinary.com/test-cloud/image/upload/v1234567890/payment-receipts/${userId}/${orderId}/receipt.png`
 }
 
 async function submitCustomerOrder(db, orderId, order) {
@@ -257,6 +257,36 @@ test('customers can create a valid order and decrement inventory in one transact
   assert.equal(orderSnapshot.data().total, 121)
   assert.equal(productSnapshot.data().stock, 8)
   assert.equal(productSnapshot.data().sold, 2)
+})
+
+test('customers can make a second valid purchase when checkoutAction remains sale', async () => {
+  const db = environment.authenticatedContext('customer-a').firestore()
+  await assertSucceeds(submitCustomerOrder(db, 'customer-order-first', customerOrder('customer-order-first')))
+
+  const secondOrder = customerOrder('customer-order-second', {
+    items: [{
+      productId: 'product-a',
+      name: 'CARROTS',
+      price: 10,
+      quantity: 1,
+      unit: 'KG',
+    }],
+    subtotal: 10,
+    tax: 0.5,
+    total: 110.5,
+  })
+  await assertSucceeds(submitCustomerOrder(db, 'customer-order-second', secondOrder))
+
+  const [firstOrder, secondOrderSnapshot, productSnapshot] = await Promise.all([
+    getDoc(doc(db, 'orders/customer-order-first')),
+    getDoc(doc(db, 'orders/customer-order-second')),
+    getDoc(doc(db, 'products/product-a')),
+  ])
+  assert.equal(firstOrder.exists(), true)
+  assert.equal(secondOrderSnapshot.exists(), true)
+  assert.equal(productSnapshot.data().checkoutAction, 'sale')
+  assert.equal(productSnapshot.data().stock, 7)
+  assert.equal(productSnapshot.data().sold, 3)
 })
 
 test('customers can checkout five distinct products within the rules validation limit', async () => {
@@ -398,13 +428,13 @@ test('customers cannot use an order ID to bypass receipt URL validation', async 
   })
   await assertFails(submitCustomerOrder(db, maliciousId, externalReceipt))
 
-  const wrongBucketReceipt = customerOrder('order-wrong-receipt-bucket', {
+  const wrongHostReceipt = customerOrder('order-wrong-receipt-host', {
     paymentMethod: 'GCASH',
     paymentStatus: 'awaiting_verification',
-    paymentReceiptUrl: receiptUrl('customer-a', 'order-wrong-receipt-bucket')
-      .replace('cces-farm-market.firebasestorage.app', 'attacker-bucket.appspot.com'),
+    paymentReceiptUrl: receiptUrl('customer-a', 'order-wrong-receipt-host')
+      .replace('res.cloudinary.com', 'attacker.example'),
   })
-  await assertFails(submitCustomerOrder(db, 'order-wrong-receipt-bucket', wrongBucketReceipt))
+  await assertFails(submitCustomerOrder(db, 'order-wrong-receipt-host', wrongHostReceipt))
 })
 
 test('customers cannot create orders for another user or more than five products', async () => {

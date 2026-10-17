@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { collection, doc, getDoc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore'
-import { deleteObject, getDownloadURL, ref, uploadBytes, type StorageReference } from 'firebase/storage'
 import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
 import { Header } from '../../components/layout/Header'
 import { ProductRating } from '../../components/common/ProductRating'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
-import { storage } from '../../firebase/storage'
+import { uploadImageToCloudinary } from '../../utils/cloudinary'
 import { productImages, resolveProductImage } from '../../utils/productImages'
 import styles from './ShopPage.module.css'
 
@@ -746,14 +745,15 @@ export function ShopPage() {
     isSubmittingOrder.current = true
     setIsCheckingOut(true)
     setOrderMessage('')
-    let uploadedReceiptRef: StorageReference | null = null
-    let orderCreated = false
+    let paymentReceiptUrl = ''
 
     try {
       const orderRef = doc(collection(db, 'orders'))
       if (receiptFile && paymentMethod !== 'COD') {
-        uploadedReceiptRef = ref(storage, `payment-receipts/${user.uid}/${orderRef.id}/${Date.now()}-${receiptFile.name}`)
-        await uploadBytes(uploadedReceiptRef, receiptFile, { contentType: receiptFile.type })
+        paymentReceiptUrl = await uploadImageToCloudinary(
+          receiptFile,
+          `payment-receipts/${user.uid}/${orderRef.id}`,
+        )
       }
       const productRefs = cartItems.map((item) => ({
         item,
@@ -770,11 +770,6 @@ export function ShopPage() {
         quantity: item.quantity,
         unit: item.unit,
       }))
-      let paymentReceiptUrl = ''
-      if (uploadedReceiptRef) {
-        paymentReceiptUrl = await getDownloadURL(uploadedReceiptRef)
-      }
-
       try {
         await runTransaction(db, async (transaction) => {
           const [profileSnapshot, ...productSnapshots] = await Promise.all([
@@ -833,15 +828,15 @@ export function ShopPage() {
             createdAt: serverTimestamp(),
           })
         })
-        orderCreated = true
       } catch (transactionError) {
+        let orderWasCreated = false
         try {
           const persistedOrder = await getDoc(orderRef)
-          orderCreated = persistedOrder.exists() && persistedOrder.data().userId === user.uid
+          orderWasCreated = persistedOrder.exists() && persistedOrder.data().userId === user.uid
         } catch (verificationError) {
           console.error('Verifying transaction result failed:', verificationError)
         }
-        if (!orderCreated) throw transactionError
+        if (!orderWasCreated) throw transactionError
       }
 
       try {
@@ -853,13 +848,6 @@ export function ShopPage() {
       window.location.hash = '/orders'
     } catch (checkoutError) {
       console.error('Checkout failed:', checkoutError)
-      if (uploadedReceiptRef && !orderCreated) {
-        try {
-          await deleteObject(uploadedReceiptRef)
-        } catch (cleanupError) {
-          console.error('Cleaning up unused payment receipt failed:', cleanupError)
-        }
-      }
       const errorCode = typeof checkoutError === 'object' && checkoutError !== null && 'code' in checkoutError
         && typeof checkoutError.code === 'string'
         ? checkoutError.code

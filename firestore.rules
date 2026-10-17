@@ -55,8 +55,6 @@ service cloud.firestore {
       let item = orderAfter.items[itemIndex];
       return request.resource.data.diff(resource.data).affectedKeys()
           .hasOnly(['stock', 'sold', 'checkoutOrderId', 'checkoutQuantity', 'checkoutAction', 'checkoutItemIndex'])
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasAll(['stock', 'sold', 'checkoutOrderId', 'checkoutQuantity', 'checkoutAction', 'checkoutItemIndex'])
         && orderId is string
         && !exists(orderPath(orderId))
         && quantity is int
@@ -136,8 +134,8 @@ service cloud.firestore {
     function validReceiptUrl(orderId) {
       return orderId.matches('^[A-Za-z0-9_-]{1,128}$')
         && request.resource.data.paymentReceiptUrl.matches(
-        '^https://firebasestorage\\.googleapis\\.com/v0/b/cces-farm-market\\.firebasestorage\\.app/o/payment-receipts%2F'
-          + request.auth.uid + '%2F' + orderId + '%2F[^?]+\\?alt=media&token=.+$'
+          '^https://res\\.cloudinary\\.com/[^/]+/image/upload/(v[0-9]+/)?payment-receipts/'
+          + request.auth.uid + '/' + orderId + '/[^/?]+$'
       );
     }
 

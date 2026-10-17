@@ -2,12 +2,11 @@ import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { onAuthStateChanged, sendPasswordResetEmail, signOut } from 'firebase/auth'
 import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore'
-import { deleteObject, getDownloadURL, ref, uploadBytes, type StorageReference } from 'firebase/storage'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
-import { storage } from '../../firebase/storage'
+import { uploadImageToCloudinary } from '../../utils/cloudinary'
 import { formatMonthDayYear } from '../../utils/dateFormat'
 import styles from './AdminAccountPage.module.css'
 
@@ -311,7 +310,6 @@ export function AdminAccountPage({ role = 'farmer' }: { role?: 'farmer' | 'cces_
     setSettingsError('')
     setSettingsNotice('')
     setIsSavingSettings(true)
-    const uploadedRefs: StorageReference[] = []
     const nextSettings: StoreSettings = {
       ...storeSettingsDraft,
       pickupLocation: storeSettingsDraft.pickupLocation.trim(),
@@ -327,13 +325,8 @@ export function AdminAccountPage({ role = 'farmer' }: { role?: 'farmer' | 'cces_
       const uploadResults = await Promise.allSettled((['gcash', 'maya'] as const).map(async (provider) => {
         const file = qrFiles[provider]
         if (!file) return null
-        const extension = file.type === 'image/jpeg' ? 'jpg' : file.type.split('/')[1]
-        const storagePath = `payment-qr/${provider}/${user.uid}/${Date.now()}-${crypto.randomUUID()}.${extension}`
-        const uploadRef = ref(storage, storagePath)
-        uploadedRefs.push(uploadRef)
-        const upload = await uploadBytes(uploadRef, file, { contentType: file.type })
-        const url = await getDownloadURL(upload.ref)
-        return { provider, url, storagePath }
+        const url = await uploadImageToCloudinary(file)
+        return { provider, url }
       }))
       const failedUpload = uploadResults.find((result) => result.status === 'rejected')
       if (failedUpload?.status === 'rejected') throw failedUpload.reason
@@ -342,7 +335,7 @@ export function AdminAccountPage({ role = 'farmer' }: { role?: 'farmer' | 'cces_
       )
       for (const result of uploadedQr) {
         nextSettings[`${result.provider}QrUrl`] = result.url
-        nextSettings[`${result.provider}QrPath`] = result.storagePath
+        nextSettings[`${result.provider}QrPath`] = ''
       }
       for (const provider of ['gcash', 'maya'] as const) {
         if (removeQr[provider] && !qrFiles[provider]) {
@@ -358,28 +351,9 @@ export function AdminAccountPage({ role = 'farmer' }: { role?: 'farmer' | 'cces_
       setQrFiles({ gcash: null, maya: null })
       setQrInputRevision((current) => ({ gcash: current.gcash + 1, maya: current.maya + 1 }))
       setRemoveQr({ gcash: false, maya: false })
-      const obsoletePaths = (['gcash', 'maya'] as const)
-        .map((provider) => ({
-          oldPath: storeSettings[`${provider}QrPath`],
-          newPath: nextSettings[`${provider}QrPath`],
-        }))
-        .filter(({ oldPath, newPath }) => oldPath && oldPath !== newPath)
-
       setSettingsNotice('Pickup and payment settings have been saved.')
-      void Promise.allSettled(obsoletePaths.map(({ oldPath }) => deleteObject(ref(storage, oldPath))))
-        .then((results) => {
-          const failures = results.filter((result) => result.status === 'rejected')
-          failures.forEach((failure) => console.error('Removing replaced payment QR image failed:', failure.reason))
-          if (failures.length > 0) {
-            setSettingsNotice('Settings were saved, but an old QR image could not be removed.')
-          }
-        })
     } catch (saveError) {
       console.error('Saving store settings failed:', saveError)
-      void Promise.allSettled(uploadedRefs.map((uploadRef) => deleteObject(uploadRef)))
-        .then((results) => results
-          .filter((result) => result.status === 'rejected')
-          .forEach((failure) => console.error('Cleaning up an unused payment QR image failed:', failure.reason)))
       setSettingsError('Unable to save pickup and payment settings. Please try again.')
     } finally {
       setIsSavingSettings(false)
