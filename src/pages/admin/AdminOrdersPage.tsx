@@ -4,6 +4,7 @@ import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { db } from '../../firebase/firestore'
 import { formatMonthDayYearTime } from '../../utils/dateFormat'
+import { isOrderEligibleForFinancialTotals } from '../../utils/orderFinancials'
 import styles from './AdminOrdersPage.module.css'
 
 type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PACKED' | 'DELIVERED' | 'CANCELLED'
@@ -17,6 +18,7 @@ type Order = {
   createdAtTime: number
   status: OrderStatus
   payment: string
+  paymentStatus: string
   deliveryFee: number
   tax: number
   total: number
@@ -78,6 +80,7 @@ function OrderDetails({ order, onAdvance, onBack, isUpdating, isArchived }: { or
   const statusIndex = statusOrder.indexOf(order.status)
   const previousStatus = statusOrder[statusIndex - 1]
   const nextStatus = statusOrder[statusIndex + 1]
+  const isTerminal = order.status === 'CANCELLED' || order.paymentStatus === 'rejected'
   return (
     <section className={styles.details}>
       <div className={styles.customer}>
@@ -102,7 +105,7 @@ function OrderDetails({ order, onAdvance, onBack, isUpdating, isArchived }: { or
         <div className={styles.itemRow}><span>TAX 5%</span><span>-</span><span>{currency(tax)}</span><strong>{currency(tax)}</strong></div>
         <div className={styles.totalRow}><strong>TOTAL</strong><strong>{currency(total)}</strong></div>
       </div>
-      {!isArchived && <div className={styles.detailFooter}>
+      {!isArchived && !isTerminal && <div className={styles.detailFooter}>
         {previousStatus && (
           <button
             disabled={isUpdating}
@@ -156,7 +159,10 @@ export function AdminOrdersPage() {
         const loadedOrders: Order[] = snapshot.docs.map((orderDocument) => {
           const data = orderDocument.data()
           const rawStatus = typeof data.status === 'string' ? data.status.toUpperCase() : 'PENDING'
-          const status = statusOrder.includes(rawStatus as OrderStatus) ? rawStatus as OrderStatus : 'PENDING'
+          const paymentStatus = typeof data.paymentStatus === 'string' ? data.paymentStatus.toLowerCase() : ''
+          const status = rawStatus === 'CANCELLED' || rawStatus === 'REJECTED' || paymentStatus === 'rejected'
+            ? 'CANCELLED'
+            : statusOrder.includes(rawStatus as OrderStatus) ? rawStatus as OrderStatus : 'PENDING'
           const parsedDate = parseOrderDate(data.createdAt)
           const date = parsedDate ? formatMonthDayYearTime(parsedDate) : 'Pending'
           const createdAtTime = parsedDate ? parsedDate.getTime() : 0
@@ -171,6 +177,7 @@ export function AdminOrdersPage() {
             createdAtTime,
             status,
             payment: typeof data.paymentMethod === 'string' ? data.paymentMethod : '',
+            paymentStatus,
             deliveryFee: typeof data.deliveryFee === 'number' ? data.deliveryFee : 0,
             tax: typeof data.tax === 'number' ? data.tax : 0,
             total: typeof data.total === 'number' ? data.total : 0,
@@ -211,7 +218,9 @@ export function AdminOrdersPage() {
     return orders.filter((order) => {
       if (statusFilter && order.status !== statusFilter) return false
       if (!statusFilter && !showAllOrders) {
-        const matchesArchive = archive ? order.status === 'DELIVERED' : order.status !== 'DELIVERED'
+        const matchesArchive = archive
+          ? order.status === 'DELIVERED'
+          : order.status !== 'DELIVERED' && order.status !== 'CANCELLED'
         if (!matchesArchive) return false
       }
       if (!query) return true
@@ -225,10 +234,11 @@ export function AdminOrdersPage() {
   const selected = visibleOrders.find((order) => order.id === selectedId) ?? visibleOrders[0]
   const counts = statusOrder.reduce<Record<OrderStatus, number>>((result, status) => ({ ...result, [status]: orders.filter((order) => order.status === status).length }), {} as Record<OrderStatus, number>)
   const completedOrders = orders.filter((order) => order.status === 'DELIVERED')
-  const completedSales = completedOrders.reduce((sum, order) => sum + order.total, 0)
+  const completedSales = completedOrders.reduce((sum, order) =>
+    isOrderEligibleForFinancialTotals(order) ? sum + order.total : sum, 0)
 
   async function updateSelectedStatus(direction: -1 | 1) {
-    if (!selected) return
+    if (!selected || selected.status === 'CANCELLED' || selected.paymentStatus === 'rejected') return
     const targetStatus = statusOrder[statusOrder.indexOf(selected.status) + direction]
     if (!targetStatus) return
     setError('')
@@ -283,7 +293,7 @@ export function AdminOrdersPage() {
                 <p>Track and manage orders still being fulfilled.</p>
               </div>
               <div className={styles.archiveMetrics}>
-                <div><strong>{orders.filter((order) => order.status !== 'DELIVERED').length}</strong><span>ACTIVE ORDERS</span></div>
+                <div><strong>{orders.filter((order) => order.status !== 'DELIVERED' && order.status !== 'CANCELLED').length}</strong><span>ACTIVE ORDERS</span></div>
                 <div><strong>{counts.PENDING}</strong><span>AWAITING CONFIRMATION</span></div>
               </div>
             </section>

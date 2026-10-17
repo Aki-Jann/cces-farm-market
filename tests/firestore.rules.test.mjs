@@ -527,6 +527,67 @@ test('Farmers can verify an online payment but cannot claim verification as a Cu
   }))
 })
 
+test('Farmers can mark an active unpaid COD order as paid only once', async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'orders/cod-unpaid'), {
+      userId: 'customer-a',
+      paymentMethod: 'COD',
+      paymentStatus: 'unpaid',
+      status: 'pending',
+    })
+    await setDoc(doc(context.firestore(), 'orders/cod-cancelled'), {
+      userId: 'customer-a',
+      paymentMethod: 'COD',
+      paymentStatus: 'unpaid',
+      status: 'cancelled',
+    })
+    await setDoc(doc(context.firestore(), 'orders/cod-rejected'), {
+      userId: 'customer-a',
+      paymentMethod: 'COD',
+      paymentStatus: 'rejected',
+      status: 'cancelled',
+    })
+    await setDoc(doc(context.firestore(), 'orders/rejected-active'), {
+      userId: 'customer-a',
+      paymentMethod: 'COD',
+      paymentStatus: 'rejected',
+      status: 'pending',
+    })
+  })
+
+  const farmerDb = environment.authenticatedContext('admin-a').firestore()
+  await assertSucceeds(updateDoc(doc(farmerDb, 'orders/cod-unpaid'), {
+    paymentStatus: 'paid',
+    paymentVerifiedAt: serverTimestamp(),
+    paymentVerifiedBy: 'admin-a',
+  }))
+  await assertFails(updateDoc(doc(farmerDb, 'orders/cod-unpaid'), {
+    paymentStatus: 'paid',
+    paymentVerifiedAt: serverTimestamp(),
+    paymentVerifiedBy: 'admin-a',
+  }))
+  await assertFails(updateDoc(doc(farmerDb, 'orders/cod-cancelled'), {
+    paymentStatus: 'paid',
+    paymentVerifiedAt: serverTimestamp(),
+    paymentVerifiedBy: 'admin-a',
+  }))
+  await assertFails(updateDoc(doc(farmerDb, 'orders/cod-rejected'), {
+    paymentStatus: 'paid',
+    paymentVerifiedAt: serverTimestamp(),
+    paymentVerifiedBy: 'admin-a',
+  }))
+  await assertFails(updateDoc(doc(farmerDb, 'orders/cod-cancelled'), { status: 'confirmed' }))
+  await assertFails(updateDoc(doc(farmerDb, 'orders/rejected-active'), { status: 'confirmed' }))
+  await assertFails(updateDoc(doc(farmerDb, 'orders/rejected-active'), { paymentStatus: 'paid' }))
+
+  const ccesAdminDb = environment.authenticatedContext('cces-admin-a').firestore()
+  await assertFails(updateDoc(doc(ccesAdminDb, 'orders/cod-unpaid'), {
+    paymentStatus: 'paid',
+    paymentVerifiedAt: serverTimestamp(),
+    paymentVerifiedBy: 'cces-admin-a',
+  }))
+})
+
 test('Farmers can reject a pending online payment and restore stock atomically', async () => {
   const customerDb = environment.authenticatedContext('customer-a').firestore()
   await assertSucceeds(submitCustomerOrder(
@@ -579,6 +640,8 @@ test('Farmers can reject a pending online payment and restore stock atomically',
   assert.equal(orderSnapshot.data().paymentStatus, 'rejected')
   assert.equal(productSnapshot.data().stock, 10)
   assert.equal(productSnapshot.data().sold, 0)
+  await assertFails(updateDoc(doc(farmerDb, 'orders/order-to-reject'), { status: 'confirmed' }))
+  await assertFails(updateDoc(doc(farmerDb, 'orders/order-to-reject'), { paymentStatus: 'paid' }))
 
   await assertFails(runTransaction(farmerDb, async (transaction) => {
     const orderRef = doc(farmerDb, 'orders/order-to-reject')

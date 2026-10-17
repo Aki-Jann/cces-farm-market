@@ -121,7 +121,11 @@ function PaymentReviewActions({ payment }: { payment: PaymentRecord }) {
     }
   }
 
-  if (payment.paymentStatus !== 'awaiting_verification' || !payment.paymentReceiptUrl) return null
+  if (
+    !['GCASH', 'MAYA'].includes(payment.method) ||
+    payment.paymentStatus !== 'awaiting_verification' ||
+    !payment.paymentReceiptUrl
+  ) return null
 
   return (
     <>
@@ -145,6 +149,73 @@ function PaymentReviewActions({ payment }: { payment: PaymentRecord }) {
       </span>
       {payment.orderStatus !== 'pending' && (
         <span className={styles.reviewMessage}>Only pending orders can be rejected.</span>
+      )}
+      {message && <span className={styles.reviewMessage} role="status">{message}</span>}
+    </>
+  )
+}
+
+function CodPaymentAction({ payment }: { payment: PaymentRecord }) {
+  const [isUpdating, setIsUpdating] = useState(false)
+  const [message, setMessage] = useState('')
+
+  async function markAsPaid() {
+    setIsUpdating(true)
+    setMessage('')
+    try {
+      const verifierId = auth.currentUser?.uid
+      if (!verifierId) throw new Error('Log in again before updating this payment.')
+      const orderRef = doc(db, 'orders', payment.firestoreId)
+      await runTransaction(db, async (transaction) => {
+        const orderSnapshot = await transaction.get(orderRef)
+        if (!orderSnapshot.exists()) throw new Error('The order could not be found.')
+        const order = orderSnapshot.data()
+        const orderStatus = typeof order.status === 'string' ? order.status.toLowerCase() : ''
+        if (normalizePaymentMethod(order.paymentMethod ?? '') !== 'COD') {
+          throw new Error('Only COD orders can be marked as paid.')
+        }
+        if (order.paymentStatus !== 'unpaid') {
+          throw new Error('This payment is no longer unpaid.')
+        }
+        if (!['pending', 'confirmed', 'packed', 'delivered'].includes(orderStatus)) {
+          throw new Error('Cancelled or rejected orders cannot be marked as paid.')
+        }
+
+        transaction.update(orderRef, {
+          paymentStatus: 'paid',
+          paymentVerifiedAt: serverTimestamp(),
+          paymentVerifiedBy: verifierId,
+        })
+      })
+      setMessage('COD payment marked as paid.')
+    } catch (paymentError) {
+      console.error('Marking COD payment as paid failed:', paymentError)
+      setMessage(paymentError instanceof Error
+        ? paymentError.message
+        : 'Unable to update payment status. Please try again.')
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const orderStatus = payment.orderStatus.toLowerCase()
+  const canMarkAsPaid = payment.method === 'COD' &&
+    payment.paymentStatus === 'unpaid' &&
+    ['pending', 'confirmed', 'packed', 'delivered'].includes(orderStatus)
+
+  if (!canMarkAsPaid && !message) return null
+
+  return (
+    <>
+      {canMarkAsPaid && (
+        <button
+          type="button"
+          className={styles.reviewButton}
+          disabled={isUpdating}
+          onClick={() => void markAsPaid()}
+        >
+          {isUpdating ? 'UPDATING...' : 'MARK AS PAID'}
+        </button>
       )}
       {message && <span className={styles.reviewMessage} role="status">{message}</span>}
     </>
@@ -226,11 +297,12 @@ function PaymentTable({
               <span className={styles.receiptCell}>
                 {payment.method === 'GCASH' || payment.method === 'MAYA'
                   ? payment.paymentReceiptUrl
-                    ? <a href={payment.paymentReceiptUrl} target="_blank" rel="noreferrer" aria-label={`View payment receipt for order ${payment.orderId}`}><img src={payment.paymentReceiptUrl} alt={`Payment receipt for order ${payment.orderId}`} /><span>View receipt</span></a>
+                    ? <a href={payment.paymentReceiptUrl} target="_blank" rel="noreferrer" aria-label={`View payment receipt for order ${payment.orderId}`}>View receipt</a>
                     : <span className={styles.receiptMissing}>Not uploaded</span>
                   : <span className={styles.receiptNotRequired}>Not required</span>}
                 <span className={styles.paymentStatus}>{payment.paymentStatus.replaceAll('_', ' ')}</span>
                 <PaymentReviewActions payment={payment} />
+                <CodPaymentAction payment={payment} />
               </span>
               <strong>{currency(payment.amount)}</strong>
             </div>

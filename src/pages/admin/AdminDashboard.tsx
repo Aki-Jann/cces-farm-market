@@ -6,10 +6,11 @@ import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import { formatMonthDayYear } from '../../utils/dateFormat'
+import { isOrderEligibleForFinancialTotals } from '../../utils/orderFinancials'
 import styles from './AdminDashboard.module.css'
 
 type RevenuePoint = { day: string; amount: number; isToday: boolean; fill: 'green' | 'today' | 'empty' }
-type RecentOrder = { id: string; customer: string; total: number; status: 'PENDING' | 'CONFIRMED' | 'PACKED' | 'DELIVERED'; createdAtTime: number }
+type RecentOrder = { id: string; customer: string; total: number; status: 'PENDING' | 'CONFIRMED' | 'PACKED' | 'DELIVERED' | 'CANCELLED'; createdAtTime: number }
 type InventoryItem = { name: string; category: string; stock: string; stockNum: number; isAvailable: boolean }
 
 type FirestoreOrder = {
@@ -18,6 +19,7 @@ type FirestoreOrder = {
   customerName?: string
   total: number
   status: string
+  paymentStatus: string
   createdAt: unknown
 }
 
@@ -193,6 +195,7 @@ export function AdminDashboard() {
             customerName: typeof data.customerName === 'string' ? data.customerName : undefined,
             total: typeof data.total === 'number' ? data.total : 0,
             status: typeof data.status === 'string' ? data.status : 'pending',
+            paymentStatus: typeof data.paymentStatus === 'string' ? data.paymentStatus : '',
             createdAt: data.createdAt,
           }
         })
@@ -283,12 +286,13 @@ export function AdminDashboard() {
       const total = typeof order.total === 'number' ? order.total : 0
       const rawStatus = (order.status || 'pending').toUpperCase()
       const normalizedStatus: RecentOrder['status'] =
-        rawStatus === 'DELIVERED' ? 'DELIVERED' :
-        rawStatus === 'CONFIRMED' ? 'CONFIRMED' :
-        rawStatus === 'PACKED' ? 'PACKED' : 'PENDING'
+      ['CANCELLED', 'CANCELED', 'REJECTED'].includes(rawStatus) || order.paymentStatus.toLowerCase() === 'rejected' ? 'CANCELLED' :
+      rawStatus === 'DELIVERED' ? 'DELIVERED' :
+      rawStatus === 'CONFIRMED' ? 'CONFIRMED' :
+      rawStatus === 'PACKED' ? 'PACKED' : 'PENDING'
 
-      if (normalizedStatus !== 'DELIVERED') {
-        activeOrders += 1
+      if (normalizedStatus !== 'DELIVERED' && normalizedStatus !== 'CANCELLED') {
+      activeOrders += 1
       }
 
       parsedOrders.push({
@@ -298,6 +302,8 @@ export function AdminDashboard() {
         status: normalizedStatus,
         createdAtTime: time,
       })
+
+      if (!isOrderEligibleForFinancialTotals(order)) return
 
       days.forEach((day) => {
         if (time >= day.start && time <= day.end) {
