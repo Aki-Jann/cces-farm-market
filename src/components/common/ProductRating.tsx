@@ -113,6 +113,7 @@ export function ProductRating({ productId, showReviews = false }: { productId?: 
               <div
                 className={styles.reviewsOverlay}
                 onClick={(event) => {
+                  event.stopPropagation()
                   if (event.target === event.currentTarget) setAreReviewsOpen(false)
                 }}
               >
