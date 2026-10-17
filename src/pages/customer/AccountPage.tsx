@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { onAuthStateChanged } from 'firebase/auth'
+import { onAuthStateChanged, sendPasswordResetEmail } from 'firebase/auth'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
 import { Header } from '../../components/layout/Header'
@@ -38,6 +38,9 @@ export function AccountPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
+  const [isSendingReset, setIsSendingReset] = useState(false)
+  const [resetError, setResetError] = useState('')
+  const [resetNotice, setResetNotice] = useState('')
 
   useEffect(() => {
     let isMounted = true
@@ -137,6 +140,27 @@ export function AccountPage() {
     }
   }
 
+  async function sendPasswordReset() {
+    const email = auth.currentUser?.email
+    if (!email) {
+      setResetError('Your account does not have an email address for password recovery.')
+      return
+    }
+
+    setResetError('')
+    setResetNotice('')
+    setIsSendingReset(true)
+    try {
+      await sendPasswordResetEmail(auth, email)
+      setResetNotice(`A password reset link was sent to ${email}.`)
+    } catch (resetEmailError) {
+      console.error('Sending customer password reset email failed:', resetEmailError)
+      setResetError('Unable to send a password reset link. Please try again.')
+    } finally {
+      setIsSendingReset(false)
+    }
+  }
+
   if (isLoading) {
     return <main className={styles.page}><CustomerSidebar active="account" /><section className={styles.content}><Header title="MY ACCOUNT" /><section className={styles.card}><p>Loading account information...</p></section></section></main>
   }
@@ -188,6 +212,17 @@ export function AccountPage() {
               <div><dt>Birthday</dt><dd>{account.birthday}</dd></div>
             </dl>
           )}
+          <div className={styles.security}>
+            <div>
+              <h3>Password</h3>
+              <p>Send a password reset link to your account email address.</p>
+            </div>
+            <button type="button" disabled={isSendingReset} onClick={() => void sendPasswordReset()}>
+              {isSendingReset ? 'SENDING...' : 'SEND RESET LINK'}
+            </button>
+          </div>
+          {resetError && <p className={styles.resetError} role="alert">{resetError}</p>}
+          {resetNotice && <p className={styles.resetNotice} role="status">{resetNotice}</p>}
         </section>
       </section>
     </main>
