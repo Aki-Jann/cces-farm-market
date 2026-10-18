@@ -40,7 +40,7 @@ function canAccessRoute(role: UserRole | null, route: Route) {
   if (role === 'admin') {
     return ['admin', 'admin-orders', 'admin-payment', 'admin-products', 'admin-customers', 'admin-analytics', 'admin-account'].includes(route)
   }
-  return role === 'cces_admin' && ['admin-analytics', 'admin-account'].includes(route)
+  return role === 'cces_admin' && ['admin', 'admin-analytics', 'admin-account'].includes(route)
 }
 
 function homeForRole(role: UserRole | null) {
@@ -149,7 +149,7 @@ function App() {
   }
 
   if (route === 'admin') {
-    return <AdminDashboard />
+    return <AdminDashboard role={role === 'cces_admin' ? 'cces_admin' : 'farmer'} />
   }
 
   if (route === 'admin-orders') {

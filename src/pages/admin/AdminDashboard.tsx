@@ -64,14 +64,15 @@ function formatCategory(category?: string): string {
   return category.charAt(0).toUpperCase() + category.slice(1).toLowerCase()
 }
 
-function StatCard({ label, value, note, href }: { label: string; value: string; note: string; href: string }) {
+function StatCard({ label, value, note, href }: { label: string; value: string; note: string; href?: string }) {
+  const Card = href ? 'a' : 'div'
   return (
-    <a className={styles.statCard} href={href}>
+    <Card className={styles.statCard} href={href}>
       <h2>{label}</h2>
       <strong>{value}</strong>
       <p>{note}</p>
-      <span className={styles.cardArrow} aria-hidden="true">→</span>
-    </a>
+      {href && <span className={styles.cardArrow} aria-hidden="true">→</span>}
+    </Card>
   )
 }
 
@@ -96,20 +97,21 @@ function RevenueChart({ revenue }: { revenue: RevenuePoint[] }) {
   )
 }
 
-function RecentOrders({ orders }: { orders: RecentOrder[] }) {
+function RecentOrders({ orders, readOnly = false }: { orders: RecentOrder[]; readOnly?: boolean }) {
+  const Row = readOnly ? 'div' : 'a'
   return (
     <section className={styles.bottomPanel}>
-      <div className={styles.panelHeading}><h2>RECENT ORDERS</h2><a href="#/admin/orders">See more</a></div>
+      <div className={styles.panelHeading}><h2>RECENT ORDERS</h2>{!readOnly && <a href="#/admin/orders">See more</a>}</div>
       <div className={styles.orderList}>
         {orders.length === 0 ? (
           <p style={{ color: '#6c7175', fontSize: '13px', margin: '16px 0' }}>No orders found.</p>
         ) : (
           orders.slice(0, 4).map((order) => (
-            <a className={styles.orderRow} href="#/admin/orders" key={order.id} aria-label={`Open orders to view ${order.id}, ${order.status}`}>
+            <Row className={styles.orderRow} href={readOnly ? undefined : '#/admin/orders'} key={order.id} aria-label={readOnly ? `Order ${order.id}, ${order.status}` : `Open orders to view ${order.id}, ${order.status}`}>
               <div><strong>{order.customer}</strong><small>{order.id}</small></div>
               <span className={`${styles.status} ${styles[order.status.toLowerCase()]}`}>{order.status}</span>
               <strong>{currency(order.total)}</strong>
-            </a>
+            </Row>
           ))
         )}
       </div>
@@ -117,19 +119,20 @@ function RecentOrders({ orders }: { orders: RecentOrder[] }) {
   )
 }
 
-function ProductInventory({ items }: { items: InventoryItem[] }) {
+function ProductInventory({ items, readOnly = false }: { items: InventoryItem[]; readOnly?: boolean }) {
+  const Row = readOnly ? 'div' : 'a'
   return (
     <section className={styles.bottomPanel}>
-      <div className={styles.panelHeading}><h2>PRODUCT INVENTORY</h2><a href="#/admin/products">See more</a></div>
+      <div className={styles.panelHeading}><h2>PRODUCT INVENTORY</h2>{!readOnly && <a href="#/admin/products">See more</a>}</div>
       <div className={styles.inventoryList}>
         {items.length === 0 ? (
           <p style={{ color: '#6c7175', fontSize: '13px', margin: '16px 0' }}>No products found.</p>
         ) : (
           items.slice(0, 4).map((item) => (
-            <a className={styles.inventoryRow} href="#/admin/products" key={item.name} aria-label={`Open product inventory to manage ${item.name}`}>
+            <Row className={styles.inventoryRow} href={readOnly ? undefined : '#/admin/products'} key={item.name} aria-label={readOnly ? `Inventory for ${item.name}` : `Open product inventory to manage ${item.name}`}>
               <div><strong>{item.name}</strong><small>{item.category}</small></div>
               <strong>{item.stock}</strong>
-            </a>
+            </Row>
           ))
         )}
       </div>
@@ -137,7 +140,8 @@ function ProductInventory({ items }: { items: InventoryItem[] }) {
   )
 }
 
-export function AdminDashboard() {
+export function AdminDashboard({ role = 'farmer' }: { role?: 'farmer' | 'cces_admin' }) {
+  const readOnly = role === 'cces_admin'
   const [search, setSearch] = useState('')
   const [adminName, setAdminName] = useState('')
   const [orders, setOrders] = useState<FirestoreOrder[]>([])
@@ -161,7 +165,7 @@ export function AdminDashboard() {
       unsubscribeProfile = onSnapshot(
         doc(db, 'users', user.uid),
         (snapshot) => {
-          if (!snapshot.exists() || snapshot.data().role !== 'admin') return
+          if (!snapshot.exists() || !['admin', 'cces_admin'].includes(snapshot.data().role)) return
           const data = snapshot.data()
           const profileName = [data.firstName, data.lastName]
             .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
@@ -392,7 +396,7 @@ export function AdminDashboard() {
 
   return (
     <main className={styles.page}>
-      <AdminSidebar active="dashboard" />
+      <AdminSidebar active="dashboard" role={role} />
       <section className={styles.content}>
         <Header title="DASHBOARD" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
         <div className={styles.dashboard}>
@@ -404,10 +408,12 @@ export function AdminDashboard() {
             </div>
             <div className={styles.welcomeMeta}>
               <time>{todayLabel}</time>
-              <div className={styles.quickLinks}>
-                <a href="#/admin/orders">VIEW ORDERS</a>
-                <a href="#/admin/products">MANAGE PRODUCTS</a>
-              </div>
+              {!readOnly && (
+                <div className={styles.quickLinks}>
+                  <a href="#/admin/orders">VIEW ORDERS</a>
+                  <a href="#/admin/products">MANAGE PRODUCTS</a>
+                </div>
+              )}
             </div>
           </section>
           <section className={styles.stats}>
@@ -421,25 +427,25 @@ export function AdminDashboard() {
               label="ACTIVE ORDERS"
               value={isLoading ? '...' : activeOrdersCount.toLocaleString()}
               note={isLoading ? 'Loading...' : `${activeOrdersCount} need attention`}
-              href="#/admin/orders"
+              href={readOnly ? undefined : '#/admin/orders'}
             />
             <StatCard
               label="FRESH INVENTORY"
               value={isLoading ? '...' : `${totalFreshStock.toLocaleString()}kg`}
               note="Across all crops"
-              href="#/admin/products"
+              href={readOnly ? undefined : '#/admin/products'}
             />
             <StatCard
               label="LISTED PRODUCTS"
               value={isLoading ? '...' : availableProductsCount.toLocaleString()}
               note={`of ${totalProductsCount} total`}
-              href="#/admin/products"
+              href={readOnly ? undefined : '#/admin/products'}
             />
           </section>
           <RevenueChart revenue={revenuePoints} />
           <div className={styles.bottomPanels}>
-            <RecentOrders orders={filteredOrders} />
-            <ProductInventory items={filteredInventory} />
+            <RecentOrders orders={filteredOrders} readOnly={readOnly} />
+            <ProductInventory items={filteredInventory} readOnly={readOnly} />
           </div>
         </div>
       </section>
