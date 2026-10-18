@@ -176,7 +176,7 @@ export function MessagesPage() {
             </div>
             {error && messages.length > 0 && <p className={styles.sendError} role="alert">{error}</p>}
             <form className={styles.composer} onSubmit={sendMessage}>
-              <input value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Write a message..." aria-label="Message" />
+              <input value={draft} onChange={(event) => setDraft(event.target.value)} spellCheck autoCapitalize="sentences" autoCorrect="on" placeholder="Write a message..." aria-label="Message" />
               <button disabled={isSending || !draft.trim()} type="submit">
                 <span>{isSending ? 'SENDING' : 'SEND'}</span>
                 <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>

@@ -34,11 +34,13 @@
 .statusFilters button.activeFilter span { background: rgb(255 255 255 / 20%); color: #fff; }
 .tableHeader { align-items: center; display: grid; gap: 12px; grid-template-columns: 1.4fr 1fr 1fr 1fr 1.2fr 1fr; text-align: center; }
 .tableHeader { border-bottom: 1px solid #d9d9d9; color: #6c7175; font-size: 12px; font-weight: 700; padding: 0 16px 14px; text-transform: uppercase; }
+.orderPlacedNotice { background: #eaf5ed; border: 1px solid #cfe0d3; border-radius: var(--radius-control); color: #017632; font-size: 13px; font-weight: 600; margin: 0 0 14px; padding: 12px 14px; }
 .orderList { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
 .orderGroup { border: 1px solid var(--color-border); border-radius: var(--radius-control); overflow: hidden; }
 .orderLine { align-items: stretch; background: #fff; display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 1.2fr 1fr; }
 .orderRow { align-items: center; background: #fff; border: 0; cursor: pointer; display: grid; font: inherit; font-size: 14px; gap: 12px; grid-column: 1 / 6; grid-row: 1; grid-template-columns: 1.4fr 1fr 1fr 1fr 1.2fr; min-height: 63px; padding: 16px; text-align: center; width: 100%; }
 .orderRow:hover, .orderRow:focus-visible { background: #f7faf8; outline: 0; }
+.orderRow[aria-expanded='true'] { background: #f7faf8; font-weight: 700; }
 .receiptColumn { align-items: center; display: flex; font-size: 11px; grid-column: 6; grid-row: 1; justify-content: center; padding: 8px; text-align: center; }
 .receiptAction { background: #eff7f0; border: 1px solid #dcecdf; border-radius: 6px; color: #087b3b; font-size: 10px; font-weight: 700; padding: 7px 9px; text-decoration: none; white-space: nowrap; }
 .receiptAction:hover { background: #e2f0e5; border-color: #b8d8bf; }
@@ -64,8 +66,8 @@
 .clearSearchButton:hover { background: #015c27; }
 .clearSearchButton:focus-visible { outline: 2px solid #017632; outline-offset: 3px; }
 
-.details { background: var(--color-surface-muted); border-top: 1px solid var(--color-border); padding: 18px; }
-.detailsHeading { align-items: center; display: flex; justify-content: space-between; margin-bottom: 14px; }
+.details { background: #eef5f0; border-top: 3px solid #017632; padding: 18px; }
+.detailsHeading { align-items: center; border-bottom: 1px solid #cfe0d3; display: flex; justify-content: space-between; margin-bottom: 14px; padding-bottom: 12px; }
 .detailsHeading h2 { color: #017632; font-size: 17px; margin: 0; }
 .detailsHeading p { color: #6c7175; font-size: 12px; margin: 3px 0 0; }
 .detailsStatus { border-radius: 999px; font-size: 10px; font-weight: 700; padding: 6px 9px; white-space: nowrap; }

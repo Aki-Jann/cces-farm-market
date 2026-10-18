@@ -253,6 +253,13 @@ export function OrdersPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null)
   const [deliveryError, setDeliveryError] = useState<{ orderId: string; message: string } | null>(null)
+  const [placedPayment] = useState(() => {
+    try {
+      return sessionStorage.getItem('cces-farm-market-order-placed') ?? ''
+    } catch {
+      return ''
+    }
+  })
   const emptyState = window.location.hash.includes('empty')
   const visibleOrders = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -269,6 +276,15 @@ export function OrdersPage() {
   function countOrders(filter: OrderStatusFilter) {
     return filter === 'ALL' ? orders.length : orders.filter((order) => order.status === filter).length
   }
+
+  useEffect(() => {
+    // The notice is only shown once, right after checkout.
+    try {
+      sessionStorage.removeItem('cces-farm-market-order-placed')
+    } catch (storageError) {
+      console.error('Clearing order confirmation failed:', storageError)
+    }
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -389,6 +405,11 @@ export function OrdersPage() {
       <section className={styles.ordersContent}>
         <Header title="ORDERS" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
         <section className={styles.orderPanel}>
+          {placedPayment && (
+            <p className={styles.orderPlacedNotice} role="status">
+              Order placed! Payment method: {placedPayment}.{placedPayment !== 'Cash on Delivery (COD)' && ' The seller will verify your receipt.'}
+            </p>
+          )}
           <nav className={styles.statusFilters} aria-label="Filter orders by status">
             {orderFilters.map((filter) => (
               <button

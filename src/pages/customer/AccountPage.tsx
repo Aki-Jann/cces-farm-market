@@ -27,6 +27,8 @@ function formatBirthday(value: unknown) {
   return 'Not provided'
 }
 
+const hiddenValue = '••••••••'
+
 function accountName(account: AccountData) {
   return `${account.firstName} ${account.lastName}`.trim() || 'Customer'
 }
@@ -35,6 +37,7 @@ export function AccountPage() {
   const [account, setAccount] = useState<AccountData | null>(null)
   const [draft, setDraft] = useState<AccountData | null>(null)
   const [editing, setEditing] = useState(false)
+  const [detailsHidden, setDetailsHidden] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
@@ -182,7 +185,7 @@ export function AccountPage() {
                 <h2>{accountName(account)}</h2>
                 <span className={styles.role}>CUSTOMER</span>
               </div>
-              <p>{account.email}</p>
+              <p>{detailsHidden ? hiddenValue : account.email}</p>
             </div>
             <a href="#/" className={styles.logout}>LOG OUT</a>
           </div>
@@ -191,7 +194,12 @@ export function AccountPage() {
               <h3>Personal information</h3>
               <p>Manage the details associated with your account.</p>
             </div>
-            {!editing && <button type="button" onClick={() => { setDraft(account); setEditing(true) }}>EDIT PROFILE</button>}
+            {!editing && (
+              <div className={styles.headingActions}>
+                <button type="button" aria-pressed={detailsHidden} onClick={() => setDetailsHidden((hidden) => !hidden)}>{detailsHidden ? 'SHOW DETAILS' : 'HIDE DETAILS'}</button>
+                <button type="button" onClick={() => { setDraft(account); setEditing(true) }}>EDIT PROFILE</button>
+              </div>
+            )}
           </div>
           {editing ? (
             <form className={styles.form} onSubmit={save}>
@@ -206,10 +214,10 @@ export function AccountPage() {
             <dl className={styles.details}>
               <div><dt>First Name</dt><dd>{account.firstName || 'Not provided'}</dd></div>
               <div><dt>Last Name</dt><dd>{account.lastName || 'Not provided'}</dd></div>
-              <div><dt>Email Address</dt><dd>{account.email}</dd></div>
-              <div><dt>Contact Number</dt><dd>{account.contact}</dd></div>
-              <div><dt>Address</dt><dd>{account.address}</dd></div>
-              <div><dt>Birthday</dt><dd>{account.birthday}</dd></div>
+              <div><dt>Email Address</dt><dd>{detailsHidden ? hiddenValue : account.email}</dd></div>
+              <div><dt>Contact Number</dt><dd>{detailsHidden ? hiddenValue : account.contact}</dd></div>
+              <div><dt>Address</dt><dd>{detailsHidden ? hiddenValue : account.address}</dd></div>
+              <div><dt>Birthday</dt><dd>{detailsHidden ? hiddenValue : account.birthday}</dd></div>
             </dl>
           )}
           <div className={styles.security}>

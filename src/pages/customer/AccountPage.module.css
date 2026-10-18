@@ -111,6 +111,12 @@
   margin: 4px 0 0;
 }
 
+.headingActions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
 .sectionHeading button {
   background: #eaf5ed;
   border: 0;
@@ -182,8 +188,8 @@
 }
 
 .form input {
-  background: #fafbfa;
-  border: 1px solid #d9e0db;
+  background: #fff;
+  border: 1px solid #9aa89f;
   border-radius: 5px;
   color: #191919;
   font: inherit;
@@ -331,6 +337,10 @@
   .sectionHeading {
     align-items: flex-start;
     padding-top: 18px;
+  }
+
+  .headingActions {
+    flex-direction: column;
   }
 
   .details {
