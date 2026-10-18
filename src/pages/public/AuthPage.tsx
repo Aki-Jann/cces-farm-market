@@ -17,6 +17,9 @@ type FieldProps = {
   value?: string
   onChange?: (event: ChangeEvent<HTMLInputElement>) => void
   error?: string
+  required?: boolean
+  autoComplete?: string
+  hint?: string
 }
 
 type RegistrationFields = {
@@ -74,11 +77,13 @@ function DateField({
   value = '',
   onChange,
   error,
+  required,
 }: {
   label: string
   value?: string
   onChange?: (value: string) => void
   error?: string
+  required?: boolean
 }) {
   const pickerRef = useRef<HTMLInputElement>(null)
   const [dateText, setDateText] = useState(() => formatDateInput(value))
@@ -86,7 +91,7 @@ function DateField({
 
   return (
     <label className={styles.field}>
-      <span>{label}</span>
+      <span>{label}{required && <b className={styles.required} aria-hidden="true"> *</b>}</span>
       <div className={styles.dateInputGroup}>
         <input
           className={styles.dateTextInput}
@@ -137,16 +142,16 @@ function DateField({
   )
 }
 
-function Field({ label, placeholder, type = 'text', value, onChange, error }: FieldProps) {
+function Field({ label, placeholder, type = 'text', value, onChange, error, required, autoComplete, hint }: FieldProps) {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
   const isPassword = type === 'password'
 
   return (
     <label className={styles.field}>
-      <span>{label}</span>
+      <span>{label}{required && <b className={styles.required} aria-hidden="true"> *</b>}</span>
       {isPassword ? (
         <div className={styles.inputWithAction}>
-          <input type={isPasswordVisible ? 'text' : 'password'} placeholder={placeholder} value={value} onChange={onChange} aria-invalid={Boolean(error)} aria-describedby={error ? `${label.replace(/\s+/g, '-').toLowerCase()}-error` : undefined} />
+          <input type={isPasswordVisible ? 'text' : 'password'} placeholder={placeholder} value={value} onChange={onChange} autoComplete={autoComplete} aria-required={required} aria-invalid={Boolean(error)} aria-describedby={error ? `${label.replace(/\s+/g, '-').toLowerCase()}-error` : undefined} />
           <button
             className={styles.passwordToggle}
             type="button"
@@ -158,9 +163,9 @@ function Field({ label, placeholder, type = 'text', value, onChange, error }: Fi
           </button>
         </div>
       ) : (
-        <input type={type} placeholder={placeholder} value={value} onChange={onChange} aria-invalid={Boolean(error)} aria-describedby={error ? `${label.replace(/\s+/g, '-').toLowerCase()}-error` : undefined} />
+        <input type={type} placeholder={placeholder} value={value} onChange={onChange} autoComplete={autoComplete} aria-required={required} aria-invalid={Boolean(error)} aria-describedby={error ? `${label.replace(/\s+/g, '-').toLowerCase()}-error` : undefined} />
       )}
-      {error && <small className={styles.fieldError} id={`${label.replace(/\s+/g, '-').toLowerCase()}-error`}>{error}</small>}
+      {error ? <small className={styles.fieldError} id={`${label.replace(/\s+/g, '-').toLowerCase()}-error`}>{error}</small> : hint && <small className={styles.fieldHint}>{hint}</small>}
     </label>
   )
 }
@@ -370,14 +375,15 @@ export function AuthPage({ type }: { type: AuthType }) {
             <p>Create your account</p>
           </div>
           <div className={styles.registerFields}>
-            <Field label="First Name" placeholder="Juan" value={registrationFields.firstName} onChange={updateRegistrationField('firstName')} error={showRegistrationErrors ? registrationErrors.firstName : undefined} />
-            <Field label="Last Name" placeholder="Dela Cruz" value={registrationFields.lastName} onChange={updateRegistrationField('lastName')} error={showRegistrationErrors ? registrationErrors.lastName : undefined} />
-            <Field label="Email Address" placeholder="name@example.com" type="email" value={registrationFields.email} onChange={updateRegistrationField('email')} error={showRegistrationErrors ? registrationErrors.email : undefined} />
-            <Field label="Contact Number" placeholder="09XX XXX XXXX" value={registrationFields.contactNumber} onChange={updateRegistrationField('contactNumber')} error={showRegistrationErrors ? registrationErrors.contactNumber : undefined} />
-            <Field label="Address" placeholder="Zone I, Zamboanga City, Philippines" value={registrationFields.address} onChange={updateRegistrationField('address')} error={showRegistrationErrors ? registrationErrors.address : undefined} />
-            <DateField label="Birthday" value={registrationFields.birthday} onChange={(birthday) => setRegistrationFields((current) => ({ ...current, birthday }))} error={showRegistrationErrors ? registrationErrors.birthday : undefined} />
-            <Field label="Password" placeholder="Enter Password" type="password" value={registrationFields.password} onChange={updateRegistrationField('password')} error={showRegistrationErrors ? registrationErrors.password : undefined} />
-            <Field label="Confirm Password" placeholder="Re-enter Password" type="password" value={registrationFields.confirmPassword} onChange={updateRegistrationField('confirmPassword')} error={showRegistrationErrors ? registrationErrors.confirmPassword : undefined} />
+            <Field label="First Name" required autoComplete="given-name" placeholder="Juan" value={registrationFields.firstName} onChange={updateRegistrationField('firstName')} error={showRegistrationErrors ? registrationErrors.firstName : undefined} />
+            <Field label="Last Name" required autoComplete="family-name" placeholder="Dela Cruz" value={registrationFields.lastName} onChange={updateRegistrationField('lastName')} error={showRegistrationErrors ? registrationErrors.lastName : undefined} />
+            <Field label="Email Address" required autoComplete="email" placeholder="name@example.com" type="email" value={registrationFields.email} onChange={updateRegistrationField('email')} error={showRegistrationErrors ? registrationErrors.email : undefined} />
+            <Field label="Contact Number" required autoComplete="tel" hint="Use 09XX XXX XXXX or +63 9XX XXX XXXX" placeholder="09XX XXX XXXX" value={registrationFields.contactNumber} onChange={updateRegistrationField('contactNumber')} error={showRegistrationErrors ? registrationErrors.contactNumber : undefined} />
+            <Field label="Address" required autoComplete="street-address" placeholder="Zone I, Zamboanga City, Philippines" value={registrationFields.address} onChange={updateRegistrationField('address')} error={showRegistrationErrors ? registrationErrors.address : undefined} />
+            <DateField label="Birthday" required value={registrationFields.birthday} onChange={(birthday) => setRegistrationFields((current) => ({ ...current, birthday }))} error={showRegistrationErrors ? registrationErrors.birthday : undefined} />
+            <Field label="Password" required autoComplete="new-password" placeholder="Enter Password" type="password" value={registrationFields.password} onChange={updateRegistrationField('password')} error={showRegistrationErrors ? registrationErrors.password : undefined} />
+            <Field label="Confirm Password" required autoComplete="new-password" placeholder="Re-enter Password" type="password" value={registrationFields.confirmPassword} onChange={updateRegistrationField('confirmPassword')} error={showRegistrationErrors ? registrationErrors.confirmPassword : undefined} />
+            <p className={styles.requiredNote}><b className={styles.required}>*</b> Required field</p>
             <div className={styles.registerAction}>
               {registrationError && <p className={styles.registrationError} role="alert">{registrationError}</p>}
               <p>Already have an account? <a href="#/login">Login Here</a></p>

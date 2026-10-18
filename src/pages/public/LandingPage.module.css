@@ -59,16 +59,17 @@
 }
 
 .header .loginLink {
-  background: var(--color-brand);
+  background: #fff;
+  border: 1.5px solid var(--color-brand);
   border-radius: var(--radius-control);
-  color: #fff;
+  color: var(--color-brand);
   margin-left: 4px;
   padding-inline: 18px;
 }
 
 .header .loginLink:hover {
-  background-color: var(--color-brand-strong);
-  color: #fff;
+  background-color: var(--color-brand-soft);
+  color: var(--color-brand-strong);
   transform: translateY(-1px);
 }
 
@@ -200,6 +201,18 @@
   font-weight: 600;
   line-height: 1.5;
   padding: 4px 14px;
+}
+
+.promise svg {
+  display: block;
+  fill: none;
+  height: 26px;
+  margin: 0 auto 6px;
+  stroke: var(--color-brand);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  width: 26px;
 }
 
 .promise span + span {
@@ -347,7 +360,7 @@
 .communityNote > span {
   color: #78a77f;
   display: block;
-  font-family: Georgia, serif;
+  font-family: 'Playfair Display', Georgia, serif;
   font-size: 54px;
   height: 38px;
   line-height: 1;
@@ -355,7 +368,7 @@
 
 .communityNote blockquote {
   color: #34473a;
-  font-family: Georgia, serif;
+  font-family: 'Playfair Display', Georgia, serif;
   font-size: 18px;
   line-height: 1.6;
   margin: 12px 0 18px;
@@ -877,4 +890,20 @@ footer .details {
   .productCard button {
     transition: none;
   }
+}
+
+.productInfo .scientificName {
+  font-size: 10px;
+  font-style: italic;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.story button {
+  background: #233d2c;
+}
+
+.story button:hover {
+  background-color: #182b1f;
+  box-shadow: 0 6px 14px rgb(24 43 31 / 25%);
 }

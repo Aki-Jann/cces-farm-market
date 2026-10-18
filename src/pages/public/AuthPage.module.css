@@ -246,6 +246,23 @@
   box-shadow: 0 0 0 3px rgb(180 35 24 / 10%);
 }
 
+.required {
+  color: #b42318;
+}
+
+.fieldHint {
+  color: var(--color-text-muted);
+  font-size: 10px;
+  line-height: 1.15;
+}
+
+.requiredNote {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
 .fieldError,
 .registrationError {
   color: #b42318;

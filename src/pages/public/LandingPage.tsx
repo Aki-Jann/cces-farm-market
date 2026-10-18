@@ -12,10 +12,10 @@ import gumamelaImage from '../../assets/gumamela.png'
 import storyImage from '../../assets/our-story.png'
 
 const products = [
-  { name: 'APPLE', category: 'FRUITS', image: appleImage },
-  { name: 'BELL PEPPER', category: 'VEGETABLES', image: pepperImage },
-  { name: 'CORN', category: 'GRAINS', image: cornImage },
-  { name: 'GUMAMELA', category: 'FLOWERS', image: gumamelaImage },
+  { name: 'APPLE', scientific: 'Malus domestica', category: 'FRUITS', image: appleImage },
+  { name: 'BELL PEPPER', scientific: 'Capsicum annuum', category: 'VEGETABLES', image: pepperImage },
+  { name: 'CORN', scientific: 'Zea mays', category: 'GRAINS', image: cornImage },
+  { name: 'GUMAMELA', scientific: 'Hibiscus rosa-sinensis', category: 'FLOWERS', image: gumamelaImage },
 ]
 
 export function LandingPage() {
@@ -80,10 +80,10 @@ export function LandingPage() {
       </section>
 
       <section className={styles.promise}>
-        <span>Harvested daily<br /><small>Picked at peak ripeness</small></span>
-        <span>No pesticides<br /><small>Naturally grown</small></span>
-        <span>Pickup Sat–Sun<br /><small>8am – 1pm at the farm</small></span>
-        <span>Direct orders<br /><small>Online pre-order available</small></span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 18h18" /><path d="M7 18a5 5 0 0 1 10 0" /><path d="M12 5v3" /><path d="m5.6 9.6 2 2" /><path d="m18.4 9.6-2 2" /></svg>Harvested daily<br /><small>Picked at peak ripeness</small></span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14" /><path d="M5 19c3-4 6-7 10-9" /></svg>No pesticides<br /><small>Naturally grown</small></span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 21s-6-5.2-6-10a6 6 0 0 1 12 0c0 4.8-6 10-6 10z" /><circle cx="12" cy="11" r="2" /></svg>Pickup Sat–Sun<br /><small>8am – 1pm at the farm</small></span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 9h14l-1.5 9a2 2 0 0 1-2 1.7h-7a2 2 0 0 1-2-1.7z" /><path d="m9 9 3-5 3 5" /></svg>Direct orders<br /><small>Online pre-order available</small></span>
       </section>
 
       <section className={styles.products} id="shops">
@@ -95,6 +95,7 @@ export function LandingPage() {
               <div className={styles.productInfo}>
                 <div>
                   <strong>{product.name}</strong>
+                  <small className={styles.scientificName}>{product.scientific}</small>
                   <small>{product.category}</small>
                   <small className={styles.soldText}>
                     {salesError
