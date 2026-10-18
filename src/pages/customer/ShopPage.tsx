@@ -845,6 +845,12 @@ export function ShopPage() {
         console.error('Clearing saved cart failed:', storageError)
       }
       updateCartQuantities({})
+      try {
+        const paymentLabels = { COD: 'Cash on Delivery (COD)', GCASH: 'GCash', MAYA: 'Maya' }
+        sessionStorage.setItem('cces-farm-market-order-placed', paymentLabels[paymentMethod])
+      } catch (storageError) {
+        console.error('Saving order confirmation failed:', storageError)
+      }
       window.location.hash = '/orders'
     } catch (checkoutError) {
       console.error('Checkout failed:', checkoutError)
