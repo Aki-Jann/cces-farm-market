@@ -14,7 +14,7 @@ const links: { key: AdminNavItem; label: string; href: string }[] = [
 
 export function AdminSidebar({ active, role = 'farmer' }: { active: AdminNavItem; role?: 'farmer' | 'cces_admin' }) {
   const visibleLinks = role === 'cces_admin'
-    ? links.filter((link) => link.key === 'analytics')
+    ? links.filter((link) => link.key === 'dashboard' || link.key === 'analytics')
     : links
 
   return (
