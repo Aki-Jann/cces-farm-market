@@ -770,6 +770,8 @@ export function ShopPage() {
         quantity: item.quantity,
         unit: item.unit,
       }))
+      const orderNumber = `ORD-${Date.now()}`;
+
       try {
         await runTransaction(db, async (transaction) => {
           const [profileSnapshot, ...productSnapshots] = await Promise.all([
@@ -805,7 +807,7 @@ export function ShopPage() {
 
           const profile = profileSnapshot.data()
           transaction.set(orderRef, {
-            orderNumber: `ORD-${Date.now()}`,
+            orderNumber,
             userId: user.uid,
             customerName: `${typeof profile.firstName === 'string' ? profile.firstName : ''} ${typeof profile.lastName === 'string' ? profile.lastName : ''}`.trim(),
             customerEmail: typeof profile.email === 'string' ? profile.email : user.email ?? '',
@@ -847,7 +849,13 @@ export function ShopPage() {
       updateCartQuantities({})
       try {
         const paymentLabels = { COD: 'Cash on Delivery (COD)', GCASH: 'GCash', MAYA: 'Maya' }
-        sessionStorage.setItem('cces-farm-market-order-placed', paymentLabels[paymentMethod])
+        sessionStorage.setItem(
+        'cces-farm-market-order-placed',
+        JSON.stringify({
+          orderNumber,
+          paymentMethod: paymentLabels[paymentMethod],
+          })
+        );
       } catch (storageError) {
         console.error('Saving order confirmation failed:', storageError)
       }

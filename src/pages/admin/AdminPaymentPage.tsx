@@ -144,7 +144,7 @@ function PaymentReviewActions({ payment }: { payment: PaymentRecord }) {
           disabled={isUpdating || payment.orderStatus !== 'pending'}
           onClick={() => void reviewPayment('reject')}
         >
-          REJECT & CANCEL
+          REJECT
         </button>
       </span>
       {payment.orderStatus !== 'pending' && (

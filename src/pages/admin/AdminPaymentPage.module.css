@@ -163,6 +163,9 @@
   min-height: 54px;
   padding: 0 8px;
 }
+.tableRow{
+  padding: 10px 8px;
+}
 
 .tableRowHeader {
   background: #f7faf7;
@@ -172,6 +175,10 @@
   letter-spacing: .07em;
   position: sticky;
   top: 0;
+}
+
+.tableRowHeader > strong:nth-child(6) {
+  text-align: center;
 }
 
 .tableRowHeader > strong:nth-child(7) {
@@ -212,7 +219,7 @@
 }
 
 .receiptCell {
-  align-items: flex-start;
+  align-items: center;
   display: flex;
   flex-direction: column;
   gap: 5px;

@@ -253,13 +253,35 @@ export function OrdersPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null)
   const [deliveryError, setDeliveryError] = useState<{ orderId: string; message: string } | null>(null)
-  const [placedPayment] = useState(() => {
-    try {
-      return sessionStorage.getItem('cces-farm-market-order-placed') ?? ''
-    } catch {
-      return ''
+  const [placedOrder] = useState(() => {
+  try {
+    const stored = sessionStorage.getItem(
+      'cces-farm-market-order-placed'
+    );
+
+    if (!stored) return null;
+
+    const parsed: unknown = JSON.parse(stored);
+
+    if (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      !('orderNumber' in parsed) ||
+      !('paymentMethod' in parsed) ||
+      typeof parsed.orderNumber !== 'string' ||
+      typeof parsed.paymentMethod !== 'string'
+    ) {
+      return null;
     }
-  })
+
+    return {
+      orderNumber: parsed.orderNumber,
+      paymentMethod: parsed.paymentMethod,
+    };
+  } catch {
+    return null;
+  }
+});
   const emptyState = window.location.hash.includes('empty')
   const visibleOrders = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -278,13 +300,12 @@ export function OrdersPage() {
   }
 
   useEffect(() => {
-    // The notice is only shown once, right after checkout.
-    try {
-      sessionStorage.removeItem('cces-farm-market-order-placed')
-    } catch (storageError) {
-      console.error('Clearing order confirmation failed:', storageError)
-    }
-  }, [])
+  try {
+    sessionStorage.removeItem('cces-farm-market-order-placed');
+  } catch (storageError) {
+    console.error('Failed to clear order confirmation:', storageError);
+  }
+}, []);
 
   useEffect(() => {
     let isMounted = true
@@ -405,9 +426,11 @@ export function OrdersPage() {
       <section className={styles.ordersContent}>
         <Header title="ORDERS" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
         <section className={styles.orderPanel}>
-          {placedPayment && (
+          {placedOrder && (
             <p className={styles.orderPlacedNotice} role="status">
-              Order placed! Payment method: {placedPayment}.{placedPayment !== 'Cash on Delivery (COD)' && ' The seller will verify your receipt.'}
+              {`Order ${placedOrder.orderNumber} placed!`}
+              {placedOrder.paymentMethod !== 'Cash on Delivery (COD)' &&
+                ' The seller will verify your receipt.'}
             </p>
           )}
           <nav className={styles.statusFilters} aria-label="Filter orders by status">
@@ -453,9 +476,21 @@ export function OrdersPage() {
                 >{search.trim() ? 'Clear filters' : 'View all orders'}</button>
               </div>
             ) : (
-              <div className={styles.emptyState}>
-                <strong>No Orders Yet</strong>
-                <a href="#/shop">SHOP</a>
+              <div className={`${styles.emptyState} ${styles.noMatches}`} role="status" aria-live="polite">
+              <span className={styles.emptyIcon} aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="m16 16 4 4" /></svg>
+                </span>
+                <div className={styles.emptyCopy}>
+                  <strong>No orders yet</strong>
+                  <p>Start shopping to place your first order.</p>
+                </div>
+                <button
+                  className={styles.clearSearchButton}
+                  type="button"
+                  onClick={() => {
+                    window.location.href = '#/shop'
+                  }}
+                >Shop Now</button>
               </div>
             )
           ) : (

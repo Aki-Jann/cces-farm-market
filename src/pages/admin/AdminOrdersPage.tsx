@@ -303,6 +303,14 @@ export function AdminOrdersPage() {
               <div className={styles.stats} aria-label="Filter orders by status">
                 <span className={styles.statusFilterLabel}>ORDER STATUS</span>
                 <div className={styles.statusFilters}>
+                  <button
+                    aria-pressed={showAllOrders && !statusFilter}
+                    className={showAllOrders && !statusFilter ? styles.activeStat : ''}
+                    onClick={() => { setStatusFilter(null); setShowAllOrders(true) }}
+                    type="button"
+                  >
+                    ALL ORDERS <span>{orders.length}</span>
+                  </button>
                   {statusOrder.map((status) => (
                     <button
                       aria-pressed={statusFilter === status}
@@ -314,14 +322,7 @@ export function AdminOrdersPage() {
                       {status} <span>{counts[status]}</span>
                     </button>
                   ))}
-                  <button
-                    aria-pressed={showAllOrders && !statusFilter}
-                    className={showAllOrders && !statusFilter ? styles.activeStat : ''}
-                    onClick={() => { setStatusFilter(null); setShowAllOrders(true) }}
-                    type="button"
-                  >
-                    ALL ORDERS <span>{orders.length}</span>
-                  </button>
+                  
                 </div>
               </div>
             )}
