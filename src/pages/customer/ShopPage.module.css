@@ -330,15 +330,18 @@
 }
 
 .cart {
-  align-self: flex-start;
+  align-self: flex;
   background: #fff;
   border-left: 1px solid #d9d9d9;
   box-shadow: -2px 0 5px rgb(0 0 0 / 8%);
   display: flex;
+  position: sticky;
   flex: 0 0 clamp(260px, 24vw, 320px);
   flex-direction: column;
   height: 100vh;
   min-height: 0;
+  position: sticky;
+  top: 0;
 }
 
 .cartHeading {

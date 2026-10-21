@@ -8,3 +8,11 @@ export function formatMonthDayYearTime(date: Date): string {
   const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
   return `${formatMonthDayYear(date)} ${time}`
 }
+
+export const formatTime = (date: Date): string => {
+  return new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(date);
+};

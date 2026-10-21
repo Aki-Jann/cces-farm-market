@@ -54,9 +54,12 @@
 .packed { background: var(--order-packed-bg); color: var(--order-packed-text); }
 .cancelled { background: #fff1ee; color: #9f342a; }
 
-.emptyState { align-items: center; background: #cce9d5; border-radius: 10px; box-shadow: 0 3px 5px rgb(0 0 0 / 10%); display: flex; flex-direction: column; gap: 20px; margin: 48px auto; max-width: 100%; padding: 32px 24px; width: 280px; }
-.emptyState strong { font-size: 22px; white-space: nowrap; }
-.emptyState a { background: #017632; border-radius: 5px; color: #fff; font-size: 14px; font-weight: 700; padding: 9px 25px; text-decoration: none; }
+.emptyState {
+  padding: 20px 0px;
+  color: #6c7175;
+  grid-column: 1 / -1;
+  text-align: center;
+}
 .noMatches { background: transparent; border-radius: 0; box-shadow: none; gap: 14px; margin: 32px auto; max-width: 460px; min-height: 280px; padding: 28px 20px; text-align: center; width: 100%; }
 .noMatches strong { color: #191919; font-size: 20px; white-space: normal; }
 .emptyIcon { align-items: center; background: #eaf5ed; border-radius: 50%; color: #017632; display: flex; flex: 0 0 56px; height: 56px; justify-content: center; width: 56px; }

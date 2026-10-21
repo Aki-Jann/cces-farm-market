@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { collection, onSnapshot } from 'firebase/firestore'
+import { collection, doc, onSnapshot } from 'firebase/firestore'
 import { BrandLogo } from '../../components/common/BrandLogo'
 import { ProductRating } from '../../components/common/ProductRating'
 import { db } from '../../firebase/firestore'
@@ -10,6 +10,18 @@ import pepperImage from '../../assets/bell-pepper.png'
 import cornImage from '../../assets/corn.png'
 import gumamelaImage from '../../assets/gumamela.png'
 import storyImage from '../../assets/our-story.png'
+
+type PickupSettings = {
+  pickupLocation: string
+  pickupDays: string
+  pickupHours: string
+}
+
+const defaultPickupSettings: PickupSettings = {
+  pickupLocation: '',
+  pickupDays: '',
+  pickupHours: '',
+}
 
 const products = [
   { name: 'APPLE', scientific: 'Malus domestica', category: 'FRUITS', image: appleImage },
@@ -22,7 +34,43 @@ export function LandingPage() {
   const [soldCounts, setSoldCounts] = useState<Record<string, number> | null>(null)
   const [productIds, setProductIds] = useState<Record<string, string>>({})
   const [salesError, setSalesError] = useState(false)
+  const [pickupSettings, setPickupSettings] = useState<PickupSettings>(defaultPickupSettings)
+  
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      doc(db, 'settings', 'storefront'),
+      (snapshot) => {
+        if (!snapshot.exists()) {
+          setPickupSettings(defaultPickupSettings)
+          return
+        }
 
+        const data = snapshot.data()
+
+        setPickupSettings({
+          pickupLocation:
+            typeof data.pickupLocation === 'string'
+              ? data.pickupLocation
+              : '',
+          pickupDays:
+            typeof data.pickupDays === 'string'
+              ? data.pickupDays
+              : '',
+          pickupHours:
+            typeof data.pickupHours === 'string'
+              ? data.pickupHours
+              : '',
+        })
+      },
+      (error) => {
+        console.error('Loading public pickup settings failed:', error)
+        setPickupSettings(defaultPickupSettings)
+      }
+    )
+
+    return () => unsubscribe()
+  }, [])
+  
   useEffect(() => {
     const unsubscribe = onSnapshot(
       collection(db, 'products'),
@@ -82,7 +130,7 @@ export function LandingPage() {
       <section className={styles.promise}>
         <span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 18h18" /><path d="M7 18a5 5 0 0 1 10 0" /><path d="M12 5v3" /><path d="m5.6 9.6 2 2" /><path d="m18.4 9.6-2 2" /></svg>Harvested daily<br /><small>Picked at peak ripeness</small></span>
         <span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14" /><path d="M5 19c3-4 6-7 10-9" /></svg>No pesticides<br /><small>Naturally grown</small></span>
-        <span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 21s-6-5.2-6-10a6 6 0 0 1 12 0c0 4.8-6 10-6 10z" /><circle cx="12" cy="11" r="2" /></svg>Pickup Sat–Sun<br /><small>8am – 1pm at the farm</small></span>
+        <span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 21s-6-5.2-6-10a6 6 0 0 1 12 0c0 4.8-6 10-6 10z" /><circle cx="12" cy="11" r="2" /></svg> {pickupSettings.pickupDays || 'Pickup schedule'}<br /><small>{[pickupSettings.pickupHours,pickupSettings.pickupLocation,].filter(Boolean).join(' · ') || 'Schedule to be announced'}</small></span>
         <span><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M5 9h14l-1.5 9a2 2 0 0 1-2 1.7h-7a2 2 0 0 1-2-1.7z" /><path d="m9 9 3-5 3 5" /></svg>Direct orders<br /><small>Online pre-order available</small></span>
       </section>
 
@@ -152,7 +200,7 @@ export function LandingPage() {
       </section>
 
       <section className={styles.story} id="about">
-        <h2>AGRICULTORES DE LA PAZ</h2>
+        <h2>LA PAZ BYPASS FLOWER GROWERS</h2>
         <p className={styles.storyLabel}>OUR STORY</p>
         <img src={storyImage} alt="Agricultores de la Paz community" />
         <p className={styles.storyText}>We are the Agricultores De La Paz, a community of growers working together to bring our harvest directly to buyers. Farming is our livelihood, but selling our produce has always been a challenge. Through this platform, we can share our crops at fair prices, reduce waste, and reach more people who value fresh, local food.</p>

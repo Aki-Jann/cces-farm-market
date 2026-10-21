@@ -344,7 +344,15 @@ export function AdminAccountPage({ role = 'farmer' }: { role?: 'farmer' | 'cces_
         }
       }
 
-      await setDoc(doc(db, 'settings', 'storefront'), nextSettings, { merge: true })
+      await setDoc(
+        doc(db, 'settings', 'storefront'),
+        {
+          pickupLocation: nextSettings.pickupLocation,
+          pickupDays: nextSettings.pickupDays,
+          pickupHours: nextSettings.pickupHours,
+        },
+        { merge: true }
+      )
       storeSettingsDirty.current = false
       setStoreSettings(nextSettings)
       setStoreSettingsDraft(nextSettings)

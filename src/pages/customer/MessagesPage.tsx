@@ -6,7 +6,7 @@ import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
-import { formatMonthDayYear, formatMonthDayYearTime } from '../../utils/dateFormat'
+import { formatMonthDayYear, formatTime } from '../../utils/dateFormat'
 import styles from './MessagesPage.module.css'
 
 type Message = { id: string; text: string; timestamp: string; sender: 'customer' | 'market'; dayDivider?: string }
@@ -60,7 +60,7 @@ export function MessagesPage() {
               id: messageDocument.id,
               sender: data.senderRole === 'customer' ? 'customer' : 'market',
               text: typeof data.text === 'string' ? data.text : '',
-              timestamp: createdAt ? formatMonthDayYearTime(createdAt) : 'Pending',
+              timestamp: createdAt ? formatTime(createdAt) : 'Pending',
               createdAt,
             }
           })

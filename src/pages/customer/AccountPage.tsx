@@ -37,7 +37,7 @@ export function AccountPage() {
   const [account, setAccount] = useState<AccountData | null>(null)
   const [draft, setDraft] = useState<AccountData | null>(null)
   const [editing, setEditing] = useState(false)
-  const [detailsHidden, setDetailsHidden] = useState(false)
+  const [detailsHidden, setDetailsHidden] = useState(true)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
