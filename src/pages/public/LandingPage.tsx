@@ -200,7 +200,7 @@ export function LandingPage() {
       </section>
 
       <section className={styles.story} id="about">
-        <h2>LA PAZ BYPASS FLOWER GROWERS</h2>
+        <h2>La Paz Bypass Flower Growers</h2>
         <p className={styles.storyLabel}>OUR STORY</p>
         <img src={storyImage} alt="Agricultores de la Paz community" />
         <p className={styles.storyText}>We are the Agricultores De La Paz, a community of growers working together to bring our harvest directly to buyers. Farming is our livelihood, but selling our produce has always been a challenge. Through this platform, we can share our crops at fair prices, reduce waste, and reach more people who value fresh, local food.</p>
