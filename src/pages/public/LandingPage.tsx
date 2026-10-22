@@ -3,6 +3,7 @@ import { collection, doc, onSnapshot } from 'firebase/firestore'
 import { BrandLogo } from '../../components/common/BrandLogo'
 import { ProductRating } from '../../components/common/ProductRating'
 import { db } from '../../firebase/firestore'
+import { resolveProductImage } from '../../utils/productImages'
 import styles from './LandingPage.module.css'
 import heroImage from '../../assets/landing-temp.png'
 import appleImage from '../../assets/apple.png'
@@ -23,7 +24,18 @@ const defaultPickupSettings: PickupSettings = {
   pickupHours: '',
 }
 
-const products = [
+type LandingProduct = {
+  id: string
+  name: string
+  scientific: string
+  category: string
+  price: number
+  unit: string
+  image: string
+  sold: number
+}
+
+const productDetails = [
   { name: 'APPLE', scientific: 'Malus domestica', category: 'FRUITS', image: appleImage },
   { name: 'BELL PEPPER', scientific: 'Capsicum annuum', category: 'VEGETABLES', image: pepperImage },
   { name: 'CORN', scientific: 'Zea mays', category: 'GRAINS', image: cornImage },
@@ -31,9 +43,8 @@ const products = [
 ]
 
 export function LandingPage() {
-  const [soldCounts, setSoldCounts] = useState<Record<string, number> | null>(null)
-  const [productIds, setProductIds] = useState<Record<string, string>>({})
-  const [salesError, setSalesError] = useState(false)
+  const [products, setProducts] = useState<LandingProduct[] | null>(null)
+  const [productsError, setProductsError] = useState(false)
   const [pickupSettings, setPickupSettings] = useState<PickupSettings>(defaultPickupSettings)
   
   useEffect(() => {
@@ -75,24 +86,37 @@ export function LandingPage() {
     const unsubscribe = onSnapshot(
       collection(db, 'products'),
       (snapshot) => {
-        const counts: Record<string, number> = {}
-        const ids: Record<string, string> = {}
-        snapshot.docs.forEach((product) => {
+        const availableProducts: LandingProduct[] = snapshot.docs.flatMap((product) => {
           const data = product.data()
-          if (typeof data.name !== 'string') return
-          const name = data.name.trim().toUpperCase()
-          ids[name] = product.id
-          counts[name] = typeof data.sold === 'number' && Number.isFinite(data.sold)
-            ? data.sold
-            : 0
+          const name = typeof data.name === 'string' ? data.name.trim().toUpperCase() : ''
+          const isAvailable = typeof data.isAvailable === 'boolean' ? data.isAvailable : true
+          if (
+            !name || !isAvailable ||
+            typeof data.stock !== 'number' || !Number.isFinite(data.stock) || data.stock <= 0 ||
+            typeof data.price !== 'number' || !Number.isFinite(data.price) || data.price < 0
+          ) return []
+
+          return [{
+            id: product.id,
+            name,
+            scientific: productDetails.find((detail) => detail.name === name)?.scientific ?? '',
+            category: typeof data.category === 'string' && data.category.trim()
+              ? data.category.trim().toUpperCase()
+              : 'UNCATEGORIZED',
+            price: data.price,
+            unit: typeof data.unit === 'string' && data.unit.trim() ? data.unit.trim().toUpperCase() : 'KG',
+            image: resolveProductImage(data.imageUrl),
+            sold: typeof data.sold === 'number' && Number.isFinite(data.sold) ? Math.max(0, data.sold) : 0,
+          }]
         })
-        setSoldCounts(counts)
-        setProductIds(ids)
-        setSalesError(false)
+        availableProducts.sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id))
+        setProducts(availableProducts)
+        setProductsError(false)
       },
       (error) => {
-        console.error('Loading product sales failed:', error)
-        setSalesError(true)
+        console.error('Loading available products failed:', error)
+        setProducts([])
+        setProductsError(true)
       }
     )
 
@@ -137,24 +161,24 @@ export function LandingPage() {
       <section className={styles.products} id="shops">
         <h2>Connecting Zamboanga Farmers and Buyers<br />Through Smart Commerce</h2>
         <div className={styles.productGrid}>
-          {products.map((product) => (
-            <article className={styles.productCard} key={product.name}>
+          {productsError ? (
+            <p role="alert">Unable to load products. Please try again later.</p>
+          ) : products === null ? (
+            <p role="status">Loading available products...</p>
+          ) : products.length === 0 ? (
+            <p role="status">No products are currently available.</p>
+          ) : products.map((product) => (
+            <article className={styles.productCard} key={product.id}>
               <img src={product.image} alt={product.name} />
               <div className={styles.productInfo}>
                 <div>
                   <strong>{product.name}</strong>
                   <small className={styles.scientificName}>{product.scientific}</small>
                   <small>{product.category}</small>
-                  <small className={styles.soldText}>
-                    {salesError
-                      ? 'Sales unavailable'
-                      : soldCounts
-                        ? `${soldCounts[product.name] ?? 0} sold`
-                        : 'Loading sales…'}
-                  </small>
-                  <ProductRating productId={productIds[product.name]} />
+                  <small className={styles.soldText}>{product.sold} sold</small>
+                  <ProductRating productId={product.id} />
                 </div>
-                <div className={styles.price}><strong>₱100.00</strong><small>PER KG</small></div>
+                <div className={styles.price}><strong>{product.price.toLocaleString('en-PH', { style: 'currency', currency: 'PHP' })}</strong><small>PER {product.unit}</small></div>
               </div>
               <button type="button" onClick={() => { window.location.hash = '/login' }}>ADD TO CART</button>
             </article>
