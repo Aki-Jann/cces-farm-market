@@ -454,24 +454,30 @@ function Cart({
                   {paymentAccountName && <strong>{paymentAccountName}</strong>}
                   {paymentAccountNumber && <small>{paymentAccountNumber}</small>}
                 </div>
-                <label className={styles.receiptUpload}>
-                  <span>Payment receipt screenshot</span>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0] ?? null
-                      if (file && file.size > 5 * 1024 * 1024) {
-                        setReceiptFile(null)
-                        setReceiptError('Receipt images must be 5 MB or smaller.')
-                        return
-                      }
-                      setReceiptFile(file)
-                      setReceiptError('')
-                    }}
-                  />
-                </label>
-                {receiptFile && <p className={styles.receiptName}>{receiptFile.name}</p>}
+                <div className={styles.receiptUpload}>
+                <span>Payment receipt screenshot</span>
+                  <div className={styles.fileRow}>
+                    <span className={styles.fileStatus}>{receiptFile ? receiptFile.name + '.' : 'No file chosen.'}</span>
+                    <label className={styles.fileLink}>
+                      Choose File
+                      <input
+                        className={styles.fileInput}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] ?? null
+                          if (file && file.size > 5 * 1024 * 1024) {
+                            setReceiptFile(null)
+                            setReceiptError('Receipt images must be 5 MB or smaller.')
+                            return
+                          }
+                          setReceiptFile(file)
+                          setReceiptError('')
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
                 {receiptError && <p className={styles.checkoutError} role="alert">{receiptError}</p>}
               </div>
             )}

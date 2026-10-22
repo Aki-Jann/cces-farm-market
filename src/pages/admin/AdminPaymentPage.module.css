@@ -218,6 +218,30 @@
   padding: 5px 8px;
 }
 
+.receiptButton {
+  background: none;
+  border: 0;
+  border-radius: 5px;
+  color: #087b3b;
+  cursor: pointer;
+  display: inline-block;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  max-width: 100%;
+  padding: 0;
+  text-decoration: none;
+}
+
+.receiptButton:hover {
+  text-decoration: underline;
+}
+
+.receiptButton:focus-visible {
+  outline: 3px solid rgb(1 118 50 / 22%);
+  outline-offset: 3px;
+}
+
 .receiptCell {
   align-items: center;
   display: flex;
@@ -271,25 +295,6 @@
   white-space: normal !important;
 }
 
-.receiptCell a {
-  color: #087b3b;
-  display: inline-block;
-  font-size: 10px;
-  font-weight: 700;
-  max-width: 100%;
-  text-decoration: none;
-}
-
-.receiptCell a:hover span {
-  text-decoration: underline;
-}
-
-.receiptCell a:focus-visible {
-  border-radius: 5px;
-  outline: 3px solid rgb(1 118 50 / 22%);
-  outline-offset: 3px;
-}
-
 .receiptMissing,
 .receiptNotRequired {
   border-radius: 999px;
@@ -313,6 +318,66 @@
   margin: 0;
   padding: 64px 16px;
   text-align: center;
+}
+
+.receiptOverlay {
+  align-items: center;
+  background: rgb(25 25 25 / 55%);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 16px;
+  position: fixed;
+  z-index: 100;
+}
+
+.receiptModal {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 12px 36px rgb(0 0 0 / 24%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100vh - 32px);
+  max-width: 420px;
+  padding: 16px;
+  width: 100%;
+}
+
+.receiptModalHeader {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.receiptModalHeader h2 {
+  color: #017632;
+  font-size: 18px;
+  margin: 0;
+}
+
+.receiptModalHeader button {
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: #6c7175;
+  cursor: pointer;
+  font-size: 26px;
+  line-height: 1;
+  padding: 4px 8px;
+}
+
+.receiptModalHeader button:hover {
+  background: #f4f4f4;
+}
+
+.receiptModal img {
+  background: #f5f5f5;
+  border-radius: 5px;
+  display: block;
+  max-height: calc(100vh - 140px);
+  object-fit: contain;
+  width: 100%;
 }
 
 @media (max-width: 1050px) {

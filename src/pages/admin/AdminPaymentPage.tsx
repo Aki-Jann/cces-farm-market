@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { collection, doc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
@@ -20,6 +21,52 @@ type PaymentRecord = {
   orderStatus: string
   amount: number
   createdAtDate: Date | null
+}
+
+function ReceiptViewer({
+  url,
+  label,
+  ariaLabel,
+}: {
+  url: string
+  label: string
+  ariaLabel?: string
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setIsOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isOpen])
+
+  return (
+    <>
+      <button type="button" className={styles.receiptButton} aria-label={ariaLabel} onClick={() => setIsOpen(true)}>
+        {label}
+      </button>
+      {isOpen && createPortal(
+        <div
+          className={styles.receiptOverlay}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setIsOpen(false)
+          }}
+        >
+          <section className={styles.receiptModal} role="dialog" aria-modal="true" aria-label="Payment receipt">
+            <div className={styles.receiptModalHeader}>
+              <h2>Payment receipt</h2>
+              <button type="button" aria-label="Close receipt" onClick={() => setIsOpen(false)}>×</button>
+            </div>
+            <img src={url} alt="Payment receipt screenshot" />
+          </section>
+        </div>,
+        document.body
+      )}
+    </>
+  )
 }
 
 function PaymentReviewActions({ payment }: { payment: PaymentRecord }) {
@@ -297,7 +344,7 @@ function PaymentTable({
               <span className={styles.receiptCell}>
                 {payment.method === 'GCASH' || payment.method === 'MAYA'
                   ? payment.paymentReceiptUrl
-                    ? <a href={payment.paymentReceiptUrl} target="_blank" rel="noreferrer" aria-label={`View payment receipt for order ${payment.orderId}`}>View receipt</a>
+                    ? <ReceiptViewer url={payment.paymentReceiptUrl} label="View receipt" ariaLabel={`View payment receipt for order ${payment.orderId}`} />
                     : <span className={styles.receiptMissing}>Not uploaded</span>
                   : <span className={styles.receiptNotRequired}>Not required</span>}
                 <span className={styles.paymentStatus}>{payment.paymentStatus.replaceAll('_', ' ')}</span>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { FormEvent } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
@@ -65,6 +66,54 @@ function currency(value: number) {
 function isOnlinePayment(payment: string) {
   const normalizedPayment = payment.trim().toUpperCase()
   return normalizedPayment === 'GCASH' || normalizedPayment === 'MAYA' || normalizedPayment === 'PAYMAYA'
+}
+
+function ReceiptViewer({
+  url,
+  label,
+  className,
+  ariaLabel,
+}: {
+  url: string
+  label: string
+  className?: string
+  ariaLabel?: string
+}) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setIsOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isOpen])
+
+  return (
+    <>
+      <button type="button" className={className} aria-label={ariaLabel} onClick={() => setIsOpen(true)}>
+        {label}
+      </button>
+      {isOpen && createPortal(
+        <div
+          className={styles.receiptOverlay}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setIsOpen(false)
+          }}
+        >
+          <section className={styles.receiptModal} role="dialog" aria-modal="true" aria-label="Payment receipt">
+            <div className={styles.receiptModalHeader}>
+              <h2>Payment receipt</h2>
+              <button type="button" aria-label="Close receipt" onClick={() => setIsOpen(false)}>×</button>
+            </div>
+            <img src={url} alt="Payment receipt screenshot" />
+          </section>
+        </div>,
+        document.body
+      )}
+    </>
+  )
 }
 
 function ProductReview({ order, item }: { order: Order; item: Order['items'][number] }) {
@@ -208,7 +257,7 @@ export function OrderDetails({
       {order.fulfillmentType === 'pickup' && order.pickupDays && <p className={styles.detailNote}><strong>Pickup days</strong><span>{order.pickupDays}</span></p>}
       {order.fulfillmentType === 'pickup' && order.pickupHours && <p className={styles.detailNote}><strong>Pickup hours</strong><span>{order.pickupHours}</span></p>}
       {order.sellerNotes && <p className={styles.detailNote}><strong>Note to seller</strong><span>{order.sellerNotes}</span></p>}
-      {order.paymentReceiptUrl && <a className={styles.receiptLink} href={order.paymentReceiptUrl} target="_blank" rel="noreferrer">View payment receipt</a>}
+      {order.paymentReceiptUrl && (<ReceiptViewer className={styles.receiptLink} url={order.paymentReceiptUrl}label="View payment receipt"/>)}
       <div className={styles.detailTable}>
         <div className={styles.detailHeader}><span>ITEM</span><span>QTY</span><span>PRICE</span><span>AMOUNT</span></div>
         {order.items.map((item) => (
@@ -508,7 +557,7 @@ export function OrdersPage() {
                     <span className={styles.receiptColumn}>
                       {isOnlinePayment(order.payment)
                         ? order.paymentReceiptUrl
-                          ? <a className={styles.receiptAction} href={order.paymentReceiptUrl} target="_blank" rel="noreferrer" aria-label={`View digital receipt for order ${order.id}`}>View receipt</a>
+                          ? <ReceiptViewer className={styles.receiptAction} url={order.paymentReceiptUrl} label="View receipt" ariaLabel={`View digital receipt for order ${order.id}`}/>
                           : <span className={styles.receiptPending}>Not uploaded</span>
                         : <span className={styles.receiptNotNeeded}>—</span>}
                     </span>
