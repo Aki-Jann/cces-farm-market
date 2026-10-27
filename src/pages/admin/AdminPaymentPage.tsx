@@ -456,11 +456,6 @@ export function AdminPaymentPage() {
           onSearchChange={(event) => setSearch(event.target.value)}
         />
         <div className={styles.dashboard}>
-          <section className={styles.pageIntro} aria-label="Payments overview">
-            <span>TRANSACTION REVIEW</span>
-            <h2>Payment records</h2>
-            <p>Review order payment methods, submitted receipts, and transaction amounts.</p>
-          </section>
           <section className={styles.paymentPanel} aria-label="Payment records and filters">
             <nav className={styles.methodFilters} aria-label="Filter payments by method">
               <span className={styles.filterLabel}>PAYMENT METHOD</span>

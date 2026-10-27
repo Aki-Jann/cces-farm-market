@@ -53,6 +53,12 @@ type FirestoreProduct = {
 
 const categoryColors = ['#017632', '#79a94b', '#d3a32d', '#78a9a0', '#7492b8', '#a788b5']
 
+function matchesProduct(product: Product, query: string) {
+  return !query ||
+    product.name.toLowerCase().includes(query) ||
+    product.category.toLowerCase().includes(query)
+}
+
 function currency(value: number) {
   const safeValue = isNaN(value) || !isFinite(value) ? 0 : value
   return `₱${safeValue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -192,7 +198,6 @@ function MetricCard({ label, value, detail, icon, onClick }: { label: string; va
     products: <><path d="M4 7h16v13H4z" /><path d="M8 7V4h8v3" /><path d="M8 12h8" /><path d="M8 16h5" /></>,
     stock: <><path d="M12 3 21 19H3L12 3Z" /><path d="M12 9v4" /><path d="M12 16h.01" /></>,
   }
-
   return (
     <button className={`${styles.metric} ${styles[`metric${icon[0].toUpperCase()}${icon.slice(1)}`]}`} type="button" onClick={onClick} aria-label={`${label}: ${value}. View details`}>
       <div className={styles.metricHeading}>
@@ -431,6 +436,7 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
   const [transactionsPeriod, setTransactionsPeriod] = useState<Period>('daily')
   const [topProductsPeriod, setTopProductsPeriod] = useState<Period>('daily')
   const [underperformingPeriod, setUnderperformingPeriod] = useState<Period>('daily')
+  const query = search.trim().toLowerCase()
 
   useEffect(() => {
     // Orders and products are independent collections, so each gets its own
@@ -674,14 +680,12 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
   }
 
   const topProducts = useMemo(() => {
-    const query = search.trim().toLowerCase()
     return getProductPerformance(analytics.financialOrders, analytics.allProducts, topProductsPeriod)
-      .filter(({ product }) => !query ||
-        product.name.toLowerCase().includes(query) ||
-        product.category.toLowerCase().includes(query))
+      .filter(({ product }) => matchesProduct(product, query))
       .sort((a, b) => b.units - a.units || b.revenue - a.revenue || a.product.name.localeCompare(b.product.name))
       .slice(0, 5)
-  }, [analytics.allProducts, analytics.financialOrders, search, topProductsPeriod])
+  }, [analytics.allProducts, analytics.financialOrders, query, topProductsPeriod])
+
 
   const underperformingProducts = useMemo(() => {
     const { start } = getPeriodBounds(underperformingPeriod)
@@ -694,11 +698,12 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
     if (cohortRevenue <= 0) return []
     const averageRevenue = cohortRevenue / cohort.length
     return cohort
-      .map((product) => salesByProduct.get(product.id) ?? { product, units: 0, revenue: 0 })
-      .filter((result) => result.revenue < averageRevenue)
-      .sort((a, b) => a.revenue - b.revenue || a.units - b.units || a.product.name.localeCompare(b.product.name))
-      .slice(0, 5)
-  }, [analytics.allProducts, analytics.financialOrders, underperformingPeriod])
+    .map((product) => salesByProduct.get(product.id) ?? { product, units: 0, revenue: 0 })
+    .filter((result) => result.revenue < averageRevenue)
+    .filter(({ product }) => matchesProduct(product, query))
+    .sort()
+    .slice(0, 5)
+  }, [analytics.allProducts, analytics.financialOrders, underperformingPeriod, query])
 
   function openPanel(panel: AnalyticsPanel) {
     setActivePanel(panel)
@@ -719,12 +724,14 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
     underperforming: 'UNDERPERFORMING PRODUCTS',
   }
 
-  const inventoryProducts = activePanel === 'out-of-stock'
+  const inventoryProducts = (activePanel === 'out-of-stock'
     ? analytics.inventory.filter((product) => product.stock <= 0)
     : analytics.inventory
-  const rankedProducts = activePanel === 'top-products'
+  ).filter((product) => matchesProduct(product, query))
+  const rankedProducts = (activePanel === 'top-products'
     ? [...analytics.allProducts].sort((a, b) => b.sold - a.sold || a.name.localeCompare(b.name))
     : [...analytics.allProducts].sort((a, b) => a.sold - b.sold || a.name.localeCompare(b.name))
+  ).filter((product) => matchesProduct(product, query))
   const detailProducts = activePanel === 'inventory' || activePanel === 'out-of-stock' || activePanel === 'products-listed'
     ? inventoryProducts
     : activePanel === 'top-products' || activePanel === 'underperforming'
@@ -732,7 +739,10 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
       : activePanel === 'units-sold'
         ? [...analytics.allProducts].sort((a, b) => b.sold - a.sold || a.name.localeCompare(b.name))
         : []
-
+  const filteredInventory = useMemo(
+  () => analytics.inventory.filter((product) => matchesProduct(product, query)),
+  [analytics.inventory, query],
+  )
   return (
     <main className={styles.page}>
       <AdminSidebar active="analytics" role={role} />
@@ -796,6 +806,7 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
             <RevenueTrend points={revenueTrend} period={revenuePeriod} onPeriodChange={setRevenuePeriod} loading={!ordersLoaded} error={ordersError} />
             <TransactionsTrend points={transactionsTrend} period={transactionsPeriod} onPeriodChange={setTransactionsPeriod} loading={!ordersLoaded} error={ordersError} />
           </div>
+          
           <div className={styles.lowerGrid}>
             <ProductRanking
               title="TOP SELLING PRODUCTS"
@@ -820,7 +831,7 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
               description="Available products below the cohort's average revenue."
               onClick={() => openPanel('underperforming')}
             />
-            <InventoryChart products={analytics.inventory} loading={!productsLoaded} error={productsError} onClick={() => openPanel('inventory')} />
+            <InventoryChart products={filteredInventory} loading={!productsLoaded} error={productsError} onClick={() => openPanel('inventory')} />
           </div>
         </div>}
       </section>

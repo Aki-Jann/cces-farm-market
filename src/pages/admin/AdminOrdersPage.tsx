@@ -273,7 +273,7 @@ export function AdminOrdersPage() {
           actions={<><a aria-current={!archive ? 'page' : undefined} href="#/admin/orders">ACTIVE ORDERS</a><a aria-current={archive ? 'page' : undefined} href="#/admin/orders/archive">ORDER HISTORY</a></>}
         />
         <div className={styles.dashboard}>
-          {archive ? (
+          {archive ?? (
             <section className={styles.archiveSummary} aria-label="Completed orders summary">
               <div>
                 <span className={styles.archiveEyebrow}>ORDER HISTORY</span>
@@ -283,18 +283,6 @@ export function AdminOrdersPage() {
               <div className={styles.archiveMetrics}>
                 <div><strong>{completedOrders.length}</strong><span>COMPLETED ORDERS</span></div>
                 <div><strong>{currency(completedSales)}</strong><span>COMPLETED SALES</span></div>
-              </div>
-            </section>
-          ) : (
-            <section className={styles.archiveSummary} aria-label="Active orders summary">
-              <div>
-                <span className={styles.archiveEyebrow}>ORDER MANAGEMENT</span>
-                <h2>Active orders</h2>
-                <p>Track and manage orders still being fulfilled.</p>
-              </div>
-              <div className={styles.archiveMetrics}>
-                <div><strong>{orders.filter((order) => order.status !== 'DELIVERED' && order.status !== 'CANCELLED').length}</strong><span>ACTIVE ORDERS</span></div>
-                <div><strong>{counts.PENDING}</strong><span>AWAITING CONFIRMATION</span></div>
               </div>
             </section>
           )}

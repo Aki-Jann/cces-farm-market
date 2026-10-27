@@ -40,7 +40,7 @@
 
 .top::before {
   color: #89958c;
-  content: "ADMIN WORKSPACE";
+  content: "MY WORKSPACE";
   font-size: 9px;
   font-weight: 700;
   letter-spacing: .1em;
