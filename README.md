@@ -1,47 +1,57 @@
-# CCES Farm Market
+# Green Market
 
-CCES Farm Market is a farm-produce storefront with customer ordering and account features, plus an admin dashboard for managing products, orders, customers, payments, and sales analytics.
+### Farm to Market Supply Management System
 
-## Tech stack
+## Overview
 
-- React and TypeScript
+Green Market is an e-commerce platform that allows customers to purchase products online, sellers to manage inventory and orders, and administrators to oversee system operations.
+
+## Group Members
+
+| Name | Role | Responsibilities |
+| :--- | :--- | :--- |
+| Aaron Jann Enriquez | Project Manager, Backend Developer, Database Management | Oversees project planning and coordination, develops backend functionalities, and manages database design, implementation, and maintenance. |
+| Jasmien Pajiji | UI/UX Designer, Frontend Developer, QA Analyst and Tester | Designs user interfaces and user experiences, develops frontend components, and conducts system testing and quality assurance. |
+| Stephen Gabrielle David | Frontend Developer | Develops and implements user-facing features and interfaces. |
+| Abdullah Ratag | Backend Developer | Develops server-side functionalities, APIs, and system logic. |
+| Andre Joshua Nobleza | Frontend Developer | Develops and maintains frontend features and user interfaces. |
+| Roni Amir Bauzon | Frontend Developer | Assists in frontend development, interface implementation, and user experience enhancement. |
+
+## Tools and Software Used
+
+The system is developed using modern web technologies to support a responsive, database-driven, and real-time online marketplace platform.
+
+### Frontend Development
+
+- React.js
+- TypeScript
 - Vite
-- Firebase Authentication and Cloud Firestore
-- Cloudinary for product image uploads
 
-## Setup
+React.js, together with TypeScript and Vite, is used to develop the web application's user interface. This stack enables fast development, efficient performance, and maintainable code.
 
-1. Install the project dependencies:
+### Backend and Database Services
 
-   ```sh
-   npm install
-   ```
+- Firebase Authentication
+- Cloud Firestore
 
-2. Configure a Firebase project: register a web app, enable Email/Password Authentication, and create a Firestore database. Set the Firebase web app configuration in `src/firebase/firebaseConfig.ts`.
+Firebase Authentication manages user registration, login, logout, and role-based access control. Cloud Firestore serves as the primary database for storing user profiles, products, orders, conversations, and messages.
 
-3. Configure Cloudinary with an unsigned image-upload preset. Create a local `.env.local` file in the project root and set these variables (do not commit their values):
+### Media Storage
 
-   ```text
-   VITE_CLOUDINARY_CLOUD_NAME=
-   VITE_CLOUDINARY_UPLOAD_PRESET=
-   ```
+- Cloudinary
 
-4. Start the development server:
+Cloudinary is used to store, manage, and deliver product images efficiently through cloud-based image hosting.
 
-   ```sh
-   npm run dev
-   ```
+## Installation and Setup Guide
 
-## Checks
+No installation is required. Open the link below to view the live system:
 
-```sh
-npm run build
-npx tsc --noEmit
-npm run lint
-```
+🔗 **[Green Market](https://cces-farm-market.vercel.app/)**
 
-Firestore and Storage rules tests run with the local Firebase emulators:
+## Test Accounts
 
-```sh
-npm run test:rules
-```
+| Role | Username | Password |
+| :--- | :--- | :--- |
+| Administrator | cces@adzu.edu.ph | CCES1234 |
+| Farmer | co240652@adzu.edu.ph | Farmer1234 |
+| Customer | create own account | create own account |
