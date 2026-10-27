@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { onAuthStateChanged, sendPasswordResetEmail, signOut } from 'firebase/auth'
+import { onAuthStateChanged, sendPasswordResetEmail, verifyBeforeUpdateEmail, reauthenticateWithCredential, EmailAuthProvider, signOut } from 'firebase/auth'
 import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
@@ -105,6 +105,12 @@ export function AdminAccountPage({ role = 'farmer' }: { role?: 'farmer' | 'cces_
   const [settingsNotice, setSettingsNotice] = useState('')
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [showEmailForm, setShowEmailForm] = useState(false)
+  const [newEmail, setNewEmail] = useState('')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false)
+  const [emailError, setEmailError] = useState('')
+  const [emailNotice, setEmailNotice] = useState('')
   const storeSettingsDirty = useRef(false)
 
   useEffect(() => {
@@ -153,6 +159,14 @@ export function AdminAccountPage({ role = 'farmer' }: { role?: 'farmer' | 'cces_
             email: user.email ?? (typeof data.email === 'string' ? data.email : ''),
             birthday: displayBirthday(data.birthday),
           }
+
+          // After the user verifies a new email and signs back in, Auth has the new
+          // address but the Firestore profile still has the old one. Keep them in sync.
+          if (user.email && data.email !== user.email) {
+            updateDoc(doc(db, 'users', user.uid), { email: user.email })
+              .catch((e) => console.error('Syncing email to profile failed:', e))
+          }
+
           setProfile(loadedProfile)
           setIsEditing((currentlyEditing) => {
             if (!currentlyEditing) setDraft(loadedProfile)
@@ -239,6 +253,65 @@ export function AdminAccountPage({ role = 'farmer' }: { role?: 'farmer' | 'cces_
       setError('Unable to save your account details. Please try again.')
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  async function requestEmailChange(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const user = auth.currentUser
+    const trimmed = newEmail.trim()
+
+    if (!user || !user.email) {
+      setEmailError('You must be logged in to change your email.')
+      return
+    }
+    if (trimmed.toLowerCase() === user.email.toLowerCase()) {
+      setEmailError('That is already your current email address.')
+      return
+    }
+
+    setEmailError('')
+    setEmailNotice('')
+    setIsUpdatingEmail(true)
+
+    try {
+      // Sensitive operation: Firebase requires a recent login, so reauthenticate first.
+      const credential = EmailAuthProvider.credential(user.email, currentPassword)
+      await reauthenticateWithCredential(user, credential)
+
+      // Sends a verification link to the NEW address. The email only
+      // changes after the user clicks that link.
+      await verifyBeforeUpdateEmail(user, trimmed)
+
+      setEmailNotice(`A verification link was sent to ${trimmed}. Your email will change once you confirm it.`)
+      setNewEmail('')
+      setCurrentPassword('')
+      setShowEmailForm(false)
+    } catch (err) {
+      console.error('Admin email change failed:', err)
+      const code = (err as { code?: string }).code
+      switch (code) {
+        case 'auth/wrong-password':
+        case 'auth/invalid-credential':
+          setEmailError('Your current password is incorrect.')
+          break
+        case 'auth/invalid-email':
+          setEmailError('Please enter a valid email address.')
+          break
+        case 'auth/email-already-in-use':
+          setEmailError('That email address is already in use.')
+          break
+        case 'auth/requires-recent-login':
+          setEmailError('Please log out and log back in, then try again.')
+          break
+        case 'auth/too-many-requests':
+          setEmailError('Too many attempts. Please try again later.')
+          break
+        default:
+          setEmailError('Unable to start the email change. Please try again.')
+      }
+    } finally {
+      setIsUpdatingEmail(false)
     }
   }
 
@@ -456,7 +529,6 @@ export function AdminAccountPage({ role = 'farmer' }: { role?: 'farmer' | 'cces_
               <form className={styles.form} onSubmit={(event) => void save(event)}>
                 <label>First Name<input autoComplete="given-name" value={draft?.firstName ?? ''} onChange={(event) => updateField('firstName', event.target.value)} /></label>
                 <label>Last Name<input autoComplete="family-name" value={draft?.lastName ?? ''} onChange={(event) => updateField('lastName', event.target.value)} /></label>
-                <label>Email Address<input type="email" value={profile.email} readOnly /></label>
                 <label>Contact Number<input autoComplete="tel" value={draft?.contactNumber ?? ''} onChange={(event) => updateField('contactNumber', event.target.value)} /></label>
                 <label className={styles.fullWidth}>Address<input autoComplete="street-address" value={draft?.address ?? ''} onChange={(event) => updateField('address', event.target.value)} /></label>
                 <div className={styles.actions}>
@@ -474,6 +546,32 @@ export function AdminAccountPage({ role = 'farmer' }: { role?: 'farmer' | 'cces_
                 <div><dt>Birthday</dt><dd>{profile.birthday}</dd></div>
               </dl>
             )}
+
+            <div className={styles.security}>
+              <div>
+                <h3>Email</h3>
+                <p>Change your email. We'll send a verification link to the new address.</p>
+              </div>
+              {!showEmailForm && (
+                <button type="button" onClick={() => { setShowEmailForm(true); setEmailNotice('') }}>CHANGE EMAIL</button>
+              )}
+            </div>
+            {showEmailForm && (
+              <form className={styles.form} onSubmit={(event) => void requestEmailChange(event)}>
+                <label>New Email
+                  <input type="email" required autoComplete="email" disabled={isUpdatingEmail} value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+                </label>
+                <label>Current Password
+                  <input type="password" required autoComplete="current-password" disabled={isUpdatingEmail} value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+                </label>
+                <div className={styles.actions}>
+                  <button type="button" disabled={isUpdatingEmail} onClick={() => { setShowEmailForm(false); setEmailError(''); setNewEmail(''); setCurrentPassword('') }}>CANCEL</button>
+                  <button type="submit" disabled={isUpdatingEmail}>{isUpdatingEmail ? 'SENDING...' : 'SEND VERIFICATION'}</button>
+                </div>
+              </form>
+            )}
+            {emailError && <p className={styles.error} role="alert">{emailError}</p>}
+            {emailNotice && <p className={styles.notice} role="status">{emailNotice}</p>}
 
             <div className={styles.security}>
               <div>
