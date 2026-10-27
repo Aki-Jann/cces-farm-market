@@ -6,10 +6,10 @@ import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import styles from './AdminCustomersPage.module.css'
-import { formatMonthDayYear, formatMonthDayYearTime } from '../../utils/dateFormat'
+import { formatMonthDayYear, formatTime } from '../../utils/dateFormat'
 
-type Message = { id: string; text: string; timestamp: string; sender: 'customer' | 'admin' }
-type LoadedMessage = Message & { createdAt: unknown }
+type Message = { id: string; text: string; timestamp: string; sender: 'customer' | 'admin'; dayDivider?: string }
+type LoadedMessage = Omit<Message, 'dayDivider'> & { createdAt: Date | null }
 type Order = { id: string; date: string; status: 'DELIVERED' | 'PENDING' | 'CONFIRMED' | 'PACKED'; total: number }
 type Customer = {
   id: string
@@ -37,11 +37,12 @@ function formatDate(value: unknown, fallback = 'Unknown') {
   return fallback
 }
 
-function formatMessageTimestamp(value: unknown) {
+function parseMessageDate(value: unknown): Date | null {
   if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
-    return formatMonthDayYearTime(value.toDate())
+    const date = value.toDate()
+    return date instanceof Date && !Number.isNaN(date.getTime()) ? date : null
   }
-  return 'Pending'
+  return null
 }
 
 const customerTypes = ['Individual', 'Retail', 'Wholesale'] as const
@@ -133,24 +134,33 @@ function Messages({ customer }: { customer: Customer }) {
     shouldScrollToBottom.current = true
     const messagesQuery = query(collection(db, 'conversations', customer.id, 'messages'))
     return onSnapshot(messagesQuery, (snapshot) => {
-      const loadedMessages = snapshot.docs
+      const sortedMessages = snapshot.docs
         .map((messageDocument): LoadedMessage => {
           const data = messageDocument.data()
+          const createdAt = parseMessageDate(data.createdAt)
           return {
             id: messageDocument.id,
             sender: data.senderRole === 'admin' ? 'admin' : 'customer',
             text: typeof data.text === 'string' ? data.text : '',
-            timestamp: formatMessageTimestamp(data.createdAt),
-            createdAt: data.createdAt,
+            timestamp: createdAt ? formatTime(createdAt) : 'Pending',
+            createdAt,
           }
         })
         .filter((message) => message.text)
-        .sort((first, second) => {
-          const firstTime = first.createdAt && typeof first.createdAt === 'object' && 'toDate' in first.createdAt && typeof first.createdAt.toDate === 'function' ? first.createdAt.toDate().getTime() : 0
-          const secondTime = second.createdAt && typeof second.createdAt === 'object' && 'toDate' in second.createdAt && typeof second.createdAt.toDate === 'function' ? second.createdAt.toDate().getTime() : 0
-          return firstTime - secondTime
-        })
-        .map(({ id, text, timestamp, sender }) => ({ id, text, timestamp, sender }))
+        .sort((first, second) => (first.createdAt?.getTime() ?? 0) - (second.createdAt?.getTime() ?? 0))
+
+      let previousDay = ''
+      const loadedMessages: Message[] = sortedMessages.map(({ createdAt, ...message }) => {
+        const currentDay = createdAt
+          ? `${createdAt.getFullYear()}-${createdAt.getMonth()}-${createdAt.getDate()}`
+          : ''
+        const dayDivider = createdAt && currentDay !== previousDay
+          ? formatMonthDayYear(createdAt)
+          : undefined
+        if (currentDay) previousDay = currentDay
+        return { ...message, ...(dayDivider ? { dayDivider } : {}) }
+      })
+
       setMessages(loadedMessages)
       setIsLoading(false)
     }, (snapshotError) => {
@@ -201,7 +211,19 @@ function Messages({ customer }: { customer: Customer }) {
       setIsSending(false)
     }
   }
-  return <div className={styles.chat}><div className={styles.messageList} onScroll={(event) => { const element = event.currentTarget; shouldScrollToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24 }} ref={messageListRef}>{isLoading ? <p>Loading messages...</p> : error && messages.length === 0 ? <p role="alert">{error}</p> : messages.map((message) => <article className={`${styles.message} ${message.sender === 'admin' ? styles.outgoing : styles.incoming}`} key={message.id}><p>{message.text}</p><time>{message.timestamp}</time></article>)}</div><form className={styles.composer} onSubmit={submit}><input aria-label={`Message ${customer.name}`} placeholder={`Message ${customer.name}...`} value={draft} onChange={(event) => setDraft(event.target.value)} /><button disabled={isSending} type="submit">SEND</button></form>{error && messages.length > 0 && <p role="alert">{error}</p>}</div>
+  return <div className={styles.chat}><div className={styles.messageList} onScroll={(event) => { const element = event.currentTarget; shouldScrollToBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 24 }} ref={messageListRef}>{isLoading ? <p>Loading messages...</p> : error && messages.length === 0 ? <p role="alert">{error}</p> : messages.map((message) => (
+  <div className={styles.messageGroup} key={message.id}>
+    {message.dayDivider && (
+      <div className={styles.dayDivider} role="separator" aria-label={`Messages from ${message.dayDivider}`}>
+        <span>{message.dayDivider}</span>
+      </div>
+    )}
+    <article className={`${styles.message} ${message.sender === 'admin' ? styles.outgoing : styles.incoming}`}>
+      <p>{message.text}</p>
+      <time>{message.timestamp}</time>
+    </article>
+  </div>
+))}</div><form className={styles.composer} onSubmit={submit}><input aria-label={`Message ${customer.name}`} placeholder={`Message ${customer.name}...`} value={draft} onChange={(event) => setDraft(event.target.value)} /><button disabled={isSending} type="submit">SEND</button></form>{error && messages.length > 0 && <p role="alert">{error}</p>}</div>
 }
 
 type RawUserRecord = { id: string; data: Record<string, unknown> }
@@ -321,5 +343,21 @@ export function AdminCustomersPage() {
     }
   }
 
-  return <main className={styles.page}><AdminSidebar active="customers" /><section className={styles.content}><Header title="CUSTOMERS" search={search} onSearchChange={(event) => setSearch(event.target.value)} /><section className={styles.pageIntro} aria-label="Customers overview"><span>COMMUNITY DIRECTORY</span><h2>Customer relationships</h2><p>Review customer profiles, preferences, and conversations in one place.</p></section>{isLoading ? <div className={styles.workspace}><p>Loading customers...</p></div> : error && customers.length === 0 ? <div className={styles.workspace}><p role="alert">{error}</p></div> : !selected ? <div className={styles.workspace}><p>{search.trim() ? 'No customer profiles match your search.' : 'No customer profiles found.'}</p></div> : <div className={styles.workspace}><CustomerList customers={visibleCustomers} selectedId={selected.id} onSelect={(id) => { setSelectedId(id); setTab('profile') }} /><section className={styles.details}><CustomerHeader customer={selected} onChangeCustomerType={(customerType) => void updateCustomerProfile('customerType', customerType)} /><nav className={styles.tabs}><button className={tab === 'profile' ? styles.activeTab : ''} type="button" onClick={() => setTab('profile')}>PROFILE</button><button className={tab === 'messages' ? styles.activeTab : ''} type="button" onClick={() => setTab('messages')}>MESSAGES</button></nav>{tab === 'profile' ? <Profile key={selected.id} customer={selected} isSaving={isSaving} onSaveNotes={(notes) => updateCustomerProfile('farmNotes', notes)} /> : <Messages key={selected.id} customer={selected} />}</section></div>}</section></main>
+  return <main className={styles.page}><AdminSidebar active="customers" />
+  <section className={styles.content}>
+    <Header title="CUSTOMERS" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
+      {isLoading ? <div className={styles.workspace}>
+          <p>Loading customers...</p>
+          </div> : error && customers.length === 0 ? 
+          <div className={styles.workspace}><p role="alert">{error}</p>
+          </div> : !selected ? <div className={styles.workspace}>
+            <p>{search.trim() ? 'No customer profiles match your search.' : 'No customer profiles found.'}</p>
+          </div> : <div className={styles.workspace}>
+            <CustomerList customers={visibleCustomers} selectedId={selected.id} onSelect={(id) => { setSelectedId(id); setTab('profile') }} />
+              <section className={styles.details}>
+                <CustomerHeader customer={selected} onChangeCustomerType={(customerType) => void updateCustomerProfile('customerType', customerType)} />
+                  <nav className={styles.tabs}>
+                    <button className={tab === 'profile' ? styles.activeTab : ''} type="button" onClick={() => setTab('profile')}>PROFILE</button>
+                    <button className={tab === 'messages' ? styles.activeTab : ''} type="button" onClick={() => setTab('messages')}>MESSAGES</button>
+                    </nav>{tab === 'profile' ? <Profile key={selected.id} customer={selected} isSaving={isSaving} onSaveNotes={(notes) => updateCustomerProfile('farmNotes', notes)} /> : <Messages key={selected.id} customer={selected} />}</section></div>}</section></main>
 }

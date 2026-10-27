@@ -94,8 +94,7 @@ function ProductCard({
           <span className={styles.categoryLabel}>{product.category}</span>
           <strong>{product.name}</strong>
           <small className={styles.stockText}>{product.stock} {product.unit} in stock · {product.sold} sold</small>
-          <ProductRating productId={product.id} />
-        </div>
+          <ProductRating productId={product.id} showReviews />        </div>
         <div className={styles.price}><strong>{currency(product.price)}</strong><small>PER {product.unit}</small></div>
       </div>
       <div className={styles.productActions}>
@@ -498,26 +497,25 @@ export function AdminProductsPage() {
         <Header title="PRODUCTS" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
         <div className={`${styles.workspace} ${isFormOpen ? styles.workspaceWithForm : ''}`}>
           <section className={`${styles.grid} ${isFormOpen ? styles.gridWithForm : styles.gridList}`}>
-            <div className={styles.catalogHeader}>
-              <div><span>MARKET MANAGEMENT</span><h2>Product catalog</h2><p>Manage listings, prices, and availability · {products.length} product{products.length === 1 ? '' : 's'}</p></div>
+            <div className={styles.toolbar}>
+              <nav className={styles.categoryFilters} aria-label="Filter products by category">
+                {['ALL', ...categoryOptions].map((category) => {
+                  const count = category === 'ALL' ? products.length : products.filter((product) => product.category === category).length
+                  return (
+                    <button
+                      aria-pressed={selectedCategory === category}
+                      className={selectedCategory === category ? styles.activeCategoryFilter : ''}
+                      key={category}
+                      onClick={() => setSelectedCategory(category)}
+                      type="button"
+                    >
+                      {category} <span>{count}</span>
+                    </button>
+                  )
+                })}
+              </nav>
               <button className={styles.addButton} type="button" onClick={startAdd}><span aria-hidden="true">+</span> ADD PRODUCT</button>
             </div>
-            <nav className={styles.categoryFilters} aria-label="Filter products by category">
-              {['ALL', ...categoryOptions].map((category) => {
-                const count = category === 'ALL' ? products.length : products.filter((product) => product.category === category).length
-                return (
-                  <button
-                    aria-pressed={selectedCategory === category}
-                    className={selectedCategory === category ? styles.activeCategoryFilter : ''}
-                    key={category}
-                    onClick={() => setSelectedCategory(category)}
-                    type="button"
-                  >
-                    {category} <span>{count}</span>
-                  </button>
-                )
-              })}
-            </nav>
             {visibleProducts.map((product) => (
               <ProductCard
                 key={product.id}
