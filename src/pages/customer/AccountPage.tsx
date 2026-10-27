@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
-import { onAuthStateChanged, sendPasswordResetEmail } from 'firebase/auth'
+import { onAuthStateChanged, sendPasswordResetEmail, verifyBeforeUpdateEmail, reauthenticateWithCredential, EmailAuthProvider, signOut } from 'firebase/auth'
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
 import { Header } from '../../components/layout/Header'
@@ -44,13 +44,19 @@ export function AccountPage() {
   const [isSendingReset, setIsSendingReset] = useState(false)
   const [resetError, setResetError] = useState('')
   const [resetNotice, setResetNotice] = useState('')
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [showEmailForm, setShowEmailForm] = useState(false)
+  const [newEmail, setNewEmail] = useState('')
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [isUpdatingEmail, setIsUpdatingEmail] = useState(false)
+  const [emailError, setEmailError] = useState('')
+  const [emailNotice, setEmailNotice] = useState('')
 
   useEffect(() => {
     let isMounted = true
     let unsubscribeProfile: (() => void) | undefined
 
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      // Tear down any previous profile listener before attaching a new one.
       if (unsubscribeProfile) {
         unsubscribeProfile()
         unsubscribeProfile = undefined
@@ -73,7 +79,7 @@ export function AccountPage() {
             setIsLoading(false)
             return
           }
-
+        
           const data = snapshot.data()
           const loadedAccount: AccountData = {
             firstName: typeof data.firstName === 'string' ? data.firstName : '',
@@ -85,6 +91,11 @@ export function AccountPage() {
             customerType: typeof data.customerType === 'string' ? data.customerType : 'Not provided',
             farmNotes: typeof data.farmNotes === 'string' ? data.farmNotes : '',
           }
+          if (user.email && data.email !== user.email) {
+            updateDoc(doc(db, 'users', user.uid), { email: user.email })
+              .catch((e) => console.error('Syncing email to profile failed:', e))
+          }
+
           setAccount(loadedAccount)
           // Only sync the edit draft when the user isn't actively editing,
           // so a live update doesn't overwrite unsaved changes.
@@ -114,7 +125,7 @@ export function AccountPage() {
     }
   }, [])
 
-  function updateField(field: 'firstName' | 'lastName' | 'email' | 'contact' | 'address', value: string) {
+  function updateField(field: 'firstName' | 'lastName' | 'contact' | 'address', value: string) {
     setDraft((current) => current ? { ...current, [field]: value } : current)
   }
 
@@ -129,7 +140,6 @@ export function AccountPage() {
       await updateDoc(doc(db, 'users', user.uid), {
         firstName: draft.firstName.trim(),
         lastName: draft.lastName.trim(),
-        email: draft.email.trim(),
         contactNumber: draft.contact.trim(),
         address: draft.address.trim(),
       })
@@ -142,6 +152,62 @@ export function AccountPage() {
       setIsSaving(false)
     }
   }
+
+  async function requestEmailChange(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const user = auth.currentUser
+    const trimmed = newEmail.trim()
+
+    if (!user || !user.email) {
+      setEmailError('You must be logged in to change your email.')
+      return
+    }
+    if (trimmed.toLowerCase() === user.email.toLowerCase()) {
+      setEmailError('That is already your current email address.')
+      return
+    }
+
+    setEmailError('')
+    setEmailNotice('')
+    setIsUpdatingEmail(true)
+
+    try {
+      const credential = EmailAuthProvider.credential(user.email, currentPassword)
+      await reauthenticateWithCredential(user, credential)
+
+      await verifyBeforeUpdateEmail(user, trimmed)
+
+      setEmailNotice(`A verification link was sent to ${trimmed}. Your email will change once you confirm it.`)
+      setNewEmail('')
+      setCurrentPassword('')
+      setShowEmailForm(false)
+    } catch (err) {
+      console.error('Email change failed:', err)
+      const code = (err as { code?: string }).code
+      switch (code) {
+        case 'auth/wrong-password':
+        case 'auth/invalid-credential':
+          setEmailError('Your current password is incorrect.')
+          break
+        case 'auth/invalid-email':
+          setEmailError('Please enter a valid email address.')
+          break
+        case 'auth/email-already-in-use':
+          setEmailError('That email address is already in use.')
+          break
+        case 'auth/requires-recent-login':
+          setEmailError('Please log out and log back in, then try again.')
+          break
+        case 'auth/too-many-requests':
+          setEmailError('Too many attempts. Please try again later.')
+          break
+        default:
+          setEmailError('Unable to start the email change. Please try again.')
+      }
+    } finally {
+      setIsUpdatingEmail(false)
+    }
+  } 
 
   async function sendPasswordReset() {
     const email = auth.currentUser?.email
@@ -163,6 +229,19 @@ export function AccountPage() {
       setIsSendingReset(false)
     }
   }
+
+  async function logout() {
+      setIsLoggingOut(true)
+      setError('')
+      try {
+        await signOut(auth)
+        window.location.hash = '/login'
+      } catch (logoutError) {
+        console.error('Signing out of account failed:', logoutError)
+        setError('Unable to log out. Please try again.')
+        setIsLoggingOut(false)
+      }
+    }
 
   if (isLoading) {
     return <main className={styles.page}><CustomerSidebar active="account" /><section className={styles.content}><Header title="MY ACCOUNT" /><section className={styles.card}><p>Loading account information...</p></section></section></main>
@@ -187,7 +266,9 @@ export function AccountPage() {
               </div>
               <p>{detailsHidden ? hiddenValue : account.email}</p>
             </div>
-            <a href="#/" className={styles.logout}>LOG OUT</a>
+            <button className={styles.logout} type="button" disabled={isLoggingOut} onClick={() => void logout()}>
+                {isLoggingOut ? 'LOGGING OUT...' : 'LOG OUT'}
+              </button>
           </div>
           <div className={styles.sectionHeading}>
             <div>
@@ -205,7 +286,7 @@ export function AccountPage() {
             <form className={styles.form} onSubmit={save}>
               <label>First Name<input value={draft?.firstName ?? ''} onChange={(event) => updateField('firstName', event.target.value)} /></label>
               <label>Last Name<input value={draft?.lastName ?? ''} onChange={(event) => updateField('lastName', event.target.value)} /></label>
-              <label>Email Address<input type="email" value={draft?.email ?? ''} onChange={(event) => updateField('email', event.target.value)} /></label>
+              
               <label>Contact Number<input value={draft?.contact ?? ''} onChange={(event) => updateField('contact', event.target.value)} /></label>
               <label>Address<input value={draft?.address ?? ''} onChange={(event) => updateField('address', event.target.value)} /></label>
               <div className={styles.actions}><button disabled={isSaving} type="button" onClick={() => setEditing(false)}>CANCEL</button><button disabled={isSaving} type="submit">{isSaving ? 'SAVING...' : 'SAVE CHANGES'}</button></div>
@@ -220,6 +301,31 @@ export function AccountPage() {
               <div><dt>Birthday</dt><dd>{detailsHidden ? hiddenValue : account.birthday}</dd></div>
             </dl>
           )}
+          <div className={styles.security}>
+            <div>
+              <h3>Email</h3>
+              <p>Change your email. We'll send a verification link to the new address.</p>
+            </div>
+            {!showEmailForm && (
+              <button type="button" onClick={() => setShowEmailForm(true)}>CHANGE EMAIL</button>
+            )}
+          </div>
+          {showEmailForm && (
+            <form className={styles.form} onSubmit={requestEmailChange}>
+              <label>New Email
+                <input type="email" required value={newEmail} onChange={(e) => setNewEmail(e.target.value)} />
+              </label>
+              <label>Current Password
+                <input type="password" required autoComplete="current-password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
+              </label>
+              <div className={styles.actions}>
+                <button type="button" disabled={isUpdatingEmail} onClick={() => { setShowEmailForm(false); setEmailError('') }}>CANCEL</button>
+                <button type="submit" disabled={isUpdatingEmail}>{isUpdatingEmail ? 'SENDING...' : 'SEND VERIFICATION'}</button>
+              </div>
+            </form>
+          )}
+          {emailError && <p className={styles.resetError} role="alert">{emailError}</p>}
+          {emailNotice && <p className={styles.resetNotice} role="status">{emailNotice}</p>}
           <div className={styles.security}>
             <div>
               <h3>Password</h3>

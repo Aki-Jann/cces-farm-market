@@ -76,19 +76,25 @@
 
 .logout {
   background: #fff0ee;
+  border: 0;
   border-radius: 5px;
   color: #b42318;
+  cursor: pointer;
   font-size: 12px;
   font-weight: 700;
   margin-left: auto;
   padding: 9px 15px;
-  text-decoration: none;
 }
 
-.logout:hover,
+.logout:hover:not(:disabled),
 .logout:focus-visible {
   background: #fde6e2;
   outline: 0;
+}
+
+.logout:disabled {
+  cursor: wait;
+  opacity: .6;
 }
 
 .sectionHeading {

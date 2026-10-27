@@ -6,10 +6,6 @@
   min-height: 100vh;
 }
 
-.product {
-  grid-template-columns: 22px 34px minmax(0, 1fr);
-}
-
 .productRank {
   align-items: center;
   background: #edf5ef;
@@ -272,15 +268,19 @@ button.panel {
 }
 
 .panelHeading {
-  align-items: flex-start;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: space-between;
+  align-items: start;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .panelHeading > div {
   min-width: 0;
+}
+
+.periodFilters {
+  flex: 0 0 auto;
+  justify-self: end;
 }
 
 .periodFilters {
@@ -484,6 +484,11 @@ button.panel {
   grid-template-columns: 40px minmax(0, 1fr) auto;
   min-width: 0;
 }
+
+.product {
+  grid-template-columns: 22px 34px minmax(0, 1fr);
+}
+
 
 .inventoryItem img,
 .product img {

@@ -1,0 +1,149 @@
+# SYSTEM NOTES
+
+## ROLES
+- `customer`: stored as `users/{uid}.role == "customer"`; public registration creates this role; route guard permits `shop`, `orders`, `messages`, and `account`.
+- `admin`: stored as `users/{uid}.role == "admin"`; route guard permits all `/admin` pages; admin account/dashboard UI labels this role `farmer`.
+- `farmer`: UI label/prop value for a user whose stored role is `admin`; not an accepted stored role or route-guard role.
+- `cces_admin`: stored as `users/{uid}.role == "cces_admin"`; route guard permits `admin`, `admin-analytics`, and `admin-account`; admin sidebar shows dashboard, analytics, and account navigation.
+- Any other, missing, or unreadable `users/{uid}.role`: treated as no valid role by the app route guard.
+- Unauthenticated user: public landing and auth routes; protected routes redirect to `#/login`.
+- `firestore.rules` role helpers recognize `customer`, `admin`, and `cces_admin`; no `farmer` role helper.
+
+## PAGES
+- `/` (landing): public.
+  - Navigate to shop section, steps, community, about, and FAQ anchors.
+  - Navigate to login.
+  - View up to four available, in-stock products sorted by sold count then name.
+  - View product ratings and public pickup schedule.
+  - Select “ADD TO CART”; navigates to login and does not add a product.
+- `/login`: public.
+  - Sign in with email and password.
+  - Navigate to registration, password recovery, and landing.
+  - Successful sign-in routes customers to `/shop`, admins to `/admin`, and CCES admins to `/admin/analytics`.
+- `/register`: public.
+  - Create a customer account with first name, last name, email, password, birthday, Philippine contact number, and address.
+  - Navigate to login and landing.
+- `/forgot-password`: public.
+  - Request a password-reset email.
+  - Navigate back to login.
+- `/shop`: `customer`.
+  - Search products and filter by category.
+  - Add products to cart; increase, decrease, or enter quantity; remove individual products; clear cart.
+  - Persist cart quantities in browser local storage per user.
+  - Edit delivery address; choose delivery or pickup; add seller notes.
+  - Select COD, GCash, or Maya; view configured payment details/QR; upload online-payment receipt and place order.
+  - View product ratings/reviews.
+- `/orders` (including `orders/...` hashes): `customer`.
+  - Search and filter orders by status.
+  - Select an order, view details and payment receipt.
+  - Confirm delivery for delivered orders.
+  - After delivery confirmation, rate each order product from 1–5 and submit an optional comment.
+- `/messages`: `customer`.
+  - View real-time seller conversation and send text messages.
+- `/account`: `customer`.
+  - Show/hide personal details; edit first name, last name, email, contact number, and address; save or cancel.
+  - Request password-reset email.
+  - Select “LOG OUT”; the link navigates to landing.
+- `/admin`: `admin`, `cces_admin`.
+  - Search dashboard orders/inventory and view revenue, active orders, stock, listed-product counts, recent orders, and inventory.
+  - Admin can navigate to orders and products; CCES admin dashboard is read-only and has no orders/products navigation links.
+- `/admin/orders` and `/admin/orders/archive`: `admin`.
+  - Search and filter orders; show all or filter by status; select an order and view its details/receipt.
+  - Advance or reverse an active order through pending, confirmed, packed, and delivered.
+  - Switch between active orders and order history.
+- `/admin/payment`: `admin`.
+  - Search and filter payment records by method; view uploaded receipts.
+  - Verify eligible GCash/Maya payments; reject eligible pending GCash/Maya orders.
+  - Mark eligible COD orders as paid.
+- `/admin/products`: `admin`.
+  - Search and filter product catalog by category.
+  - Add products; edit name, category, stock, price, availability, and photo; add a category.
+  - List or unlist a product; view rating and sales count.
+- `/admin/customers`: `admin`.
+  - Search and select customer profiles; view customer orders and profile details.
+  - Change customer type; edit farm notes.
+  - View the customer conversation and send text messages.
+- `/admin/analytics`: `admin`, `cces_admin`.
+  - Search analytics; view revenue/order-value, unit, product, stock, category, trend, top-product, and underperforming-product views.
+  - Select analytics detail panels; switch revenue, transaction, top-product, and underperforming-product periods between daily, monthly, and yearly; return to overview.
+- `/admin/account`: `admin`, `cces_admin`.
+  - Edit first name, last name, contact number, and address; save or cancel.
+  - Request password-reset email and log out.
+  - `admin` can edit pickup/payment settings and upload/remove GCash/Maya QR images in the UI.
+  - `cces_admin` does not see store settings.
+
+## BUSINESS RULES
+- Registration requires non-empty first and last names, valid email syntax, valid Philippine mobile format (`09` plus 9 digits or `+639` plus 9 digits), non-empty address, valid non-future birthday, password length of at least 6, and matching confirmation.
+- A customer order contains 1–5 distinct products.
+- Product quantity must be a positive integer, not exceed available stock, and be at most 1,000 under Firestore rules.
+- Checkout transaction rechecks customer profile role, product existence, availability, stock, and unchanged price.
+- Checkout decrements product stock and increments sold count in the same transaction that creates the order.
+- Tax is 5% of subtotal.
+- Delivery fee is ₱100 for non-empty delivery orders; pickup has no delivery fee.
+- Delivery requires a non-empty address; pickup uses storefront pickup location, days, and hours.
+- Seller notes are optional and limited to 1,000 characters by Firestore rules.
+- Payment methods are `COD`, `GCASH`, and `MAYA`; COD starts `unpaid`; online payments start `awaiting_verification`.
+- Online payment requires a configured QR URL and uploaded receipt.
+- Receipt accepts JPEG, PNG, or WebP MIME types and a maximum size of 5 MB in checkout.
+- Product and payment QR image selection accepts JPG/JPEG, PNG, and WebP; maximum size is 5 MB.
+- GCash/Maya receipt verification changes payment status to paid and records reviewer/time.
+- Rejecting an awaiting-verification online payment is limited to pending orders; rejection cancels the order and restores each product's stock while reducing sold count.
+- COD can be marked paid for pending, confirmed, packed, or delivered orders.
+- Order status actions are pending → confirmed → packed → delivered, with reverse actions in the UI.
+- Customer delivery confirmation requires delivered status and an unconfirmed order.
+- A product review requires the signed-in customer to own the order, the order to be delivered and delivery-confirmed, the review to match an order item, and no existing review for that product/order.
+- Review rating is an integer from 1 to 5; comment is limited to 1,000 characters; reviews cannot be updated or deleted under Firestore rules.
+- Product sales and revenue analytics use orders eligible under the financial-totals helper imported by the admin dashboard and analytics pages.
+
+## FIRESTORE
+- `users/{userId}` fields used: `firstName`, `lastName`, `email`, `birthday`, `contactNumber`, `address`, `role`, `customerType`, `farmNotes`, `createdAt`.
+  - Read: owner `get`; `admin` `get` and `list`.
+  - Create: owner only; required customer-profile fields, role `customer`, customer type `individual`, and server timestamp.
+  - Update: `admin` except changing `role`; owner may change only first name, last name, email, contact number, and address.
+  - Delete: `admin`.
+- `products/{productId}` fields used: `name`, `category`, `price`, `stock`, `unit`, `imageUrl`, `isAvailable`, `sold`, `createdAt`; checkout metadata `checkoutOrderId`, `checkoutQuantity`, `checkoutAction`, `checkoutItemIndex`.
+  - Read: public.
+  - Create/delete: `admin`.
+  - Update: `admin`, except checkout-action updates must satisfy inventory-restore rules; `customer` may perform only a valid order stock/sold update tied to the order transaction.
+  - `cces_admin`: read only.
+- `products/{productId}/reviews/{orderId}` fields: `orderId`, `productId`, `orderItem`, `userId`, `rating`, `comment`, `createdAt`.
+  - Read: public.
+  - Create: qualifying customer review for their delivered, delivery-confirmed order.
+  - Update/delete: denied.
+- `orders/{orderId}` fields used: `orderNumber`, `userId`, `customerName`, `customerEmail`, `items` (`productId`, `name`, `price`, `quantity`, `unit`), `subtotal`, `deliveryFee`, `tax`, `total`, `paymentMethod`, `paymentStatus`, `status`, `fulfillmentType`, `deliveryAddress`, `pickupHours`, `pickupDays`, `sellerNotes`, `paymentReceiptUrl`, `createdAt`; review/payment/fulfillment fields include `deliveryConfirmed`, `deliveryConfirmedAt`, `paymentVerifiedAt`, `paymentVerifiedBy`, `paymentRejectedAt`, `paymentRejectedBy`.
+  - Read: `admin` and `cces_admin`; authenticated order owner.
+  - Create: customer only, with validated order fields, totals, fulfillment, payment, receipt URL, items, profile, and matching inventory updates.
+  - Update: `admin` may change valid order status, verify qualifying online payments, mark qualifying COD orders paid, or reject qualifying online payments; order owner may only confirm delivery on a delivered, unconfirmed order.
+  - Delete: `admin`.
+- `conversations/{customerId}` fields: `customerId`, `lastMessage`, `updatedAt`.
+  - Read: `admin` or conversation owner.
+  - Create/update: `admin`, or owner customer; requires non-empty `lastMessage` and server timestamp.
+  - Delete: `admin`.
+- `conversations/{customerId}/messages/{messageId}` fields: `senderId`, `senderRole`, `text`, `createdAt`.
+  - Read: `admin` or conversation owner.
+  - Create: authenticated `admin` with sender role `admin`, or owner `customer` with sender role `customer`; non-empty text and server timestamp required.
+  - Update: denied.
+  - Delete: `admin`.
+- `settings/storefront` fields used by UI: `pickupLocation`, `pickupDays`, `pickupHours`, `gcashAccountName`, `gcashAccountNumber`, `gcashQrUrl`, `gcashQrPath`, `mayaAccountName`, `mayaAccountNumber`, `mayaQrUrl`, `mayaQrPath`.
+  - Read: `admin` and `customer`; `list` denied.
+  - Create/update/delete: `admin`.
+  - UI save currently writes only `pickupLocation`, `pickupDays`, and `pickupHours`.
+- `storeSettings/checkout`: fields are not defined by the allowed page/rules code.
+  - Read: `admin`; `list` denied.
+  - Create/update: `admin`.
+  - Delete: denied.
+- Other unlisted Firestore paths: denied by the rules' absence of a matching allow rule.
+- `cces_admin` is not treated as `admin` by the Firestore `isAdmin()` helper.
+
+## EXTERNAL SERVICES
+- Firebase Authentication: email/password account creation and sign-in; password-reset email; authenticated user state; admin sign-out.
+- Cloud Firestore: user profiles/roles, products, orders, payment/storefront settings, product reviews, and conversations; pages use live snapshot listeners for displayed data.
+- Cloudinary: uploads product photos, online-payment receipts, and payment QR images; receipts use `payment-receipts/{uid}/{orderId}` upload path.
+- Hosting: `package.json` defines Vite `dev`, `build`, and `preview` scripts; deployment host/provider is [UNSURE].
+
+## NOT IMPLEMENTED
+- Landing-page “ADD TO CART” navigates to login; it does not add the selected product to a cart.
+- Customer account “LOG OUT” navigates to landing without calling Firebase `signOut`.
+- Customer account email edits update the Firestore profile only; the page does not update the Firebase Authentication email.
+- Admin account payment account names/numbers and QR URL/path values are editable/uploaded in the UI but the save writes only pickup fields to `settings/storefront`; payment settings are not persisted by that save operation.
+- `storeSettings/checkout` has Firestore rules but no use in the listed page code.
