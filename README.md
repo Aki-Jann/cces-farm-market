@@ -54,3 +54,4 @@ No installation is required. Open the link below to view the live system:
 | :--- | :--- | :--- |
 | Administrator | cces@adzu.edu.ph | CCES1234 |
 | Farmer | co240652@adzu.edu.ph | Farmer1234 |
+| Customer | create own account | create own account |
