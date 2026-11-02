@@ -432,7 +432,7 @@ export function AuthPage({ type }: { type: AuthType }) {
         {!isForgot && (
           <>
             <button type="submit" className={styles.submitButton}>SUBMIT</button>
-            <p className={styles.switchPrompt}>New to GreenMarket? <a href="#/register">Register Here</a></p>
+            <p className={styles.switchPrompt}>New to Tiangge Verde? <a href="#/register">Register Here</a></p>
           </>
         )}
         {isForgot && (

@@ -133,11 +133,11 @@ export function MessagesPage() {
       <section className={styles.content}>
         <Header title="MESSAGE" />
         <div className={styles.messaging}>
-          <section className={styles.chat} aria-label="Conversation with GreenMarket">
+          <section className={styles.chat} aria-label="Conversation with Tiangge Verde">
             <div className={styles.conversationHeader}>
-              <div className={styles.conversationAvatar} aria-hidden="true">G</div>
+              <div className={styles.conversationAvatar} aria-hidden="true">T</div>
               <div className={styles.conversationIdentity}>
-                <strong>GreenMarket</strong>
+                <strong>Tiangge Verde</strong>
                 <span>Seller conversation</span>
               </div>
               <span className={styles.sellerBadge}>SELLER</span>
@@ -157,7 +157,7 @@ export function MessagesPage() {
               ) : messages.length === 0 ? (
                 <div className={styles.emptyConversation}>
                   <strong>No messages yet</strong>
-                  <span>Your conversation with GreenMarket will appear here.</span>
+                  <span>Your conversation with Tiangge Verde will appear here.</span>
                 </div>
               ) : messages.map((message) => (
                 <div className={styles.messageGroup} key={message.id}>
@@ -167,7 +167,7 @@ export function MessagesPage() {
                     </div>
                   )}
                   <article className={`${styles.message} ${message.sender === 'customer' ? styles.outgoing : styles.incoming}`}>
-                    <span className={styles.senderLabel}>{message.sender === 'customer' ? 'You' : 'GreenMarket'}</span>
+                    <span className={styles.senderLabel}>{message.sender === 'customer' ? 'You' : 'Tiangge Verde'}</span>
                     <p>{message.text}</p>
                     <time>{message.timestamp}</time>
                   </article>

@@ -1,10 +1,10 @@
-# Green Market
+# Tiangge Verde
 
-### Farm to Market Supply Management System
+### Farm-to-Market Supply Management System
 
 ## Overview
 
-Green Market is an e-commerce platform that allows customers to purchase products online, sellers to manage inventory and orders, and administrators to oversee system operations.
+Tiangge Verde is an e-commerce platform that allows customers to purchase products online, sellers to manage inventory and orders, and administrators to oversee system operations.
 
 ## Group Members
 
@@ -46,7 +46,7 @@ Cloudinary is used to store, manage, and deliver product images efficiently thro
 
 No installation is required. Open the link below to view the live system:
 
-🔗 **[Green Market](https://cces-farm-market.vercel.app/)**
+🔗 **[Tiangge Verde](https://cces-farm-market.vercel.app/)**
 
 ## Test Accounts
 
