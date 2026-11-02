@@ -2,16 +2,20 @@
   background: var(--color-canvas);
   color: var(--color-text);
   display: flex;
-  height: 100vh;
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .content {
+  box-sizing: border-box;
   display: flex;
   flex: 1;
   flex-direction: column;
-  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   min-width: 0;
+  overflow: hidden;
 }
 
 .dashboard {
@@ -610,18 +614,25 @@
 @media (max-width: 700px) {
   .page {
     display: block;
-    height: auto;
+    height: 100dvh;
+    overflow: hidden;
   }
 
   .content {
-    display: block;
-    height: auto;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    height: 100dvh;
+    overflow: hidden;
   }
 
   .dashboard {
+    flex: 1 1 0;
     gap: 12px;
     margin: 0;
     min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 20px var(--page-gutter);
     width: auto;
   }

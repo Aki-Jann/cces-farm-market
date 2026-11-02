@@ -12,10 +12,14 @@
   display: flex;
   flex: 0 0 190px;
   flex-direction: column;
+  height: 100vh;
   justify-content: space-between;
   min-height: 100vh;
   padding: 17px 10px 20px;
+  position: sticky;
+  top: 0;
   text-align: center;
+  z-index: 20;
 }
 
 .sidebar > div {
@@ -45,6 +49,8 @@
 
 .catalog {
   flex: 1;
+  margin-left: 218px;
+  margin-right: clamp(260px, 24vw, 320px);
   min-width: 0;
 }
 
@@ -330,17 +336,19 @@
 }
 
 .cart {
-  align-self: flex-start;
   background: #fff;
   border-left: 1px solid #d9d9d9;
   box-shadow: -2px 0 5px rgb(0 0 0 / 8%);
   display: flex;
   flex: 0 0 clamp(260px, 24vw, 320px);
   flex-direction: column;
-  height: 100vh;
+  height: 100dvh;
   min-height: 0;
+  position: fixed;
+  right: 0;
   top: 0;
-  position: sticky;
+  width: clamp(260px, 24vw, 320px);
+  z-index: 20;
 }
 
 .cartHeading {
@@ -1206,7 +1214,8 @@
     min-height: 54px;
     overflow: hidden;
     padding: 6px 8px;
-    position: sticky;
+    position: fixed;
+    left: 0;
     top: 0;
     width: 100%;
     z-index: 20;
@@ -1252,6 +1261,9 @@
   }
 
   .catalog {
+    margin-left: 0;
+    margin-right: 0;
+    padding-top: 54px;
     width: 100%;
   }
 
@@ -1266,7 +1278,11 @@
     height: clamp(420px, 72vh, 620px);
     min-height: 0;
     align-self: auto;
+    position: sticky;
+    right: auto;
+    top: 54px;
     width: 100%;
+    z-index: 1;
   }
 
   .cartHeading {

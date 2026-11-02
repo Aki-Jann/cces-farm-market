@@ -1,15 +1,22 @@
-.logo {
-  background: transparent;
-  width: 100%;
+@font-face {
+  font-display: swap;
+  font-family: 'SF Compact';
+  font-style: normal;
+  src: url('/fonts/SF-Compact-Text-Semibold.otf') format('opentype');
 }
 
-.logo img {
-  display: block;
-  height: auto;
-  max-width: 100%;
-  width: 100%;
+.logo {
+  background: transparent;
+  color: #017632;
+  display: inline-block;
+  font-family: 'SF Compact', sans-serif;
+  font-size: clamp(20px, 2.5vw, 32px);
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .compact {
-  width: 72px;
+  font-size: clamp(14px, 1.4vw, 18px);
 }

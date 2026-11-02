@@ -8,11 +8,21 @@
 }
 
 .content {
+  box-sizing: border-box;
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
   min-width: 0;
+  padding-top: 76px;
+}
+
+.content > :global(header) {
+  left: 218px;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 15;
 }
 
 .toolbar {
@@ -714,13 +724,16 @@
 @media (max-width: 800px) {
   .page {
     display: block;
-    height: auto;
-    min-height: 100vh;
-    overflow: visible;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .content {
+    box-sizing: border-box;
     display: block;
+    height: 100dvh;
+    overflow-y: auto;
   }
 
   .workspace,
@@ -751,6 +764,20 @@
     max-height: none;
     position: static;
     width: 100%;
+  }
+}
+
+@media (max-width: 700px) {
+  .content > :global(header) {
+    left: 0;
+    position: fixed;
+    top: 54px;
+    z-index: 15;
+    width: 100%;
+  }
+
+  .content {
+    padding-top: 118px;
   }
 }
 

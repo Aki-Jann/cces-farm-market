@@ -791,7 +791,14 @@ button.panel {
 @media (max-width: 700px) {
   .page {
     display: block;
-    height: auto;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .content {
+    box-sizing: border-box;
+    height: 100dvh;
+    overflow-y: auto;
   }
 
   .dashboard {
