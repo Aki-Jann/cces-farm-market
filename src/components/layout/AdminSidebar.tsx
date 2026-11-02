@@ -8,7 +8,7 @@ const links: { key: AdminNavItem; label: string; href: string }[] = [
   { key: 'orders', label: 'ORDERS', href: '#/admin/orders' },
   { key: 'payments', label: 'PAYMENTS', href: '#/admin/payment' },
   { key: 'products', label: 'PRODUCTS', href: '#/admin/products' },
-  { key: 'customers', label: 'CUSTOMERS', href: '#/admin/customers' },
+  { key: 'customers', label: 'MESSAGES', href: '#/admin/customers' },
   { key: 'analytics', label: 'ANALYTICS', href: '#/admin/analytics' },
 ]
 

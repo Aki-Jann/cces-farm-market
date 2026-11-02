@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
-import { collection, onSnapshot, updateDoc, doc } from 'firebase/firestore'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { collection, doc, onSnapshot, runTransaction, serverTimestamp, updateDoc } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
+import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import { formatMonthDayYearTime } from '../../utils/dateFormat'
 import { isOrderEligibleForFinancialTotals } from '../../utils/orderFinancials'
 import styles from './AdminOrdersPage.module.css'
 
 type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PACKED' | 'DELIVERED' | 'CANCELLED'
-type OrderItem = { name: string; quantity: number; price: number }
+type OrderItem = { productId?: string; name: string; quantity: number; price: number }
 type Order = {
   firestoreId: string
   id: string
@@ -75,7 +76,14 @@ function StatusTimeline({ status }: { status: OrderStatus }) {
   )
 }
 
-function OrderDetails({ order, onAdvance, onBack, isUpdating, isArchived }: { order: Order; onAdvance: () => void; onBack: () => void; isUpdating: boolean; isArchived: boolean }) {
+function OrderDetails({ order, onAdvance, onBack, onCancel, isUpdating, isArchived }: {
+  order: Order
+  onAdvance: () => void
+  onBack: () => void
+  onCancel: () => void
+  isUpdating: boolean
+  isArchived: boolean
+}) {
   const { delivery, tax, total } = totals(order)
   const statusIndex = statusOrder.indexOf(order.status)
   const previousStatus = statusOrder[statusIndex - 1]
@@ -127,6 +135,16 @@ function OrderDetails({ order, onAdvance, onBack, isUpdating, isArchived }: { or
             {isUpdating ? 'UPDATING...' : nextStatus}
           </button>
         )}
+        {order.status !== 'DELIVERED' && (
+          <button
+            disabled={isUpdating}
+            type="button"
+            className={styles.cancelOrderButton}
+            onClick={onCancel}
+          >
+            CANCEL ORDER
+          </button>
+        )}
       </div>}
     </section>
   )
@@ -138,10 +156,21 @@ export function AdminOrdersPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isUpdating, setIsUpdating] = useState(false)
+  const [pendingCancellation, setPendingCancellation] = useState<Order | null>(null)
+  const keepOrderButtonRef = useRef<HTMLButtonElement>(null)
   const [archive, setArchive] = useState(() => window.location.hash.replace(/^#\/?/, '') === 'admin/orders/archive')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<OrderStatus | null>(null)
   const [showAllOrders, setShowAllOrders] = useState(false)
+  useEffect(() => {
+    if (!pendingCancellation || isUpdating) return
+    keepOrderButtonRef.current?.focus()
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setPendingCancellation(null)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [pendingCancellation, isUpdating])
   useEffect(() => {
     const syncArchiveState = () => {
       const isArchiveRoute = window.location.hash.replace(/^#\/?/, '') === 'admin/orders/archive'
@@ -191,6 +220,7 @@ export function AdminOrdersPage() {
               if (!item || typeof item !== 'object') return []
               const itemData = item as Record<string, unknown>
               return [{
+                productId: typeof itemData.productId === 'string' ? itemData.productId : undefined,
                 name: typeof itemData.name === 'string' ? itemData.name : 'Product',
                 quantity: typeof itemData.quantity === 'number' ? itemData.quantity : 0,
                 price: typeof itemData.price === 'number' ? itemData.price : 0,
@@ -260,6 +290,98 @@ export function AdminOrdersPage() {
 
   function reverseSelected() {
     return updateSelectedStatus(-1)
+  }
+
+  async function cancelOrder(order: Order) {
+    if (isUpdating) return
+    const adminId = auth.currentUser?.uid
+    if (!adminId) {
+      setError('Please log in again before cancelling an order.')
+      return
+    }
+
+    setError('')
+    setIsUpdating(true)
+    try {
+      await runTransaction(db, async (transaction) => {
+        const orderRef = doc(db, 'orders', order.firestoreId)
+        const orderSnapshot = await transaction.get(orderRef)
+        if (!orderSnapshot.exists()) throw new Error('This order no longer exists.')
+        const currentOrder = orderSnapshot.data()
+        if (!['pending', 'confirmed', 'packed'].includes(currentOrder.status)) {
+          throw new Error('This order can no longer be cancelled.')
+        }
+
+        const rawItems = currentOrder.items
+        if (!Array.isArray(rawItems) || rawItems.length < 1 || rawItems.length > 5) {
+          throw new Error('The order items are invalid; inventory was not changed.')
+        }
+        const items = rawItems.map((item) => {
+          if (
+            !item ||
+            typeof item !== 'object' ||
+            typeof item.productId !== 'string' ||
+            !item.productId ||
+            !Number.isInteger(item.quantity) ||
+            item.quantity < 1
+          ) {
+            throw new Error('The order items are invalid; inventory was not changed.')
+          }
+          return { productId: item.productId, quantity: item.quantity }
+        })
+        if (new Set(items.map((item) => item.productId)).size !== items.length) {
+          throw new Error('The order contains duplicate products; inventory was not changed.')
+        }
+
+        const productRefs = items.map(({ productId }) => doc(db, 'products', productId))
+        const productSnapshots = await Promise.all(productRefs.map((productRef) => transaction.get(productRef)))
+        productSnapshots.forEach((productSnapshot, index) => {
+          if (!productSnapshot.exists()) {
+            throw new Error('Inventory could not be restored because a product is missing.')
+          }
+          const item = items[index]
+          const product = productSnapshot.data()
+          const stock = typeof product.stock === 'number' && Number.isFinite(product.stock) ? product.stock : 0
+          const sold = typeof product.sold === 'number' && Number.isFinite(product.sold) ? product.sold : 0
+          transaction.update(productRefs[index], {
+            stock: stock + item.quantity,
+            sold: Math.max(0, sold - item.quantity),
+            checkoutOrderId: orderRef.id,
+            checkoutQuantity: item.quantity,
+            checkoutAction: 'refund',
+          })
+        })
+
+        if (currentOrder.paymentStatus === 'awaiting_verification') {
+          if (
+            currentOrder.status !== 'pending' ||
+            !['GCASH', 'MAYA'].includes(currentOrder.paymentMethod) ||
+            typeof currentOrder.paymentReceiptUrl !== 'string' ||
+            !currentOrder.paymentReceiptUrl
+          ) {
+            throw new Error('This pending online payment must be reviewed from the Payments page.')
+          }
+          transaction.update(orderRef, {
+            status: 'cancelled',
+            paymentStatus: 'rejected',
+            paymentRejectedAt: serverTimestamp(),
+            paymentRejectedBy: adminId,
+          })
+        } else {
+          if (currentOrder.paymentStatus === 'rejected') {
+            throw new Error('This order has already been cancelled.')
+          }
+          transaction.update(orderRef, { status: 'cancelled' })
+        }
+      })
+      setPendingCancellation(null)
+    } catch (cancelError) {
+      console.error('Cancelling order failed:', cancelError)
+      setError(cancelError instanceof Error ? cancelError.message : 'Unable to cancel the order. Please try again.')
+      setPendingCancellation(null)
+    } finally {
+      setIsUpdating(false)
+    }
   }
 
   return (
@@ -351,12 +473,61 @@ export function AdminOrdersPage() {
                       </button>
                     ))}
                   </aside>
-                  {selected && <OrderDetails order={selected} onAdvance={advanceSelected} onBack={reverseSelected} isUpdating={isUpdating} isArchived={archive} />}
+                  {selected && <OrderDetails
+                    order={selected}
+                    onAdvance={advanceSelected}
+                    onBack={reverseSelected}
+                    onCancel={() => { setError(''); setPendingCancellation(selected) }}
+                    isUpdating={isUpdating}
+                    isArchived={archive}
+                  />}
                 </>
               )}
             </div>
           </div>
         </div>
+        {pendingCancellation && (
+          <div
+            className={styles.confirmOverlay}
+            onClick={(event) => {
+              if (event.target === event.currentTarget && !isUpdating) setPendingCancellation(null)
+            }}
+          >
+            <section
+              className={styles.confirmDialog}
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="cancel-order-title"
+              aria-describedby="cancel-order-description"
+            >
+              <span className={styles.confirmEyebrow}>ORDER CANCELLATION</span>
+              <h2 id="cancel-order-title">Cancel order {pendingCancellation.id}?</h2>
+              <p id="cancel-order-description">
+                This will cancel the order and return its items to inventory.
+                {pendingCancellation.paymentStatus === 'paid' && ' Any payment refund must be handled separately.'}
+              </p>
+              <div className={styles.confirmActions}>
+                <button
+                  ref={keepOrderButtonRef}
+                  className={styles.cancelConfirm}
+                  disabled={isUpdating}
+                  type="button"
+                  onClick={() => setPendingCancellation(null)}
+                >
+                  KEEP ORDER
+                </button>
+                <button
+                  className={styles.confirmCancelOrder}
+                  disabled={isUpdating}
+                  type="button"
+                  onClick={() => void cancelOrder(pendingCancellation)}
+                >
+                  {isUpdating ? 'CANCELLING...' : 'CANCEL ORDER'}
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
       </section>
     </main>
   )

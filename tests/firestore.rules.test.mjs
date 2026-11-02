@@ -674,6 +674,45 @@ test('Farmers can reject a pending online payment and restore stock atomically',
   assert.equal(finalProduct.data().sold, 0)
 })
 
+test('Farmers can cancel active orders and restore stock atomically', async () => {
+  const customerDb = environment.authenticatedContext('customer-a').firestore()
+  await assertSucceeds(submitCustomerOrder(
+    customerDb,
+    'order-to-cancel',
+    customerOrder('order-to-cancel'),
+  ))
+
+  const farmerDb = environment.authenticatedContext('admin-a').firestore()
+  await assertFails(updateDoc(doc(farmerDb, 'orders/order-to-cancel'), { status: 'cancelled' }))
+  await assertSucceeds(runTransaction(farmerDb, async (transaction) => {
+    const orderRef = doc(farmerDb, 'orders/order-to-cancel')
+    const productRef = doc(farmerDb, 'products/product-a')
+    const [orderSnapshot, productSnapshot] = await Promise.all([
+      transaction.get(orderRef),
+      transaction.get(productRef),
+    ])
+    const order = orderSnapshot.data()
+    const product = productSnapshot.data()
+    const quantity = order.items[0].quantity
+    transaction.update(productRef, {
+      stock: product.stock + quantity,
+      sold: Math.max(0, product.sold - quantity),
+      checkoutOrderId: orderRef.id,
+      checkoutQuantity: quantity,
+      checkoutAction: 'refund',
+    })
+    transaction.update(orderRef, { status: 'cancelled' })
+  }))
+
+  const [orderSnapshot, productSnapshot] = await Promise.all([
+    getDoc(doc(farmerDb, 'orders/order-to-cancel')),
+    getDoc(doc(farmerDb, 'products/product-a')),
+  ])
+  assert.equal(orderSnapshot.data().status, 'cancelled')
+  assert.equal(productSnapshot.data().stock, 10)
+  assert.equal(productSnapshot.data().sold, 0)
+})
+
 test('CCES admins can read the analytics order data but cannot manage records', async () => {
   const db = environment.authenticatedContext('cces-admin-a').firestore()
   await assertSucceeds(getDocs(collection(db, 'orders')))

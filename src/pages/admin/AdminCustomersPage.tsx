@@ -72,12 +72,18 @@ function CustomerAvatar({ customer, large = false }: { customer: Customer; large
   )
 }
 
-function CustomerList({ customers, selectedId, onSelect }: { customers: Customer[]; selectedId: string; onSelect: (id: string) => void }) {
+function CustomerList({ customers, selectedId, conversationError, onSelect }: {
+  customers: Customer[]
+  selectedId: string
+  conversationError: string
+  onSelect: (id: string) => void
+}) {
   return (
     <aside className={styles.customerList} aria-label="Customers">
       <div className={styles.customerListHeader}>
         <div><h2>Customers</h2><span>{customers.length} profiles</span></div>
       </div>
+      {conversationError && <p className={styles.conversationError} role="alert">{conversationError}</p>}
       {customers.map((customer) => (
         <button className={selectedId === customer.id ? styles.selectedCustomer : ''} key={customer.id} type="button" onClick={() => onSelect(customer.id)}>
           <CustomerAvatar key={`${customer.id}-${customer.photoUrl}`} customer={customer} />
@@ -232,14 +238,17 @@ type RawOrderRecord = { id: string; data: Record<string, unknown> }
 export function AdminCustomersPage() {
   const [rawUsers, setRawUsers] = useState<RawUserRecord[]>([])
   const [rawOrders, setRawOrders] = useState<RawOrderRecord[]>([])
+  const [conversationActivity, setConversationActivity] = useState<Record<string, number>>({})
   const [usersLoaded, setUsersLoaded] = useState(false)
   const [ordersLoaded, setOrdersLoaded] = useState(false)
+  const [conversationsLoaded, setConversationsLoaded] = useState(false)
   const [selectedId, setSelectedId] = useState('')
-  const [tab, setTab] = useState<'profile' | 'messages'>('profile')
+  const [tab, setTab] = useState<'profile' | 'messages'>('messages')
   const [search, setSearch] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
-  const isLoading = !usersLoaded || !ordersLoaded
+  const [conversationError, setConversationError] = useState('')
+  const isLoading = !usersLoaded || !ordersLoaded || !conversationsLoaded
 
   const customers = useMemo<Customer[]>(() => {
     return rawUsers.flatMap(({ id, data }) => {
@@ -281,14 +290,21 @@ export function AdminCustomersPage() {
 
   const visibleCustomers = useMemo(() => {
     const query = search.trim().toLowerCase()
-    if (!query) return customers
-    return customers.filter((customer) =>
-      customer.name.toLowerCase().includes(query) ||
-      customer.email.toLowerCase().includes(query) ||
-      customer.segment.toLowerCase().includes(query) ||
-      customer.phone.toLowerCase().includes(query)
-    )
-  }, [customers, search])
+    return customers
+      .filter((customer) =>
+        !query ||
+        customer.name.toLowerCase().includes(query) ||
+        customer.email.toLowerCase().includes(query) ||
+        customer.segment.toLowerCase().includes(query) ||
+        customer.phone.toLowerCase().includes(query)
+      )
+      .map((customer, index) => ({ customer, index }))
+      .sort((first, second) =>
+        (conversationActivity[second.customer.id] ?? 0) - (conversationActivity[first.customer.id] ?? 0) ||
+        first.index - second.index
+      )
+      .map(({ customer }) => customer)
+  }, [customers, search, conversationActivity])
 
   const selected = visibleCustomers.find((customer) => customer.id === selectedId) ?? visibleCustomers[0]
 
@@ -322,9 +338,29 @@ export function AdminCustomersPage() {
       }
     )
 
+    const unsubscribeConversations = onSnapshot(
+      collection(db, 'conversations'),
+      (snapshot) => {
+        const activity: Record<string, number> = {}
+        snapshot.docs.forEach((conversationDocument) => {
+          const updatedAt = parseMessageDate(conversationDocument.data().updatedAt)
+          if (updatedAt) activity[conversationDocument.id] = updatedAt.getTime()
+        })
+        setConversationActivity(activity)
+        setConversationError('')
+        setConversationsLoaded(true)
+      },
+      (loadError) => {
+        console.error('Loading conversation activity failed:', loadError)
+        setConversationError('Unable to sort customers by recent conversations.')
+        setConversationsLoaded(true)
+      }
+    )
+
     return () => {
       unsubscribeUsers()
       unsubscribeOrders()
+      unsubscribeConversations()
     }
   }, [])
 
@@ -345,7 +381,7 @@ export function AdminCustomersPage() {
 
   return <main className={styles.page}><AdminSidebar active="customers" />
   <section className={styles.content}>
-    <Header title="CUSTOMERS" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
+    <Header title="MESSAGES" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
       {isLoading ? <div className={styles.workspace}>
           <p>Loading customers...</p>
           </div> : error && customers.length === 0 ? 
@@ -353,11 +389,11 @@ export function AdminCustomersPage() {
           </div> : !selected ? <div className={styles.workspace}>
             <p>{search.trim() ? 'No customer profiles match your search.' : 'No customer profiles found.'}</p>
           </div> : <div className={styles.workspace}>
-            <CustomerList customers={visibleCustomers} selectedId={selected.id} onSelect={(id) => { setSelectedId(id); setTab('profile') }} />
+            <CustomerList customers={visibleCustomers} selectedId={selected.id} conversationError={conversationError} onSelect={(id) => { setSelectedId(id); setTab('messages') }} />
               <section className={styles.details}>
                 <CustomerHeader customer={selected} onChangeCustomerType={(customerType) => void updateCustomerProfile('customerType', customerType)} />
                   <nav className={styles.tabs}>
-                    <button className={tab === 'profile' ? styles.activeTab : ''} type="button" onClick={() => setTab('profile')}>PROFILE</button>
                     <button className={tab === 'messages' ? styles.activeTab : ''} type="button" onClick={() => setTab('messages')}>MESSAGES</button>
+                    <button className={tab === 'profile' ? styles.activeTab : ''} type="button" onClick={() => setTab('profile')}>PROFILE</button>
                     </nav>{tab === 'profile' ? <Profile key={selected.id} customer={selected} isSaving={isSaving} onSaveNotes={(notes) => updateCustomerProfile('farmNotes', notes)} /> : <Messages key={selected.id} customer={selected} />}</section></div>}</section></main>
 }

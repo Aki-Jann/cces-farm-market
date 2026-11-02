@@ -104,6 +104,15 @@
   margin-top: 3px;
 }
 
+.conversationError {
+  background: #fff1ed;
+  color: #a33;
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 10px;
+  padding: 9px;
+}
+
 .customerList button {
   align-items: center;
   background: transparent;
