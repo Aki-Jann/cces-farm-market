@@ -224,8 +224,10 @@ export function AdminProductsPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [draft, setDraft] = useState<ProductDraft>(emptyDraft())
   const [isFormOpen, setIsFormOpen] = useState(false)
+  const [pendingUnlist, setPendingUnlist] = useState<Product | null>(null)
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('ALL')
+  const cancelUnlistRef = useRef<HTMLButtonElement>(null)
   const productDocsForBackfill = useRef<Array<{ id: string; data: Record<string, unknown> }> | null>(null)
   const orderDocsForBackfill = useRef<Array<Record<string, unknown>> | null>(null)
   const salesBackfillStarted = useRef(false)
@@ -243,6 +245,18 @@ export function AdminProductsPage() {
       (!query || product.name.toLowerCase().includes(query) || product.category.toLowerCase().includes(query))
     )
   }, [products, search, selectedCategory])
+
+  useEffect(() => {
+    if (!pendingUnlist) return
+
+    cancelUnlistRef.current?.focus()
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') setPendingUnlist(null)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [pendingUnlist])
 
   useEffect(() => {
     async function backfillSalesCounts() {
@@ -393,6 +407,20 @@ export function AdminProductsPage() {
     }
   }
 
+  function requestAvailabilityChange(product: Product) {
+    if (product.available) {
+      setPendingUnlist(product)
+      return
+    }
+    void toggleAvailability(product)
+  }
+
+  async function confirmUnlist() {
+    if (!pendingUnlist) return
+    await toggleAvailability(pendingUnlist)
+    setPendingUnlist(null)
+  }
+
   function handleFileSelect(file: File) {
     const validationError = validateImageFile(file)
     if (validationError) {
@@ -523,7 +551,7 @@ export function AdminProductsPage() {
                 selected={selectedId === product.id}
                 isUpdating={updatingProductIds.has(product.id)}
                 onEdit={() => startEdit(product)}
-                onToggleAvailability={() => void toggleAvailability(product)}
+                onToggleAvailability={() => requestAvailabilityChange(product)}
               />
             ))}
             {isLoading && <p className={styles.empty}>Loading products...</p>}
@@ -546,6 +574,46 @@ export function AdminProductsPage() {
             />
           )}
         </div>
+        {pendingUnlist && (
+          <div
+            className={styles.confirmOverlay}
+            onClick={(event) => {
+              if (event.target === event.currentTarget) setPendingUnlist(null)
+            }}
+          >
+            <section
+              className={styles.confirmDialog}
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="unlist-title"
+              aria-describedby="unlist-description"
+            >
+              <span className={styles.confirmEyebrow}>PRODUCT VISIBILITY</span>
+              <h2 id="unlist-title">Unlist {pendingUnlist.name}?</h2>
+              <p id="unlist-description">
+                This product will no longer be visible to customers in the shop. You can list it again at any time.
+              </p>
+              <div className={styles.confirmActions}>
+                <button
+                  ref={cancelUnlistRef}
+                  className={styles.cancelConfirm}
+                  type="button"
+                  onClick={() => setPendingUnlist(null)}
+                >
+                  CANCEL
+                </button>
+                <button
+                  className={styles.confirmUnlist}
+                  type="button"
+                  disabled={updatingProductIds.has(pendingUnlist.id)}
+                  onClick={() => void confirmUnlist()}
+                >
+                  {updatingProductIds.has(pendingUnlist.id) ? 'UNLISTING...' : 'UNLIST PRODUCT'}
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
       </section>
     </main>
   )
