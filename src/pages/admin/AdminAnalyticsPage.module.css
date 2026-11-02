@@ -318,8 +318,15 @@ button.panel {
 }
 
 .trendChart {
+  cursor: pointer;
   min-width: 0;
   width: 100%;
+}
+
+.trendChart[role='button']:focus-visible {
+  border-radius: 6px;
+  outline: 3px solid rgb(1 118 50 / 28%);
+  outline-offset: 3px;
 }
 
 .trendChart svg {
@@ -577,7 +584,8 @@ button.panel {
 }
 
 .backButton,
-.refreshButton {
+.refreshButton,
+.printButton {
   border: 0;
   border-radius: 6px;
   cursor: pointer;
@@ -589,6 +597,24 @@ button.panel {
 .backButton {
   background: #eaf5ed;
   color: #017632;
+}
+
+.printButton {
+  background: #017632;
+  color: #fff;
+}
+
+.printActions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.printButton:hover,
+.printButton:focus-visible {
+  background: #066431;
+  outline: 2px solid rgb(1 118 50 / 22%);
+  outline-offset: 2px;
 }
 
 .backButton:hover,
@@ -746,6 +772,12 @@ button.panel {
 
 .categoryDetailRow {
   grid-template-columns: 10px 1fr 2fr 0.5fr 1fr;
+}
+
+.trendDataList .dataListHeading,
+.trendDataList .dataRow {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  min-width: 0;
 }
 
 .categoryDetailRow > i {
@@ -928,5 +960,99 @@ button.panel {
   .categoryDetailRow {
     gap: 8px;
     padding: 9px 10px;
+  }
+}
+
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  :global(body) {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .printView {
+    background: #fff !important;
+    display: block;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .printView > :global(nav),
+  .printView > .content > :global(header),
+  .printView .backButton,
+  .printView .printActions {
+    display: none !important;
+  }
+
+  .printView > .content {
+    display: block;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+  }
+
+  .printView .dashboard {
+    display: block;
+    height: auto;
+    margin: 0;
+    min-height: 0;
+    overflow: visible;
+    padding: 0;
+    width: auto;
+  }
+
+  .printView .detailHeader {
+    align-items: flex-start;
+    border-bottom: 2px solid #017632;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+  }
+
+  .printView .detailHeader h2 {
+    color: #000;
+    margin-top: 0;
+  }
+
+  .printView .detailSummary,
+  .printView .dataList {
+    background: #fff;
+    border: 1px solid #999;
+    border-radius: 0;
+    box-shadow: none;
+    margin-bottom: 12px;
+  }
+
+  .printView .dataList {
+    overflow: visible;
+  }
+
+  .printView .dataListHeading,
+  .printView .dataRow,
+  .printView .categoryDetailRow,
+  .printView .trendDataList .dataListHeading,
+  .printView .trendDataList .dataRow {
+    break-inside: avoid;
+    min-width: 0;
+    page-break-inside: avoid;
+  }
+
+  .printView .dataListHeading {
+    background: #edf2ee;
+    color: #000;
+  }
+
+  .printView .dataRow,
+  .printView .categoryDetailRow {
+    color: #000;
+  }
+
+  .printView .dataRow > strong,
+  .printView .dataRow > b,
+  .printView .detailSummary strong {
+    color: #000;
   }
 }
