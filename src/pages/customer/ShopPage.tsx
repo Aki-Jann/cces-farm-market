@@ -220,6 +220,7 @@ function Cart({
 }) {
   const [isEditingAddress, setIsEditingAddress] = useState(false)
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false)
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>('delivery')
   const [sellerNotes, setSellerNotes] = useState('')
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
@@ -232,9 +233,19 @@ function Cart({
   const tax = subtotal * 0.05
   const total = subtotal + delivery + tax
   const paymentProviderName = paymentMethod === 'GCASH' ? 'GCash' : 'Maya'
+  const paymentLabel = paymentMethod === 'COD' ? 'Cash on Delivery' : paymentProviderName
   const paymentQrUrl = paymentMethod === 'GCASH' ? storeSettings.gcashQrUrl : storeSettings.mayaQrUrl
   const paymentAccountName = paymentMethod === 'GCASH' ? storeSettings.gcashAccountName : storeSettings.mayaAccountName
   const paymentAccountNumber = paymentMethod === 'GCASH' ? storeSettings.gcashAccountNumber : storeSettings.mayaAccountNumber
+
+  useEffect(() => {
+    if (!isConfirmOpen) return
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setIsConfirmOpen(false)
+    }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [isConfirmOpen])
 
   function openCheckout() {
     if (fulfillmentType === 'delivery' && !address.trim()) {
@@ -258,6 +269,11 @@ function Cart({
       setReceiptError('Upload a screenshot of your payment receipt to continue.')
       return
     }
+    setIsConfirmOpen(true)
+  }
+
+  function confirmOrder() {
+    setIsConfirmOpen(false)
     onPlaceOrder({ fulfillmentType, sellerNotes: sellerNotes.trim(), receiptFile })
   }
 
@@ -487,6 +503,39 @@ function Cart({
               <button type="button" disabled={isCheckingOut} onClick={submitCheckout}>
                 {isCheckingOut ? 'PLACING ORDER...' : paymentMethod === 'COD' ? 'PLACE ORDER' : 'UPLOAD RECEIPT & PLACE ORDER'}
               </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {isCheckoutOpen && isConfirmOpen && (
+        <div className={styles.confirmOverlay} onClick={(event) => {
+          if (event.target === event.currentTarget) setIsConfirmOpen(false)
+        }}>
+          <section
+            className={styles.confirmModal}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="confirm-order-title"
+            aria-describedby="confirm-order-description"
+          >
+            <h2 id="confirm-order-title">Confirm your order</h2>
+            <p className={styles.confirmLead} id="confirm-order-description">
+              Please review before you continue.{' '}
+              <strong>Once placed, an order cannot be cancelled or changed by you.</strong>
+            </p>
+            <div className={styles.confirmSummary}>
+              <span>
+                {items.length} {items.length === 1 ? 'product' : 'products'} · {fulfillmentType === 'delivery' ? 'Delivery' : 'Pickup'} · {paymentLabel}
+              </span>
+              <strong>{currency(total)}</strong>
+            </div>
+            <ul className={styles.confirmList}>
+              <li>Products, quantities and prices are final once the order is placed.</li>
+              <li>Have a question? Go back and tap “Message the seller” before ordering.</li>
+            </ul>
+            <div className={styles.checkoutActions}>
+              <button type="button" autoFocus onClick={() => setIsConfirmOpen(false)}>GO BACK</button>
+              <button type="button" onClick={confirmOrder}>YES, PLACE ORDER</button>
             </div>
           </section>
         </div>
