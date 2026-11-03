@@ -9,7 +9,7 @@ import { isOrderEligibleForFinancialTotals } from '../../utils/orderFinancials'
 import styles from './AdminOrdersPage.module.css'
 
 type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PACKED' | 'DELIVERED' | 'CANCELLED'
-type OrderItem = { productId?: string; name: string; quantity: number; price: number }
+type OrderItem = { productId?: string; name: string; quantity: number; price: number; unit: string }
 type Order = {
   firestoreId: string
   id: string
@@ -108,7 +108,7 @@ function OrderDetails({ order, onAdvance, onBack, onCancel, isUpdating, isArchiv
         {order.paymentReceiptUrl && <a href={order.paymentReceiptUrl} target="_blank" rel="noreferrer">View payment receipt</a>}
       </div>
       <div className={styles.items}>
-        {order.items.map((item) => <div className={styles.itemRow} key={item.name}><span>{item.name}</span><span>{item.quantity}kg</span><span>{currency(item.price)}</span><strong>{currency(item.quantity * item.price)}</strong></div>)}
+        {order.items.map((item) => <div className={styles.itemRow} key={item.name}><span>{item.name}</span><span>{item.quantity} {item.unit}</span><span>{currency(item.price)}</span><strong>{currency(item.quantity * item.price)}</strong></div>)}
         <div className={styles.itemRow}><span>DELIVERY FEE</span><span>-</span><span>{currency(delivery)}</span><strong>{currency(delivery)}</strong></div>
         <div className={styles.itemRow}><span>TAX 5%</span><span>-</span><span>{currency(tax)}</span><strong>{currency(tax)}</strong></div>
         <div className={styles.totalRow}><strong>TOTAL</strong><strong>{currency(total)}</strong></div>
@@ -224,6 +224,7 @@ export function AdminOrdersPage() {
                 name: typeof itemData.name === 'string' ? itemData.name : 'Product',
                 quantity: typeof itemData.quantity === 'number' ? itemData.quantity : 0,
                 price: typeof itemData.price === 'number' ? itemData.price : 0,
+                unit: typeof itemData.unit === 'string' && itemData.unit.trim() ? itemData.unit.trim() : 'KG',
               }]
             }),
           }

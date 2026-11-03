@@ -235,6 +235,49 @@
   position: relative;
 }
 
+.deleteButton {
+  align-items: center;
+  background: rgb(255 255 255 / 92%);
+  border: 1px solid #f0d9ce;
+  border-radius: 7px;
+  color: #a63e36;
+  cursor: pointer;
+  display: flex;
+  height: 30px;
+  justify-content: center;
+  left: 8px;
+  padding: 6px;
+  position: absolute;
+  top: 8px;
+  transition: background-color 140ms ease, color 140ms ease;
+  width: 30px;
+}
+
+.deleteButton:hover:not(:disabled) {
+  background: #a63e36;
+  color: #fff;
+}
+
+.deleteButton:focus-visible {
+  outline: 3px solid rgb(166 62 54 / 25%);
+  outline-offset: 2px;
+}
+
+.deleteButton:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.deleteButton svg {
+  fill: none;
+  height: 16px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  width: 16px;
+}
+
 .productImage img {
   height: 100%;
   object-fit: contain;
@@ -656,7 +699,7 @@
 .formRow {
   display: grid;
   gap: 10px;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .availability {
@@ -747,6 +790,14 @@
   margin: 0;
 }
 
+.confirmDialog .deleteError {
+  background: #fff1ed;
+  border-radius: 7px;
+  color: #a33;
+  margin-top: 12px;
+  padding: 9px 11px;
+}
+
 .confirmActions {
   display: flex;
   gap: 10px;
@@ -781,6 +832,15 @@
 }
 
 .confirmUnlist:hover:not(:disabled) {
+  background: #8d302a;
+}
+
+.confirmDelete {
+  background: #a63e36;
+  color: #fff;
+}
+
+.confirmDelete:hover:not(:disabled) {
   background: #8d302a;
 }
 
@@ -847,6 +907,10 @@
     max-height: none;
     position: static;
     width: 100%;
+  }
+
+  .formRow {
+    grid-template-columns: 1fr;
   }
 }
 

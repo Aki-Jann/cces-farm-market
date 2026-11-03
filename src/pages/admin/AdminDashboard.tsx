@@ -11,7 +11,7 @@ import styles from './AdminDashboard.module.css'
 
 type RevenuePoint = { day: string; amount: number; isToday: boolean; fill: 'green' | 'today' | 'empty' }
 type RecentOrder = { id: string; customer: string; total: number; status: 'PENDING' | 'CONFIRMED' | 'PACKED' | 'DELIVERED' | 'CANCELLED'; createdAtTime: number }
-type InventoryItem = { name: string; category: string; stock: string; stockNum: number; isAvailable: boolean }
+type InventoryItem = { name: string; category: string; stock: string }
 
 type FirestoreOrder = {
   id: string
@@ -222,7 +222,7 @@ export function AdminDashboard({ role = 'farmer' }: { role?: 'farmer' | 'cces_ad
             name: typeof data.name === 'string' ? data.name : 'Product',
             category: typeof data.category === 'string' ? data.category : 'VEGETABLES',
             stock: typeof data.stock === 'number' ? data.stock : 0,
-            unit: typeof data.unit === 'string' ? data.unit : 'kg',
+            unit: typeof data.unit === 'string' && data.unit.trim() ? data.unit.trim().toUpperCase() : 'KG',
             isAvailable: typeof data.isAvailable === 'boolean' ? data.isAvailable : true,
           }
         })
@@ -242,7 +242,7 @@ export function AdminDashboard({ role = 'farmer' }: { role?: 'farmer' | 'cces_ad
   }, [])
 
   // Calculate stats and series
-  const { weeklyRevenue, revenuePoints, activeOrdersCount, totalFreshStock, availableProductsCount, totalProductsCount, recentOrdersList, inventoryList, revenueGrowthText } = useMemo(() => {
+  const { weeklyRevenue, revenuePoints, activeOrdersCount, inStockProductsCount, availableProductsCount, totalProductsCount, recentOrdersList, inventoryList, revenueGrowthText } = useMemo(() => {
     const now = new Date()
 
     // Build 7-day intervals for current week (last 7 days grouped by day) and previous 7 days
@@ -342,19 +342,17 @@ export function AdminDashboard({ role = 'farmer' }: { role?: 'farmer' | 'cces_ad
     })
 
     // Inventory metrics
-    let freshStockSum = 0
+    let inStockCount = 0
     let availableCount = 0
     const invItems: InventoryItem[] = []
     for (const p of products) {
       const isAvail = p.isAvailable && p.stock > 0
+      if (p.stock > 0) inStockCount += 1
       if (isAvail) availableCount += 1
-      freshStockSum += p.stock
       invItems.push({
         name: p.name,
         category: formatCategory(p.category),
-        stock: `${p.stock.toLocaleString()}${p.unit.toLowerCase()}`,
-        stockNum: p.stock,
-        isAvailable: isAvail,
+        stock: `${p.stock.toLocaleString()} ${p.unit}`,
       })
     }
 
@@ -362,7 +360,7 @@ export function AdminDashboard({ role = 'farmer' }: { role?: 'farmer' | 'cces_ad
       weeklyRevenue: thisWeekRevenue,
       revenuePoints: revPoints,
       activeOrdersCount: activeOrders,
-      totalFreshStock: freshStockSum,
+      inStockProductsCount: inStockCount,
       availableProductsCount: availableCount,
       totalProductsCount: products.length,
       recentOrdersList: parsedOrders,
@@ -430,9 +428,9 @@ export function AdminDashboard({ role = 'farmer' }: { role?: 'farmer' | 'cces_ad
               href={readOnly ? undefined : '#/admin/orders'}
             />
             <StatCard
-              label="FRESH INVENTORY"
-              value={isLoading ? '...' : `${totalFreshStock.toLocaleString()}kg`}
-              note="Across all crops"
+              label="IN-STOCK PRODUCTS"
+              value={isLoading ? '...' : inStockProductsCount.toLocaleString()}
+              note="Across all measures"
               href={readOnly ? undefined : '#/admin/products'}
             />
             <StatCard

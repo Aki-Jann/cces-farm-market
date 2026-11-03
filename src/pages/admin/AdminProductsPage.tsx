@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import { collection, doc, onSnapshot, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
+import { collection, deleteDoc, doc, getDocs, onSnapshot, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { ProductRating } from '../../components/common/ProductRating'
@@ -66,17 +66,35 @@ function emptyDraft(): ProductDraft {
   return { name: '', category: 'VEGETABLES', price: 100, stock: 0, unit: 'KG', image: imageOptions[0].value, rawImageUrl: '', available: true }
 }
 
+function orderHasProduct(order: Record<string, unknown>, product: Product) {
+  const status = typeof order.status === 'string' ? order.status.trim().toLowerCase() : 'pending'
+  if (['delivered', 'cancelled', 'canceled', 'rejected'].includes(status)) return false
+  if (!Array.isArray(order.items)) return false
+
+  return order.items.some((item) => {
+    if (!item || typeof item !== 'object') return false
+    const itemData = item as Record<string, unknown>
+    if (typeof itemData.productId === 'string' && itemData.productId) {
+      return itemData.productId === product.id
+    }
+    return typeof itemData.name === 'string' &&
+      itemData.name.trim().toLowerCase() === product.name.trim().toLowerCase()
+  })
+}
+
 function ProductCard({
   product,
   selected,
   isUpdating,
   onEdit,
+  onDelete,
   onToggleAvailability,
 }: {
   product: Product
   selected: boolean
   isUpdating: boolean
   onEdit: () => void
+  onDelete: () => void
   onToggleAvailability: () => void
 }) {
   const isOutOfStock = product.stock <= 0
@@ -88,6 +106,18 @@ function ProductCard({
       <div className={styles.productImage}>
         <img src={product.image} alt={product.name} />
         <span className={`${styles.stockBadge} ${availabilityClass}`}>{availabilityLabel}</span>
+        <button
+          aria-label={`Delete ${product.name}`}
+          className={styles.deleteButton}
+          disabled={isUpdating}
+          title={`Delete ${product.name}`}
+          type="button"
+          onClick={onDelete}
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3" />
+          </svg>
+        </button>
       </div>
       <div className={styles.productInfo}>
         <div className={styles.productDetails}>
@@ -202,6 +232,15 @@ function ProductForm({
       </div></fieldset>
       <div className={styles.formRow}>
         <label>STOCK / RESTOCK QUANTITY<input min="0" required type="number" value={draft.stock} onChange={(event) => onChange({ ...draft, stock: Number(event.target.value) })} /></label>
+        <label>UNIT OF MEASURE
+          <input
+            required
+            maxLength={20}
+            value={draft.unit}
+            placeholder="e.g. KG, PIECE, BUNDLE"
+            onChange={(event) => onChange({ ...draft, unit: event.target.value.toUpperCase() })}
+          />
+        </label>
       </div>
       <fieldset><legend>PRICE</legend><div className={styles.priceOptions}>
         {[100, 200, 300].map((price) => <button className={draft.price === price ? styles.selectedChip : ''} type="button" key={price} onClick={() => onChange({ ...draft, price })}>₱{price}.00</button>)}
@@ -225,9 +264,13 @@ export function AdminProductsPage() {
   const [draft, setDraft] = useState<ProductDraft>(emptyDraft())
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [pendingUnlist, setPendingUnlist] = useState<Product | null>(null)
+  const [pendingDelete, setPendingDelete] = useState<Product | null>(null)
+  const [deleteError, setDeleteError] = useState('')
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('ALL')
   const cancelUnlistRef = useRef<HTMLButtonElement>(null)
+  const cancelDeleteRef = useRef<HTMLButtonElement>(null)
   const productDocsForBackfill = useRef<Array<{ id: string; data: Record<string, unknown> }> | null>(null)
   const orderDocsForBackfill = useRef<Array<Record<string, unknown>> | null>(null)
   const salesBackfillStarted = useRef(false)
@@ -247,16 +290,20 @@ export function AdminProductsPage() {
   }, [products, search, selectedCategory])
 
   useEffect(() => {
-    if (!pendingUnlist) return
+    if (!pendingUnlist && !pendingDelete) return
 
-    cancelUnlistRef.current?.focus()
+    if (pendingDelete) cancelDeleteRef.current?.focus()
+    else cancelUnlistRef.current?.focus()
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setPendingUnlist(null)
+      if (event.key === 'Escape' && !deletingProductId) {
+        setPendingUnlist(null)
+        setPendingDelete(null)
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [pendingUnlist])
+  }, [pendingUnlist, pendingDelete, deletingProductId])
 
   useEffect(() => {
     async function backfillSalesCounts() {
@@ -329,7 +376,7 @@ export function AdminProductsPage() {
             category: typeof data.category === 'string' && data.category.trim() ? data.category.trim().toUpperCase() : 'VEGETABLES',
             price: typeof data.price === 'number' ? data.price : 0,
             stock: typeof data.stock === 'number' ? data.stock : 0,
-            unit: typeof data.unit === 'string' ? data.unit : 'KG',
+            unit: typeof data.unit === 'string' && data.unit.trim() ? data.unit.trim().toUpperCase() : 'KG',
             image: imageUrl,
             rawImageUrl,
             available: typeof data.isAvailable === 'boolean' ? data.isAvailable : true,
@@ -421,6 +468,57 @@ export function AdminProductsPage() {
     setPendingUnlist(null)
   }
 
+  async function confirmDelete() {
+    if (!pendingDelete || deletingProductId) return
+
+    const product = pendingDelete
+    const productRef = doc(db, 'products', product.id)
+    let temporarilyUnlisted = false
+    setDeleteError('')
+    setDeletingProductId(product.id)
+    try {
+      if (product.available) {
+        await updateDoc(productRef, { isAvailable: false })
+        temporarilyUnlisted = true
+      }
+
+      const ordersSnapshot = await getDocs(collection(db, 'orders'))
+      const activeOrders = ordersSnapshot.docs.filter((order) => orderHasProduct(order.data(), product))
+      if (activeOrders.length > 0) {
+        if (temporarilyUnlisted) {
+          await updateDoc(productRef, { isAvailable: true })
+          temporarilyUnlisted = false
+        }
+        setDeleteError(
+          `This product is in ${activeOrders.length} active ${activeOrders.length === 1 ? 'order' : 'orders'}. Complete or cancel those orders before deleting it.`
+        )
+        return
+      }
+
+      await deleteDoc(productRef)
+      setProducts((current) => current.filter((item) => item.id !== product.id))
+      if (selectedId === product.id) {
+        setSelectedId(null)
+        setIsFormOpen(false)
+      }
+      setPendingDelete(null)
+    } catch (deleteError) {
+      console.error('Deleting product failed:', deleteError)
+      if (temporarilyUnlisted) {
+        try {
+          await updateDoc(productRef, { isAvailable: true })
+        } catch (restoreError) {
+          console.error('Restoring product availability after failed deletion failed:', restoreError)
+          setDeleteError('Could not complete the deletion or restore the product listing. Please check its availability and try again.')
+          return
+        }
+      }
+      setDeleteError('Unable to verify active orders or delete this product. Please try again.')
+    } finally {
+      setDeletingProductId(null)
+    }
+  }
+
   function handleFileSelect(file: File) {
     const validationError = validateImageFile(file)
     if (validationError) {
@@ -436,8 +534,19 @@ export function AdminProductsPage() {
   async function saveProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (isSaving) return
-    const normalized = { ...draft, name: draft.name.trim().toUpperCase() }
-    if (!normalized.name) return
+    const normalized = {
+      ...draft,
+      name: draft.name.trim().toUpperCase(),
+      unit: draft.unit.trim().toUpperCase(),
+    }
+    if (!normalized.name) {
+      setError('Product name is required.')
+      return
+    }
+    if (!normalized.unit) {
+      setError('Unit of measure is required.')
+      return
+    }
     setError('')
     setIsSaving(true)
 
@@ -551,6 +660,10 @@ export function AdminProductsPage() {
                 selected={selectedId === product.id}
                 isUpdating={updatingProductIds.has(product.id)}
                 onEdit={() => startEdit(product)}
+                onDelete={() => {
+                  setDeleteError('')
+                  setPendingDelete(product)
+                }}
                 onToggleAvailability={() => requestAvailabilityChange(product)}
               />
             ))}
@@ -609,6 +722,48 @@ export function AdminProductsPage() {
                   onClick={() => void confirmUnlist()}
                 >
                   {updatingProductIds.has(pendingUnlist.id) ? 'UNLISTING...' : 'UNLIST PRODUCT'}
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+        {pendingDelete && (
+          <div
+            className={styles.confirmOverlay}
+            onClick={(event) => {
+              if (event.target === event.currentTarget && !deletingProductId) setPendingDelete(null)
+            }}
+          >
+            <section
+              className={styles.confirmDialog}
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="delete-product-title"
+              aria-describedby="delete-product-description"
+            >
+              <span className={styles.confirmEyebrow}>PERMANENT ACTION</span>
+              <h2 id="delete-product-title">Delete {pendingDelete.name}?</h2>
+              <p id="delete-product-description">
+                This permanently removes the product. Products in active orders cannot be deleted.
+              </p>
+              {deleteError && <p className={styles.deleteError} role="alert">{deleteError}</p>}
+              <div className={styles.confirmActions}>
+                <button
+                  ref={cancelDeleteRef}
+                  className={styles.cancelConfirm}
+                  disabled={Boolean(deletingProductId)}
+                  type="button"
+                  onClick={() => setPendingDelete(null)}
+                >
+                  CANCEL
+                </button>
+                <button
+                  className={styles.confirmDelete}
+                  disabled={Boolean(deletingProductId)}
+                  type="button"
+                  onClick={() => void confirmDelete()}
+                >
+                  {deletingProductId ? 'CHECKING ORDERS...' : 'DELETE PRODUCT'}
                 </button>
               </div>
             </section>
