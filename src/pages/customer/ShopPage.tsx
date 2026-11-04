@@ -8,6 +8,7 @@ import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import { normalizeRole, ROLES } from '../../constants/roles'
 import { uploadImageToCloudinary } from '../../utils/cloudinary'
+import { getFarmerDisplayName } from '../../utils/farmerDisplayName'
 import { productImages, resolveProductImage } from '../../utils/productImages'
 import styles from './ShopPage.module.css'
 
@@ -91,7 +92,7 @@ function notifyOrder(orderId: string) {
 
 function readStoreSettings(data: Record<string, unknown>, fallbackName: string): FarmerStoreSettings {
   return {
-    farmName: typeof data.farmName === 'string' && data.farmName.trim() ? data.farmName.trim() : fallbackName,
+    farmName: getFarmerDisplayName(data, fallbackName),
     status: data.status === 'suspended' ? 'suspended' : 'active',
     pickupLocation: typeof data.pickupLocation === 'string' ? data.pickupLocation : '',
     pickupDays: typeof data.pickupDays === 'string' ? data.pickupDays : '',
@@ -781,7 +782,7 @@ export function ShopPage() {
           })
           setProducts((current) => current.map((product) =>
             !product.farmerId || legacyFarmerIds.has(product.farmerId)
-              ? { ...product, farmName: legacySettings.farmName }
+              ? { ...product, farmName: getFarmerDisplayName({}, 'Original farm') }
               : product
           ))
           setStoreSettingsError('')
@@ -822,9 +823,7 @@ export function ShopPage() {
             return [{
               id: product.id,
               farmerId,
-              farmName: typeof data.farmName === 'string'
-                ? data.farmName
-                : farmerId ? '' : legacySettings.farmName,
+              farmName: getFarmerDisplayName(data, farmerId ? 'Farmer' : 'Original farm'),
               name,
               category: categoryName,
               price: typeof data.price === 'number' ? data.price : 0,
@@ -862,7 +861,7 @@ export function ShopPage() {
                   ))
                 } else {
                   legacyFarmerIds.add(farmerId)
-                  const store = { ...legacySettings, status: 'legacy' as const }
+                  const store = { ...legacySettings, farmName: 'Farmer', status: 'legacy' as const }
                   setFarmerStores((current) => ({ ...current, [farmerId]: store }))
                   setProducts((current) => current.map((product) =>
                     product.farmerId === farmerId ? { ...product, farmName: store.farmName } : product
@@ -879,7 +878,10 @@ export function ShopPage() {
             farmerProfileUnsubscribers.set(farmerId, unsubscribe)
           })
           if (loadedProducts.some((product) => !product.farmerId)) {
-            setFarmerStores((current) => ({ ...current, legacy: { ...legacySettings, status: 'legacy' } }))
+            setFarmerStores((current) => ({
+              ...current,
+              legacy: { ...legacySettings, farmName: 'Original farm', status: 'legacy' },
+            }))
           }
           const availableProductIds = new Set(loadedProducts.filter((product) => product.isAvailable).map((product) => product.id))
           const nextQuantities = Object.fromEntries(

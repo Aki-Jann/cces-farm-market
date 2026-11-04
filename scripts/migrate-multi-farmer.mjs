@@ -54,6 +54,12 @@ function isMissingFarmerId(value) {
   return typeof value !== 'string' || value.trim() === ''
 }
 
+function usableFarmName(value) {
+  if (typeof value !== 'string' || !value.trim()) return ''
+  const name = value.trim()
+  return name.toLocaleLowerCase() === 'tiangge verde' ? '' : name
+}
+
 async function findUserByEmail(db, email, label) {
   const users = await db.collection('users').get()
   const matches = users.docs.filter((document) => normalizeEmail(document.data().email) === normalizeEmail(email))
@@ -184,13 +190,14 @@ try {
   else recordSkipped('settings/storefront')
   const applicationData = applicationSnapshot.data() ?? {}
   const profileData = profileSnapshot.data() ?? {}
-  const farmName = typeof profileData.farmName === 'string' && profileData.farmName.trim()
-    ? profileData.farmName.trim()
-    : typeof applicationData.farmName === 'string' && applicationData.farmName.trim()
-      ? applicationData.farmName.trim()
-    : typeof storefront.farmName === 'string' && storefront.farmName.trim()
-      ? storefront.farmName.trim()
-      : `${farmerData.firstName ?? ''} ${farmerData.lastName ?? ''}`.trim() || 'Original farm'
+  const displayName = typeof farmerData.displayName === 'string' && farmerData.displayName.trim()
+    ? farmerData.displayName.trim()
+    : `${farmerData.firstName ?? ''} ${farmerData.lastName ?? ''}`.trim()
+  const farmName = usableFarmName(applicationData.farmName)
+    || usableFarmName(profileData.farmName)
+    || usableFarmName(storefront.farmName)
+    || displayName
+    || 'Original farm'
   const contactNumber = typeof profileData.contactNumber === 'string' && profileData.contactNumber
     ? profileData.contactNumber
     : typeof applicationData.contactNumber === 'string' && applicationData.contactNumber
@@ -237,13 +244,24 @@ try {
         ...storefront,
         status: 'active',
         farmName,
+        ...(displayName ? { displayName } : {}),
         contactNumber,
         address,
         createdAt: now,
       }
     ))
   } else {
-    recordSkipped('farmerProfiles')
+    const profileUpdates = {}
+    if (!sameValue(profileData.farmName, farmName)) profileUpdates.farmName = farmName
+    if (displayName && !sameValue(profileData.displayName, displayName)) profileUpdates.displayName = displayName
+    if (Object.keys(profileUpdates).length > 0) {
+      planWrite('farmerProfiles', (batch) => batch.update(
+        db.doc(`farmerProfiles/${farmer.id}`),
+        profileUpdates
+      ))
+    } else {
+      recordSkipped('farmerProfiles')
+    }
   }
   if (profileSnapshot.exists || !storefrontSnapshot.exists) recordSkipped('settings/storefront')
 

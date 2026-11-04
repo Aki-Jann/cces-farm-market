@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
-import { collection, doc, onSnapshot } from 'firebase/firestore'
+import { collection, doc, onSnapshot, query, where } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
@@ -192,58 +192,79 @@ export function AdminDashboard({ role = ROLES.FARMER }: { role?: ManagementRole 
   // Orders and products are independent collections, so each gets its own
   // real-time listener rather than merging unrelated data into one.
   useEffect(() => {
-    const unsubscribeOrders = onSnapshot(
-      collection(db, 'orders'),
-      (snapshot) => {
-        const loadedOrders: FirestoreOrder[] = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data()
-          return {
-            id: docSnap.id,
-            orderNumber: typeof data.orderNumber === 'string' ? data.orderNumber : undefined,
-            customerName: typeof data.customerName === 'string' ? data.customerName : undefined,
-            total: typeof data.total === 'number' ? data.total : 0,
-            status: typeof data.status === 'string' ? data.status : 'pending',
-            paymentStatus: typeof data.paymentStatus === 'string' ? data.paymentStatus : '',
-            createdAt: data.createdAt,
-          }
-        })
-        setOrders(loadedOrders)
+    let unsubscribeData: (() => void) | undefined
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      unsubscribeData?.()
+      if (!user) {
         setOrdersLoaded(true)
-      },
-      (loadError) => {
-        console.error('Loading dashboard orders failed:', loadError)
-        setOrdersLoaded(true)
+        setProductsLoaded(true)
+        return
       }
-    )
 
-    const unsubscribeProducts = onSnapshot(
-      collection(db, 'products'),
-      (snapshot) => {
-        const loadedProducts: FirestoreProduct[] = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data()
-          return {
-            id: docSnap.id,
-            name: typeof data.name === 'string' ? data.name : 'Product',
-            category: typeof data.category === 'string' ? data.category : 'VEGETABLES',
-            stock: typeof data.stock === 'number' ? data.stock : 0,
-            unit: typeof data.unit === 'string' && data.unit.trim() ? data.unit.trim().toUpperCase() : 'KG',
-            isAvailable: typeof data.isAvailable === 'boolean' ? data.isAvailable : true,
-          }
-        })
-        setProducts(loadedProducts)
-        setProductsLoaded(true)
-      },
-      (loadError) => {
-        console.error('Loading dashboard products failed:', loadError)
-        setProductsLoaded(true)
+      const ordersQuery = role === ROLES.CCES_ADMIN
+        ? collection(db, 'orders')
+        : query(collection(db, 'orders'), where('farmerId', '==', user.uid))
+      const productsQuery = role === ROLES.CCES_ADMIN
+        ? collection(db, 'products')
+        : query(collection(db, 'products'), where('farmerId', '==', user.uid))
+      const unsubscribeOrders = onSnapshot(
+        ordersQuery,
+        (snapshot) => {
+          const loadedOrders: FirestoreOrder[] = snapshot.docs.map((docSnap) => {
+            const data = docSnap.data()
+            return {
+              id: docSnap.id,
+              orderNumber: typeof data.orderNumber === 'string' ? data.orderNumber : undefined,
+              customerName: typeof data.customerName === 'string' ? data.customerName : undefined,
+              total: typeof data.total === 'number' ? data.total : 0,
+              status: typeof data.status === 'string' ? data.status : 'pending',
+              paymentStatus: typeof data.paymentStatus === 'string' ? data.paymentStatus : '',
+              createdAt: data.createdAt,
+            }
+          })
+          setOrders(loadedOrders)
+          setOrdersLoaded(true)
+        },
+        (loadError) => {
+          console.error('Loading dashboard orders failed:', loadError)
+          setOrdersLoaded(true)
+        }
+      )
+
+      const unsubscribeProducts = onSnapshot(
+        productsQuery,
+        (snapshot) => {
+          const loadedProducts: FirestoreProduct[] = snapshot.docs.map((docSnap) => {
+            const data = docSnap.data()
+            return {
+              id: docSnap.id,
+              name: typeof data.name === 'string' ? data.name : 'Product',
+              category: typeof data.category === 'string' ? data.category : 'VEGETABLES',
+              stock: typeof data.stock === 'number' ? data.stock : 0,
+              unit: typeof data.unit === 'string' && data.unit.trim() ? data.unit.trim().toUpperCase() : 'KG',
+              isAvailable: typeof data.isAvailable === 'boolean' ? data.isAvailable : true,
+            }
+          })
+          setProducts(loadedProducts)
+          setProductsLoaded(true)
+        },
+        (loadError) => {
+          console.error('Loading dashboard products failed:', loadError)
+          setProductsLoaded(true)
+        }
+      )
+
+      unsubscribeData = () => {
+        unsubscribeOrders()
+        unsubscribeProducts()
       }
-    )
+    })
 
     return () => {
-      unsubscribeOrders()
-      unsubscribeProducts()
+      unsubscribeAuth()
+      unsubscribeData?.()
     }
-  }, [])
+  }, [role])
 
   // Calculate stats and series
   const { weeklyRevenue, revenuePoints, activeOrdersCount, inStockProductsCount, availableProductsCount, totalProductsCount, recentOrdersList, inventoryList, revenueGrowthText } = useMemo(() => {

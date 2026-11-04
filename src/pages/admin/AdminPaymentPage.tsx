@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { collection, doc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore'
+import { collection, doc, onSnapshot, query, runTransaction, serverTimestamp, where } from 'firebase/firestore'
+import { onAuthStateChanged } from 'firebase/auth'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
@@ -368,61 +369,76 @@ export function AdminPaymentPage() {
   const [selectedMethod, setSelectedMethod] = useState<string | null>(null)
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(
-      collection(db, 'orders'),
-      (snapshot) => {
-        const loadedPayments: PaymentRecord[] = snapshot.docs.map((orderDoc) => {
-          const data = orderDoc.data()
-          const parsedDate = parseOrderDate(data.createdAt)
-          const rawItems = Array.isArray(data.items) ? data.items : []
-          const items = rawItems.flatMap((item) => {
-            if (!item || typeof item !== 'object') return []
-            const itemData = item as Record<string, unknown>
-            if (typeof itemData.name === 'string' && itemData.name.trim()) {
-              return [itemData.name.trim().toUpperCase()]
+    let unsubscribePayments: (() => void) | undefined
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      unsubscribePayments?.()
+      if (!user) {
+        setError('Please log in to view payment records.')
+        setIsLoading(false)
+        return
+      }
+
+      setIsLoading(true)
+      setError('')
+      unsubscribePayments = onSnapshot(
+        query(collection(db, 'orders'), where('farmerId', '==', user.uid)),
+        (snapshot) => {
+          const loadedPayments: PaymentRecord[] = snapshot.docs.map((orderDoc) => {
+            const data = orderDoc.data()
+            const parsedDate = parseOrderDate(data.createdAt)
+            const rawItems = Array.isArray(data.items) ? data.items : []
+            const items = rawItems.flatMap((item) => {
+              if (!item || typeof item !== 'object') return []
+              const itemData = item as Record<string, unknown>
+              if (typeof itemData.name === 'string' && itemData.name.trim()) {
+                return [itemData.name.trim().toUpperCase()]
+              }
+              return []
+            })
+
+            const method = typeof data.paymentMethod === 'string' && data.paymentMethod.trim()
+              ? normalizePaymentMethod(data.paymentMethod)
+              : 'CASH'
+
+            return {
+              firestoreId: orderDoc.id,
+              orderId: typeof data.orderNumber === 'string' && data.orderNumber.trim() ? data.orderNumber : orderDoc.id,
+              customer: typeof data.customerName === 'string' && data.customerName.trim() ? data.customerName : 'Unknown customer',
+              customerEmail: typeof data.customerEmail === 'string' ? data.customerEmail.trim() : '',
+              date: formatOrderDate(parsedDate),
+              items,
+              method,
+              paymentReceiptUrl: typeof data.paymentReceiptUrl === 'string' ? data.paymentReceiptUrl : '',
+              paymentStatus: typeof data.paymentStatus === 'string' ? data.paymentStatus : 'unpaid',
+              orderStatus: typeof data.status === 'string' ? data.status : 'pending',
+              amount: typeof data.total === 'number' && !isNaN(data.total) ? data.total : 0,
+              createdAtDate: parsedDate,
             }
-            return []
           })
 
-          const method = typeof data.paymentMethod === 'string' && data.paymentMethod.trim()
-            ? normalizePaymentMethod(data.paymentMethod)
-            : 'CASH'
+          // Sort newest orders first by createdAt
+          loadedPayments.sort((a, b) => {
+            const timeA = a.createdAtDate ? a.createdAtDate.getTime() : 0
+            const timeB = b.createdAtDate ? b.createdAtDate.getTime() : 0
+            return timeB - timeA
+          })
 
-          return {
-            firestoreId: orderDoc.id,
-            orderId: typeof data.orderNumber === 'string' && data.orderNumber.trim() ? data.orderNumber : orderDoc.id,
-            customer: typeof data.customerName === 'string' && data.customerName.trim() ? data.customerName : 'Unknown customer',
-            customerEmail: typeof data.customerEmail === 'string' ? data.customerEmail.trim() : '',
-            date: formatOrderDate(parsedDate),
-            items,
-            method,
-            paymentReceiptUrl: typeof data.paymentReceiptUrl === 'string' ? data.paymentReceiptUrl : '',
-            paymentStatus: typeof data.paymentStatus === 'string' ? data.paymentStatus : 'unpaid',
-            orderStatus: typeof data.status === 'string' ? data.status : 'pending',
-            amount: typeof data.total === 'number' && !isNaN(data.total) ? data.total : 0,
-            createdAtDate: parsedDate,
-          }
-        })
+          setPayments(loadedPayments)
+          setError('')
+          setIsLoading(false)
+        },
+        (loadError) => {
+          console.error('Loading payment orders failed:', loadError)
+          setError('Unable to load payment records. Please try again.')
+          setIsLoading(false)
+        }
+      )
+    })
 
-        // Sort newest orders first by createdAt
-        loadedPayments.sort((a, b) => {
-          const timeA = a.createdAtDate ? a.createdAtDate.getTime() : 0
-          const timeB = b.createdAtDate ? b.createdAtDate.getTime() : 0
-          return timeB - timeA
-        })
-
-        setPayments(loadedPayments)
-        setError('')
-        setIsLoading(false)
-      },
-      (loadError) => {
-        console.error('Loading payment orders failed:', loadError)
-        setError('Unable to load payment records. Please try again.')
-        setIsLoading(false)
-      }
-    )
-
-    return () => unsubscribe()
+    return () => {
+      unsubscribeAuth()
+      unsubscribePayments?.()
+    }
   }, [])
 
   const visiblePayments = useMemo(() => {

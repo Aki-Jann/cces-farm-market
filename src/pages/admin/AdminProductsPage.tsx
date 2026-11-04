@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import { collection, deleteDoc, doc, getDocs, onSnapshot, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
+import { onAuthStateChanged } from 'firebase/auth'
+import { collection, deleteDoc, doc, getDocs, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore'
 import { auth } from '../../firebase/auth'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
@@ -308,110 +309,127 @@ export function AdminProductsPage() {
   }, [pendingUnlist, pendingDelete, deletingProductId])
 
   useEffect(() => {
-    async function backfillSalesCounts() {
-      const productDocs = productDocsForBackfill.current
-      const orderDocs = orderDocsForBackfill.current
-      if (!productDocs || !orderDocs || orderDocs.length === 0 || salesBackfillStarted.current) return
+    let unsubscribeFarmerData: (() => void) | undefined
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      unsubscribeFarmerData?.()
+      if (!user) {
+        setError('Please log in to manage products.')
+        setIsLoading(false)
+        setSalesError('Please log in to load order sales totals.')
+        return
+      }
 
-      const productIds = new Set(productDocs.map(({ id }) => id))
-      const productIdByName = new Map(
-        productDocs.map(({ id, data }) => [
-          typeof data.name === 'string' ? data.name.trim().toLowerCase() : '',
-          id,
-        ])
-      )
-      const soldByProductId = new Map<string, number>()
+      const farmerId = user.uid
+      async function backfillSalesCounts() {
+        const productDocs = productDocsForBackfill.current
+        const orderDocs = orderDocsForBackfill.current
+        if (!productDocs || !orderDocs || orderDocs.length === 0 || salesBackfillStarted.current) return
 
-      orderDocs.forEach((order) => {
-        if (!Array.isArray(order.items)) return
-        order.items.forEach((item) => {
-          if (!item || typeof item !== 'object') return
-          const itemData = item as Record<string, unknown>
-          const quantity = typeof itemData.quantity === 'number' ? itemData.quantity : 0
-          if (!Number.isFinite(quantity) || quantity <= 0) return
+        const productIds = new Set(productDocs.map(({ id }) => id))
+        const productIdByName = new Map(
+          productDocs.map(({ id, data }) => [
+            typeof data.name === 'string' ? data.name.trim().toLowerCase() : '',
+            id,
+          ])
+        )
+        const soldByProductId = new Map<string, number>()
 
-          const itemProductId = typeof itemData.productId === 'string' ? itemData.productId : ''
-          const productId = productIds.has(itemProductId)
-            ? itemProductId
-            : typeof itemData.name === 'string'
-              ? productIdByName.get(itemData.name.trim().toLowerCase())
-              : undefined
-          if (productId) {
-            soldByProductId.set(productId, (soldByProductId.get(productId) ?? 0) + quantity)
-          }
-        })
-      })
+        orderDocs.forEach((order) => {
+          if (!Array.isArray(order.items)) return
+          order.items.forEach((item) => {
+            if (!item || typeof item !== 'object') return
+            const itemData = item as Record<string, unknown>
+            const quantity = typeof itemData.quantity === 'number' ? itemData.quantity : 0
+            if (!Number.isFinite(quantity) || quantity <= 0) return
 
-      const productsToUpdate = productDocs.filter(({ data }) =>
-        typeof data.sold !== 'number' || !Number.isFinite(data.sold)
-      )
-      try {
-        for (let index = 0; index < productsToUpdate.length; index += 450) {
-          const batch = writeBatch(db)
-          productsToUpdate.slice(index, index + 450).forEach(({ id }) => {
-            batch.update(doc(db, 'products', id), { sold: soldByProductId.get(id) ?? 0 })
+            const itemProductId = typeof itemData.productId === 'string' ? itemData.productId : ''
+            const productId = productIds.has(itemProductId)
+              ? itemProductId
+              : typeof itemData.name === 'string'
+                ? productIdByName.get(itemData.name.trim().toLowerCase())
+                : undefined
+            if (productId) {
+              soldByProductId.set(productId, (soldByProductId.get(productId) ?? 0) + quantity)
+            }
           })
-          await batch.commit()
-        }
-        setSalesError('')
-      } catch (backfillError) {
-        console.error('Initializing product sales totals failed:', backfillError)
-        salesBackfillStarted.current = false
-        setSalesError('Unable to initialize existing sales totals. Please refresh and try again.')
-      }
-    }
+        })
 
-    const unsubscribe = onSnapshot(
-      collection(db, 'products'),
-      (snapshot) => {
-        productDocsForBackfill.current = snapshot.docs.map((product) => ({
-          id: product.id,
-          data: product.data(),
-        }))
-        setProducts(snapshot.docs.map((product) => {
-          const data = product.data()
-          const rawImageUrl = typeof data.imageUrl === 'string' ? data.imageUrl : ''
-          const imageUrl = resolveProductImage(data.imageUrl, 'shop-apple.png')
-          return {
-            id: product.id,
-            farmerId: typeof data.farmerId === 'string' ? data.farmerId : '',
-            name: typeof data.name === 'string' ? data.name : '',
-            category: typeof data.category === 'string' && data.category.trim() ? data.category.trim().toUpperCase() : 'VEGETABLES',
-            price: typeof data.price === 'number' ? data.price : 0,
-            stock: typeof data.stock === 'number' ? data.stock : 0,
-            unit: typeof data.unit === 'string' && data.unit.trim() ? data.unit.trim().toUpperCase() : 'KG',
-            image: imageUrl,
-            rawImageUrl,
-            available: typeof data.isAvailable === 'boolean' ? data.isAvailable : true,
-            sold: typeof data.sold === 'number' && Number.isFinite(data.sold) ? data.sold : 0,
+        const productsToUpdate = productDocs.filter(({ data }) =>
+          typeof data.sold !== 'number' || !Number.isFinite(data.sold)
+        )
+        try {
+          for (let index = 0; index < productsToUpdate.length; index += 450) {
+            const batch = writeBatch(db)
+            productsToUpdate.slice(index, index + 450).forEach(({ id }) => {
+              batch.update(doc(db, 'products', id), { sold: soldByProductId.get(id) ?? 0 })
+            })
+            await batch.commit()
           }
-        }))
-        setError('')
-        setIsLoading(false)
-        void backfillSalesCounts()
-      },
-      (loadError) => {
-        console.error('Loading products failed:', loadError)
-        setError('Unable to load products. Please try again.')
-        setIsLoading(false)
+          setSalesError('')
+        } catch (backfillError) {
+          console.error('Initializing product sales totals failed:', backfillError)
+          salesBackfillStarted.current = false
+          setSalesError('Unable to initialize existing sales totals. Please refresh and try again.')
+        }
       }
-    )
 
-    const unsubscribeOrders = onSnapshot(
-      collection(db, 'orders'),
-      (snapshot) => {
-        orderDocsForBackfill.current = snapshot.docs.map((order) => order.data())
-        void backfillSalesCounts()
-      },
-      (loadError) => {
-        console.error('Loading orders for product sales totals failed:', loadError)
-        setSalesError('Unable to load order sales totals. Please refresh and try again.')
+      const unsubscribeProducts = onSnapshot(
+        query(collection(db, 'products'), where('farmerId', '==', farmerId)),
+        (snapshot) => {
+          productDocsForBackfill.current = snapshot.docs.map((product) => ({
+            id: product.id,
+            data: product.data(),
+          }))
+          setProducts(snapshot.docs.map((product) => {
+            const data = product.data()
+            const rawImageUrl = typeof data.imageUrl === 'string' ? data.imageUrl : ''
+            const imageUrl = resolveProductImage(data.imageUrl, 'shop-apple.png')
+            return {
+              id: product.id,
+              farmerId: typeof data.farmerId === 'string' ? data.farmerId : '',
+              name: typeof data.name === 'string' ? data.name : '',
+              category: typeof data.category === 'string' && data.category.trim() ? data.category.trim().toUpperCase() : 'VEGETABLES',
+              price: typeof data.price === 'number' ? data.price : 0,
+              stock: typeof data.stock === 'number' ? data.stock : 0,
+              unit: typeof data.unit === 'string' && data.unit.trim() ? data.unit.trim().toUpperCase() : 'KG',
+              image: imageUrl,
+              rawImageUrl,
+              available: typeof data.isAvailable === 'boolean' ? data.isAvailable : true,
+              sold: typeof data.sold === 'number' && Number.isFinite(data.sold) ? data.sold : 0,
+            }
+          }))
+          setError('')
+          setIsLoading(false)
+          void backfillSalesCounts()
+        },
+        (loadError) => {
+          console.error('Loading products failed:', loadError)
+          setError('Unable to load products. Please try again.')
+          setIsLoading(false)
+        }
+      )
+
+      const unsubscribeOrders = onSnapshot(
+        query(collection(db, 'orders'), where('farmerId', '==', farmerId)),
+        (snapshot) => {
+          orderDocsForBackfill.current = snapshot.docs.map((order) => order.data())
+          void backfillSalesCounts()
+        },
+        (loadError) => {
+          console.error('Loading orders for product sales totals failed:', loadError)
+          setSalesError('Unable to load order sales totals. Please refresh and try again.')
+        }
+      )
+
+      unsubscribeFarmerData = () => {
+        unsubscribeProducts()
+        unsubscribeOrders()
       }
-    )
+    })
 
     return () => {
-      unsubscribe()
-      unsubscribeOrders()
+      unsubscribeAuth()
+      unsubscribeFarmerData?.()
     }
   }, [])
 
@@ -485,7 +503,9 @@ export function AdminProductsPage() {
         temporarilyUnlisted = true
       }
 
-      const ordersSnapshot = await getDocs(collection(db, 'orders'))
+      const farmerId = auth.currentUser?.uid
+      if (!farmerId) throw new Error('No authenticated farmer is available.')
+      const ordersSnapshot = await getDocs(query(collection(db, 'orders'), where('farmerId', '==', farmerId)))
       const activeOrders = ordersSnapshot.docs.filter((order) => orderHasProduct(order.data(), product))
       if (activeOrders.length > 0) {
         if (temporarilyUnlisted) {

@@ -8,6 +8,7 @@ import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import { formatMonthDayYear } from '../../utils/dateFormat'
+import { getFarmerDisplayName } from '../../utils/farmerDisplayName'
 import styles from './OrdersPage.module.css'
 
 type OrderStatus = 'DELIVERED' | 'PENDING' | 'CONFIRMED' | 'PACKED' | 'CANCELLED'
@@ -27,6 +28,7 @@ type Order = {
   id: string
   checkoutGroupId: string
   farmerId: string
+  farmerName: string
   date: string
   createdAtTime: number
   total: number
@@ -297,6 +299,7 @@ export function OrderDetails({
 
 export function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
+  const [farmerNames, setFarmerNames] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
@@ -439,6 +442,7 @@ export function OrdersPage() {
               id: typeof data.orderNumber === 'string' ? data.orderNumber : orderDocument.id,
               checkoutGroupId: typeof data.checkoutGroupId === 'string' ? data.checkoutGroupId : '',
               farmerId: typeof data.farmerId === 'string' ? data.farmerId : '',
+              farmerName: getFarmerDisplayName({ farmName: data.farmName, displayName: data.farmerName }),
               date,
               createdAtTime,
               total: typeof data.total === 'number' ? data.total : 0,
@@ -488,6 +492,27 @@ export function OrdersPage() {
       if (unsubscribeOrders) unsubscribeOrders()
     }
   }, [])
+
+  useEffect(() => {
+    let isMounted = true
+    const farmerIds = [...new Set(orders.map((order) => order.farmerId).filter(Boolean))]
+    void Promise.all(farmerIds.map(async (farmerId) => {
+      try {
+        const profile = await getDoc(doc(db, 'farmerProfiles', farmerId))
+        return [farmerId, getFarmerDisplayName(profile.exists() ? profile.data() : undefined)] as const
+      } catch (profileError) {
+        console.error(`Loading farmer ${farmerId} for orders failed:`, profileError)
+        return [
+          farmerId,
+          orders.find((order) => order.farmerId === farmerId)?.farmerName ?? 'Farmer',
+        ] as const
+      }
+    })).then((entries) => {
+      if (isMounted) setFarmerNames(Object.fromEntries(entries))
+    })
+
+    return () => { isMounted = false }
+  }, [orders])
 
   async function confirmDelivery(order: Order) {
     if (!auth.currentUser || order.deliveryConfirmed || order.status !== 'DELIVERED') return
@@ -598,7 +623,12 @@ export function OrdersPage() {
                     <div className={styles.orderGroup} key={order.id}>
                       <div className={styles.orderLine}>
                         <button className={styles.orderRow} type="button" aria-expanded={selectedId === order.id} onClick={() => setSelectedId(selectedId === order.id ? null : order.id)}>
-                          <strong className={styles.orderId}>{order.id}</strong>
+                          <strong className={styles.orderId}>
+                            {order.id}
+                            <small className={styles.orderFarmName}>
+                              {farmerNames[order.farmerId] ?? order.farmerName}
+                            </small>
+                          </strong>
                           <span className={styles.orderDate}>{order.date}</span>
                           <strong className={`${styles.green} ${styles.orderTotal}`}>{currency(order.total)}</strong>
                           <span className={styles.orderPayment}>{order.payment || 'Not specified'}</span>

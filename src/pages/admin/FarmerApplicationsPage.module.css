@@ -2,21 +2,29 @@
   background: var(--color-canvas);
   color: var(--color-text);
   display: flex;
-  min-height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .content {
+  box-sizing: border-box;
   display: flex;
   flex: 1;
   flex-direction: column;
+  height: 100dvh;
+  min-height: 0;
   min-width: 0;
+  overflow: hidden;
 }
 
 .main {
+  box-sizing: border-box;
   flex: 1;
+  min-height: 0;
   min-width: 0;
-  overflow: auto;
-  padding: 28px var(--page-gutter) 40px;
+  overflow-y: auto;
+  padding: 20px var(--page-gutter);
 }
 
 .heading {
@@ -58,11 +66,17 @@
 .filter select {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   color: var(--color-text);
   font: inherit;
   min-height: 38px;
   padding: 0 10px;
+}
+
+.filter select:focus-visible,
+.reasonField textarea:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
 }
 
 .applicationList {
@@ -73,9 +87,9 @@
 .applicationCard {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-panel);
-  box-shadow: var(--shadow-panel);
-  padding: 20px;
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 18px;
 }
 
 .cardHeader {
@@ -109,14 +123,14 @@
 }
 
 .pending {
-  background: #fff3d8;
-  color: #885900;
+  background: var(--order-pending-bg);
+  color: var(--order-pending-text);
 }
 
 .approved,
 .active {
-  background: #e2f5e6;
-  color: #176b32;
+  background: var(--order-delivered-bg);
+  color: var(--order-delivered-text);
 }
 
 .rejected,
@@ -147,7 +161,7 @@
 }
 
 .reasonField {
-  color: #526157;
+  color: var(--color-text-muted);
   display: grid;
   font-size: 11px;
   font-weight: 700;
@@ -158,7 +172,7 @@
 .reasonField textarea {
   background: var(--color-surface-muted);
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   color: var(--color-text);
   font: inherit;
   min-height: 64px;
@@ -168,7 +182,7 @@
 
 .actions {
   align-items: center;
-  border-top: 1px solid #e8eee9;
+  border-top: 1px solid var(--color-border);
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -177,7 +191,7 @@
 
 .actions button {
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   cursor: pointer;
   font-size: 10px;
   font-weight: 800;
@@ -191,8 +205,12 @@
 }
 
 .approveButton {
-  background: #087538;
+  background: var(--color-brand);
   color: #fff;
+}
+
+.approveButton:hover:not(:disabled) {
+  background: var(--color-brand-strong);
 }
 
 .rejectButton {
@@ -201,8 +219,8 @@
 }
 
 .secondaryButton {
-  background: #eaf5ed;
-  color: #176b32;
+  background: var(--color-brand-soft);
+  color: var(--color-brand-strong);
 }
 
 .profileStatus {
@@ -217,7 +235,7 @@
 
 .rejectionReason {
   background: #fff8f7;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   color: #8e3b32;
   font-size: 12px;
   margin: 14px 0 0;
@@ -251,6 +269,11 @@
   .heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .filter {
+    align-self: stretch;
+    justify-content: space-between;
   }
 }
 

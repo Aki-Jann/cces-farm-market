@@ -51,6 +51,7 @@
 .orderRow { align-items: center; background: #fff; border: 0; cursor: pointer; display: grid; font: inherit; font-size: 14px; gap: 12px; grid-column: 1 / 6; grid-row: 1; grid-template-columns: 1.4fr 1fr 1fr 1fr 1.2fr; min-height: 63px; padding: 16px; text-align: center; width: 100%; }
 .orderRow:hover, .orderRow:focus-visible { background: #f7faf8; outline: 0; }
 .orderRow[aria-expanded='true'] { background: #f7faf8; font-weight: 700; }
+.orderFarmName { color: #6c7175; display: block; font-size: 11px; font-weight: 500; margin-top: 3px; }
 .receiptColumn { align-items: center; display: flex; font-size: 11px; grid-column: 6; grid-row: 1; justify-content: center; padding: 8px; text-align: center; }
 .receiptAction,
 .receiptLink {

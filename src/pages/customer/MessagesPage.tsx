@@ -8,6 +8,7 @@ import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import { ROLES } from '../../constants/roles'
 import { formatMonthDayYear, formatTime } from '../../utils/dateFormat'
+import { getFarmerDisplayName } from '../../utils/farmerDisplayName'
 import styles from './MessagesPage.module.css'
 
 type Message = { id: string; text: string; timestamp: string; sender: typeof ROLES.CUSTOMER | 'market'; dayDivider?: string }
@@ -24,7 +25,7 @@ function parseMessageDate(value: unknown): Date | null {
 
 export function MessagesPage() {
   const [targets, setTargets] = useState<ConversationTarget[]>([
-    { id: 'legacy', farmerId: '', farmName: 'Tiangge Verde', active: true },
+    { id: 'legacy', farmerId: '', farmName: 'Farmer', active: true },
   ])
   const [selectedTargetId, setSelectedTargetId] = useState('legacy')
   const [messages, setMessages] = useState<Message[]>([])
@@ -44,7 +45,7 @@ export function MessagesPage() {
       unsubscribeOrders?.()
       unsubscribeOrders = undefined
       if (!user) {
-        setTargets([{ id: 'legacy', farmerId: '', farmName: 'Tiangge Verde', active: true }])
+        setTargets([{ id: 'legacy', farmerId: '', farmName: 'Farmer', active: true }])
         selectedTargetIdRef.current = 'legacy'
         hasSelectedTargetRef.current = false
         setSelectedTargetId('legacy')
@@ -59,33 +60,36 @@ export function MessagesPage() {
       unsubscribeOrders = onSnapshot(
         query(collection(db, 'orders'), where('userId', '==', user.uid)),
         (snapshot) => {
-          const farmerIds = [...new Set(snapshot.docs.flatMap((order) => {
-            const farmerId = order.data().farmerId
-            return typeof farmerId === 'string' && farmerId ? [farmerId] : []
-          }))]
-          void Promise.all(farmerIds.map(async (farmerId): Promise<ConversationTarget | null> => {
+          const farmerOrders = new Map<string, string>()
+          snapshot.docs.forEach((order) => {
+            const data = order.data()
+            const farmerId = data.farmerId
+            if (typeof farmerId === 'string' && farmerId) {
+              farmerOrders.set(
+                farmerId,
+                getFarmerDisplayName({ farmName: data.farmName, displayName: data.farmerName })
+              )
+            }
+          })
+          void Promise.all([...farmerOrders].map(async ([farmerId, orderName]): Promise<ConversationTarget> => {
             try {
               const profile = await getDoc(doc(db, 'farmerProfiles', farmerId))
-              if (profile.exists() && profile.data().status !== 'active') return null
-              if (!profile.exists()) {
-                return { id: 'legacy', farmerId: '', farmName: 'Tiangge Verde', active: true }
+              const profileData = profile.exists() ? profile.data() : undefined
+              return {
+                id: farmerId,
+                farmerId,
+                farmName: getFarmerDisplayName(profileData, orderName),
+                active: !profile.exists() || profileData?.status === 'active',
               }
-              const profileData = profile.data()
-              const farmName = typeof profileData.farmName === 'string' ? profileData.farmName : farmerId
-              return { id: farmerId, farmerId, farmName, active: true }
             } catch (profileError) {
               console.error(`Loading farmer ${farmerId} for messaging failed:`, profileError)
-              return null
+              return { id: farmerId, farmerId, farmName: orderName, active: false }
             }
           })).then((loadedTargets) => {
             if (auth.currentUser?.uid !== user.uid) return
-            const distinctFarmerTargets = new Map(
-              loadedTargets
-                .filter((target): target is ConversationTarget => target !== null && target.farmerId !== '')
-                .map((target) => [target.id, target])
-            )
+            const distinctFarmerTargets = new Map(loadedTargets.map((target) => [target.id, target]))
             const nextTargets = [
-              { id: 'legacy', farmerId: '', farmName: 'Tiangge Verde', active: true },
+              { id: 'legacy', farmerId: '', farmName: 'Farmer', active: true },
               ...distinctFarmerTargets.values(),
             ]
             setTargets(nextTargets)
@@ -218,7 +222,7 @@ export function MessagesPage() {
               <div className={styles.conversationAvatar} aria-hidden="true">T</div>
               <div className={styles.conversationIdentity}>
                 <strong>{selectedTarget?.farmName ?? 'Farmer'}</strong>
-                <span>Seller conversation</span>
+                <span>Tiangge Verde marketplace</span>
               </div>
               <span className={styles.sellerBadge}>SELLER</span>
             </div>

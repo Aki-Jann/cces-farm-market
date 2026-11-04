@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore'
+import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore'
+import { onAuthStateChanged } from 'firebase/auth'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
+import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import { formatMonthDayYearTime } from '../../utils/dateFormat'
 import { isOrderEligibleForFinancialTotals } from '../../utils/orderFinancials'
@@ -159,67 +161,82 @@ export function AdminOrdersPage() {
     return () => window.removeEventListener('hashchange', syncArchiveState)
   }, [])
   useEffect(() => {
-    const unsubscribe = onSnapshot(
-      collection(db, 'orders'),
-      (snapshot) => {
-        const loadedOrders: Order[] = snapshot.docs.map((orderDocument) => {
-          const data = orderDocument.data()
-          const rawStatus = typeof data.status === 'string' ? data.status.toUpperCase() : 'PENDING'
-          const paymentStatus = typeof data.paymentStatus === 'string' ? data.paymentStatus.toLowerCase() : ''
-          const status = rawStatus === 'CANCELLED' || rawStatus === 'REJECTED' || paymentStatus === 'rejected'
-            ? 'CANCELLED'
-            : statusOrder.includes(rawStatus as OrderStatus) ? rawStatus as OrderStatus : 'PENDING'
-          const parsedDate = parseOrderDate(data.createdAt)
-          const date = parsedDate ? formatMonthDayYearTime(parsedDate) : 'Pending'
-          const createdAtTime = parsedDate ? parsedDate.getTime() : 0
-          const items = Array.isArray(data.items) ? data.items : []
-
-          return {
-            firestoreId: orderDocument.id,
-            id: typeof data.orderNumber === 'string' ? data.orderNumber : orderDocument.id,
-            customer: typeof data.customerName === 'string' ? data.customerName : 'Unknown customer',
-            email: typeof data.customerEmail === 'string' ? data.customerEmail : '',
-            date,
-            createdAtTime,
-            status,
-            payment: typeof data.paymentMethod === 'string' ? data.paymentMethod : '',
-            paymentStatus,
-            deliveryFee: typeof data.deliveryFee === 'number' ? data.deliveryFee : 0,
-            tax: typeof data.tax === 'number' ? data.tax : 0,
-            total: typeof data.total === 'number' ? data.total : 0,
-            fulfillmentType: data.fulfillmentType === 'pickup' ? 'pickup' : 'delivery',
-            address: typeof data.deliveryAddress === 'string' ? data.deliveryAddress : '',
-            pickupDays: typeof data.pickupDays === 'string' ? data.pickupDays : '',
-            pickupHours: typeof data.pickupHours === 'string' ? data.pickupHours : '',
-            sellerNotes: typeof data.sellerNotes === 'string' ? data.sellerNotes : '',
-            paymentReceiptUrl: typeof data.paymentReceiptUrl === 'string' ? data.paymentReceiptUrl : '',
-            items: items.flatMap((item) => {
-              if (!item || typeof item !== 'object') return []
-              const itemData = item as Record<string, unknown>
-              return [{
-                productId: typeof itemData.productId === 'string' ? itemData.productId : undefined,
-                name: typeof itemData.name === 'string' ? itemData.name : 'Product',
-                quantity: typeof itemData.quantity === 'number' ? itemData.quantity : 0,
-                price: typeof itemData.price === 'number' ? itemData.price : 0,
-                unit: typeof itemData.unit === 'string' && itemData.unit.trim() ? itemData.unit.trim() : 'KG',
-              }]
-            }),
-          }
-        })
-        loadedOrders.sort((a, b) => b.createdAtTime - a.createdAtTime)
-        setOrders(loadedOrders)
-        setSelectedId((current) => current ?? loadedOrders[0]?.id ?? null)
-        setError('')
+    let unsubscribeOrders: (() => void) | undefined
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      unsubscribeOrders?.()
+      if (!user) {
+        setError('Please log in to view your orders.')
         setIsLoading(false)
-      },
-      (loadError) => {
-        console.error('Loading admin orders failed:', loadError)
-        setError('Unable to load orders. Please try again.')
-        setIsLoading(false)
+        return
       }
-    )
 
-    return () => unsubscribe()
+      setIsLoading(true)
+      setError('')
+      unsubscribeOrders = onSnapshot(
+        query(collection(db, 'orders'), where('farmerId', '==', user.uid)),
+        (snapshot) => {
+          const loadedOrders: Order[] = snapshot.docs.map((orderDocument) => {
+            const data = orderDocument.data()
+            const rawStatus = typeof data.status === 'string' ? data.status.toUpperCase() : 'PENDING'
+            const paymentStatus = typeof data.paymentStatus === 'string' ? data.paymentStatus.toLowerCase() : ''
+            const status = rawStatus === 'CANCELLED' || rawStatus === 'REJECTED' || paymentStatus === 'rejected'
+              ? 'CANCELLED'
+              : statusOrder.includes(rawStatus as OrderStatus) ? rawStatus as OrderStatus : 'PENDING'
+            const parsedDate = parseOrderDate(data.createdAt)
+            const date = parsedDate ? formatMonthDayYearTime(parsedDate) : 'Pending'
+            const createdAtTime = parsedDate ? parsedDate.getTime() : 0
+            const items = Array.isArray(data.items) ? data.items : []
+
+            return {
+              firestoreId: orderDocument.id,
+              id: typeof data.orderNumber === 'string' ? data.orderNumber : orderDocument.id,
+              customer: typeof data.customerName === 'string' ? data.customerName : 'Unknown customer',
+              email: typeof data.customerEmail === 'string' ? data.customerEmail : '',
+              date,
+              createdAtTime,
+              status,
+              payment: typeof data.paymentMethod === 'string' ? data.paymentMethod : '',
+              paymentStatus,
+              deliveryFee: typeof data.deliveryFee === 'number' ? data.deliveryFee : 0,
+              tax: typeof data.tax === 'number' ? data.tax : 0,
+              total: typeof data.total === 'number' ? data.total : 0,
+              fulfillmentType: data.fulfillmentType === 'pickup' ? 'pickup' : 'delivery',
+              address: typeof data.deliveryAddress === 'string' ? data.deliveryAddress : '',
+              pickupDays: typeof data.pickupDays === 'string' ? data.pickupDays : '',
+              pickupHours: typeof data.pickupHours === 'string' ? data.pickupHours : '',
+              sellerNotes: typeof data.sellerNotes === 'string' ? data.sellerNotes : '',
+              paymentReceiptUrl: typeof data.paymentReceiptUrl === 'string' ? data.paymentReceiptUrl : '',
+              items: items.flatMap((item) => {
+                if (!item || typeof item !== 'object') return []
+                const itemData = item as Record<string, unknown>
+                return [{
+                  productId: typeof itemData.productId === 'string' ? itemData.productId : undefined,
+                  name: typeof itemData.name === 'string' ? itemData.name : 'Product',
+                  quantity: typeof itemData.quantity === 'number' ? itemData.quantity : 0,
+                  price: typeof itemData.price === 'number' ? itemData.price : 0,
+                  unit: typeof itemData.unit === 'string' && itemData.unit.trim() ? itemData.unit.trim() : 'KG',
+                }]
+              }),
+            }
+          })
+          loadedOrders.sort((a, b) => b.createdAtTime - a.createdAtTime)
+          setOrders(loadedOrders)
+          setSelectedId((current) => current ?? loadedOrders[0]?.id ?? null)
+          setError('')
+          setIsLoading(false)
+        },
+        (loadError) => {
+          console.error('Loading admin orders failed:', loadError)
+          setError('Unable to load orders. Please try again.')
+          setIsLoading(false)
+        }
+      )
+    })
+
+    return () => {
+      unsubscribeAuth()
+      unsubscribeOrders?.()
+    }
   }, [])
   const visibleOrders = useMemo(() => {
     const query = search.trim().toLowerCase()

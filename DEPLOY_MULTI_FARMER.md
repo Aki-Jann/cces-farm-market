@@ -54,6 +54,8 @@ node scripts/migrate-multi-farmer.mjs ../private/cces-service-account.json \
   --apply
 ```
 
+If the migration was already applied before the farmer-name display fix, rerun the same `--apply` command after deploying the updated frontend. It is idempotent and now synchronizes the original farmer profile name from the approved application and display name from the user profile.
+
 Read the summary and verify that the expected roles, `farmerId` fields, farmer profile, approved application, and farmer-scoped conversations were changed. A subsequent dry run should report no changes for already migrated records. The migration is idempotent and commits Firestore writes in batches of no more than 500 operations.
 
 ## 6. Manual role checklist

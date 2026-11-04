@@ -12,6 +12,7 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
   runTransaction,
   serverTimestamp,
   setDoc,
@@ -177,6 +178,17 @@ test('legacy admin role retains farmer access before migration', async () => {
   await assertSucceeds(getDoc(doc(db, 'orders/order-a')))
   await assertSucceeds(updateDoc(doc(db, 'products/product-a'), { stock: 9 }))
   await assertSucceeds(updateDoc(doc(db, 'orders/order-a'), { status: 'confirmed' }))
+})
+
+test('farmers cannot list orders without a farmerId filter', async () => {
+  const db = environment.authenticatedContext('farmer-b').firestore()
+  await assertFails(getDocs(collection(db, 'orders')))
+})
+
+test('farmers can list only their orders when filtered by farmerId', async () => {
+  const db = environment.authenticatedContext('farmer-b').firestore()
+  const snapshot = await getDocs(query(collection(db, 'orders'), where('farmerId', '==', 'farmer-b')))
+  assert.deepEqual(snapshot.docs.map((order) => order.id), ['order-other-farmer'])
 })
 
 test('CCES admin role retains application and read-only administration access', async () => {
