@@ -39,6 +39,25 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'customer';
     }
 
+    function isLegacyFarmer() {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin';
+    }
+
+    function isActiveFarmerId(farmerId) {
+      let userPath = /databases/$(database)/documents/users/$(farmerId);
+      let profilePath = /databases/$(database)/documents/farmerProfiles/$(farmerId);
+      return exists(userPath)
+        && (
+          get(userPath).data.get('role', '') == 'admin'
+            && !exists(profilePath)
+          || get(userPath).data.get('role', '') == 'farmer'
+            && exists(profilePath)
+            && get(profilePath).data.get('status', '') == 'active'
+        );
+    }
+
     function orderPath(orderId) {
       return /databases/$(database)/documents/orders/$(orderId);
     }
@@ -632,25 +651,36 @@ service cloud.firestore {
     }
 
     match /conversations/{customerId} {
-      allow get, list: if isFarmer() || isOwner(customerId);
+      function validLegacyConversation(data) {
+        return data.keys().hasOnly(['customerId', 'lastMessage', 'updatedAt'])
+          && data.keys().hasAll(['customerId', 'lastMessage', 'updatedAt'])
+          && data.customerId == customerId
+          && data.lastMessage is string
+          && data.lastMessage.size() > 0
+          && data.updatedAt == request.time;
+      }
 
-      allow create, update: if (
-          isFarmer() || isCustomer() && isOwner(customerId)
-        )
-        && request.resource.data.keys().hasOnly(['customerId', 'lastMessage', 'updatedAt'])
-        && request.resource.data.keys().hasAll(['customerId', 'lastMessage', 'updatedAt'])
-        && request.resource.data.customerId == customerId
-        && request.resource.data.lastMessage is string
-        && request.resource.data.lastMessage.size() > 0
-        && request.resource.data.updatedAt == request.time;
+      allow get, list: if isOwner(customerId)
+        || isLegacyFarmer() && !('farmerId' in resource.data);
 
-      allow delete: if isFarmer();
+      allow create: if validLegacyConversation(request.resource.data)
+        && (
+          isOwner(customerId) && isCustomer()
+          || isLegacyFarmer()
+        );
+
+      allow update: if validLegacyConversation(request.resource.data)
+        && (
+          isOwner(customerId) && isCustomer()
+          || isLegacyFarmer() && !('farmerId' in resource.data)
+        );
+
+      allow delete: if isLegacyFarmer() && !('farmerId' in resource.data);
 
       match /messages/{messageId} {
-        allow get, list: if isFarmer() || isOwner(customerId);
+        allow get, list: if isOwner(customerId) || isLegacyFarmer();
 
-        allow create: if isAuthenticated()
-          && request.resource.data.keys().hasOnly([
+        allow create: if request.resource.data.keys().hasOnly([
             'senderId', 'senderRole', 'text', 'createdAt'
           ])
           && request.resource.data.keys().hasAll([
@@ -661,13 +691,87 @@ service cloud.firestore {
           && request.resource.data.text.size() > 0
           && request.resource.data.createdAt == request.time
           && (
-            isFarmer() && request.resource.data.senderRole == 'admin'
-            || isCustomer() && isOwner(customerId)
+            isCustomer() && isOwner(customerId)
               && request.resource.data.senderRole == 'customer'
+            || isLegacyFarmer() && request.resource.data.senderRole == 'admin'
           );
 
         allow update: if false;
-        allow delete: if isFarmer();
+        allow delete: if isLegacyFarmer();
+      }
+
+      match /farmers/{farmerId} {
+        function validFarmerConversation(data) {
+          return data.keys().hasOnly([
+              'customerId', 'farmerId', 'lastMessage', 'updatedAt'
+            ])
+            && data.keys().hasAll([
+              'customerId', 'farmerId', 'lastMessage', 'updatedAt'
+            ])
+            && data.customerId == customerId
+            && data.farmerId == farmerId
+            && data.lastMessage is string
+            && data.lastMessage.size() > 0
+            && data.updatedAt == request.time;
+        }
+
+        allow get, list: if isOwner(customerId)
+          || isActiveFarmer() && request.auth.uid == farmerId;
+
+        allow create: if validFarmerConversation(request.resource.data)
+          && (
+            isCustomer()
+              && isOwner(customerId)
+              && isActiveFarmerId(farmerId)
+            || isActiveFarmer()
+              && request.auth.uid == farmerId
+              && exists(/databases/$(database)/documents/users/$(customerId))
+              && get(/databases/$(database)/documents/users/$(customerId)).data.get('role', '') == 'customer'
+          );
+
+        allow update: if validFarmerConversation(request.resource.data)
+          && request.resource.data.customerId == resource.data.customerId
+          && request.resource.data.farmerId == resource.data.farmerId
+          && (
+            isCustomer() && isOwner(customerId)
+            || isActiveFarmer() && request.auth.uid == farmerId
+          );
+
+        allow delete: if isActiveFarmer() && request.auth.uid == farmerId;
+
+        match /messages/{messageId} {
+          function afterFarmerConversation() {
+            return getAfter(/databases/$(database)/documents/conversations/$(customerId)/farmers/$(farmerId)).data;
+          }
+
+          allow get, list: if isOwner(customerId)
+            || isActiveFarmer() && request.auth.uid == farmerId;
+
+          allow create: if request.resource.data.keys().hasOnly([
+              'senderId', 'senderRole', 'text', 'createdAt'
+            ])
+            && request.resource.data.keys().hasAll([
+              'senderId', 'senderRole', 'text', 'createdAt'
+            ])
+            && request.resource.data.senderId == request.auth.uid
+            && request.resource.data.text is string
+            && request.resource.data.text.size() > 0
+            && request.resource.data.createdAt == request.time
+            && (
+              isCustomer()
+                && isOwner(customerId)
+                && afterFarmerConversation().customerId == request.auth.uid
+                && afterFarmerConversation().farmerId == farmerId
+                && request.resource.data.senderRole == 'customer'
+              || isActiveFarmer()
+                && request.auth.uid == farmerId
+                && afterFarmerConversation().farmerId == request.auth.uid
+                && request.resource.data.senderRole == 'farmer'
+            );
+
+          allow update: if false;
+          allow delete: if isActiveFarmer() && request.auth.uid == farmerId;
+        }
       }
     }
 

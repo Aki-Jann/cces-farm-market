@@ -17,6 +17,7 @@ import {
   setDoc,
   Timestamp,
   updateDoc,
+  where,
   writeBatch,
 } from 'firebase/firestore'
 
@@ -132,6 +133,24 @@ beforeEach(async () => {
         customerId: 'customer-b',
         lastMessage: 'hello',
         updatedAt: new Date(),
+      }),
+      setDoc(doc(db, 'conversations/customer-a/farmers/farmer-b'), {
+        customerId: 'customer-a',
+        farmerId: 'farmer-b',
+        lastMessage: 'Hi from the valley farm',
+        updatedAt: new Date(),
+      }),
+      setDoc(doc(db, 'conversations/customer-a/farmers/admin-a'), {
+        customerId: 'customer-a',
+        farmerId: 'admin-a',
+        lastMessage: 'Hi from the original farm',
+        updatedAt: new Date(),
+      }),
+      setDoc(doc(db, 'conversations/customer-a/farmers/farmer-b/messages/message-a'), {
+        senderId: 'customer-a',
+        senderRole: 'customer',
+        text: 'Hello',
+        createdAt: new Date(),
       }),
     ])
   })
@@ -956,4 +975,98 @@ test('customers cannot read another customer order or conversation', async () =>
   const db = environment.authenticatedContext('customer-a').firestore()
   await assertFails(getDoc(doc(db, 'orders/order-b')))
   await assertFails(getDoc(doc(db, 'conversations/customer-b')))
+  await assertFails(getDoc(doc(db, 'conversations/customer-b/farmers/farmer-b')))
+})
+
+test('farmers can read only conversations and messages assigned to their farmerId', async () => {
+  const valleyFarm = environment.authenticatedContext('farmer-b').firestore()
+  await assertSucceeds(getDoc(doc(valleyFarm, 'conversations/customer-a/farmers/farmer-b')))
+  await assertSucceeds(getDoc(doc(valleyFarm, 'conversations/customer-a/farmers/farmer-b/messages/message-a')))
+  await assertFails(getDoc(doc(valleyFarm, 'conversations/customer-a/farmers/admin-a')))
+  await assertFails(getDocs(collection(valleyFarm, 'conversations/customer-a/farmers/admin-a/messages')))
+  await assertFails(updateDoc(doc(valleyFarm, 'conversations/customer-a/farmers/admin-a'), {
+    lastMessage: 'A cross-farmer update.',
+    updatedAt: serverTimestamp(),
+  }))
+
+  const reply = writeBatch(valleyFarm)
+  reply.update(doc(valleyFarm, 'conversations/customer-a/farmers/farmer-b'), {
+    lastMessage: 'Thanks for your message.',
+    updatedAt: serverTimestamp(),
+  })
+  reply.set(doc(valleyFarm, 'conversations/customer-a/farmers/farmer-b/messages/message-farmer-b'), {
+    senderId: 'farmer-b',
+    senderRole: 'farmer',
+    text: 'Thanks for your message.',
+    createdAt: serverTimestamp(),
+  })
+  await assertSucceeds(reply.commit())
+
+  const originalFarm = environment.authenticatedContext('admin-a').firestore()
+  await assertSucceeds(getDoc(doc(originalFarm, 'conversations/customer-b')))
+  await assertFails(getDoc(doc(originalFarm, 'conversations/customer-a/farmers/farmer-b')))
+})
+
+test('customers can create a farmer-scoped conversation and first message atomically', async () => {
+  const db = environment.authenticatedContext('customer-b').firestore()
+  await assertSucceeds(getDocs(collection(db, 'conversations/customer-b/farmers/farmer-b/messages')))
+  const batch = writeBatch(db)
+  batch.set(doc(db, 'conversations/customer-b/farmers/farmer-b'), {
+    customerId: 'customer-b',
+    farmerId: 'farmer-b',
+    lastMessage: 'I would like to ask about your tomatoes.',
+    updatedAt: serverTimestamp(),
+  })
+  batch.set(doc(db, 'conversations/customer-b/farmers/farmer-b/messages/message-b'), {
+    senderId: 'customer-b',
+    senderRole: 'customer',
+    text: 'I would like to ask about your tomatoes.',
+    createdAt: serverTimestamp(),
+  })
+  await assertSucceeds(batch.commit())
+})
+
+test('a farmer cannot create a conversation under another farmer id', async () => {
+  const db = environment.authenticatedContext('farmer-b').firestore()
+  await assertFails(setDoc(doc(db, 'conversations/customer-b/farmers/admin-a'), {
+    customerId: 'customer-b',
+    farmerId: 'admin-a',
+    lastMessage: 'Should not be visible to the wrong farmer.',
+    updatedAt: serverTimestamp(),
+  }))
+})
+
+test('customers can review a product from a delivered split-farmer order', async () => {
+  const db = environment.authenticatedContext('customer-a').firestore()
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'orders/order-farmer-b-delivered'), {
+      farmerId: 'farmer-b',
+      userId: 'customer-a',
+      status: 'delivered',
+      deliveryConfirmed: true,
+      items: [{
+        productId: 'product-other-farmer',
+        name: 'TOMATOES',
+        price: 20,
+        quantity: 1,
+        unit: 'KG',
+      }],
+    })
+  })
+
+  await assertSucceeds(setDoc(doc(db, 'products/product-other-farmer/reviews/order-farmer-b-delivered'), {
+    orderId: 'order-farmer-b-delivered',
+    productId: 'product-other-farmer',
+    orderItem: {
+      productId: 'product-other-farmer',
+      name: 'TOMATOES',
+      price: 20,
+      quantity: 1,
+      unit: 'KG',
+    },
+    userId: 'customer-a',
+    rating: 5,
+    comment: 'Fresh and delicious.',
+    createdAt: serverTimestamp(),
+  }))
 })

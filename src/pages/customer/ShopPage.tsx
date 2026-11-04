@@ -73,6 +73,22 @@ function currency(value: number) {
   return `₱${value.toFixed(2)}`
 }
 
+function notifyOrder(orderId: string) {
+  void (async () => {
+    const user = auth.currentUser
+    if (!user) throw new Error('Cannot notify about an order without an authenticated user.')
+    const token = await user.getIdToken()
+    const response = await fetch('/api/notify-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ orderId }),
+    })
+    if (!response.ok) throw new Error(`Order notification request failed with status ${response.status}.`)
+  })().catch((notifyError: unknown) => {
+    console.error('Email notification failed:', notifyError)
+  })
+}
+
 function readStoreSettings(data: Record<string, unknown>, fallbackName: string): FarmerStoreSettings {
   return {
     farmName: typeof data.farmName === 'string' && data.farmName.trim() ? data.farmName.trim() : fallbackName,
@@ -1102,6 +1118,7 @@ export function ShopPage() {
         }
         if (!allOrdersCommitted) throw transactionError
       }
+      groupsWithOrders.forEach((group) => notifyOrder(group.orderRef.id))
       try {
         localStorage.removeItem(`cces-farm-market-cart:${user.uid}`)
       } catch (storageError) {

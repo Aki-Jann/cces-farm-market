@@ -66,13 +66,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (claim.status === 'expired') return res.status(200).json({ sent: false, reason: 'order too old' })
     const order = claim.order
 
-    // 4. Recipients: all farmer admins + optional settings/storefront.notificationEmail
+    // 4. Recipients: the order's farmer, or legacy farmer admins for old orders.
     const recipients = new Set<string>()
-    const admins = await db.collection('users').where('role', '==', LEGACY_FARMER_ROLE).get()
-    admins.forEach((d) => {
-      const email = d.data().email
-      if (typeof email === 'string' && email) recipients.add(email)
-    })
+    if (Object.hasOwn(order, 'farmerId')) {
+      if (typeof order.farmerId === 'string' && order.farmerId) {
+        const farmer = await db.doc(`users/${order.farmerId}`).get()
+        const email = farmer.data()?.email
+        if (typeof email === 'string' && email) recipients.add(email)
+      }
+    } else {
+      const admins = await db.collection('users').where('role', '==', LEGACY_FARMER_ROLE).get()
+      admins.forEach((d) => {
+        const email = d.data().email
+        if (typeof email === 'string' && email) recipients.add(email)
+      })
+    }
     const storefront = await db.doc('settings/storefront').get()
     const extra = storefront.data()?.notificationEmail
     if (typeof extra === 'string' && extra) recipients.add(extra)

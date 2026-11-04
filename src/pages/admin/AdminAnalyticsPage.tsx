@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { collection, onSnapshot } from 'firebase/firestore'
+import { collection, doc, onSnapshot, query as firestoreQuery, where } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
+import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import { ROLES } from '../../constants/roles'
 import type { ManagementRole } from '../../constants/roles'
@@ -14,7 +15,7 @@ import corn from '../../assets/shop-corn.png'
 import gumamela from '../../assets/shop-gumamela.png'
 import styles from './AdminAnalyticsPage.module.css'
 
-type Product = { id: string; name: string; category: string; sold: number; image: string; stock: number; unit: string; isAvailable: boolean; listedAt: Date | null }
+type Product = { id: string; farmerId: string; name: string; category: string; sold: number; image: string; stock: number; unit: string; isAvailable: boolean; listedAt: Date | null }
 type CategorySale = { label: string; value: number; percentage: number; color: string }
 type AnalyticsPanel = 'order-value' | 'units-sold' | 'products-listed' | 'out-of-stock' | 'category-sales' | 'revenue-trend' | 'transactions-trend' | 'inventory' | 'top-products' | 'underperforming'
 type Period = 'daily' | 'monthly' | 'yearly'
@@ -40,10 +41,11 @@ type OrderItem = {
   unit?: string
 }
 
-type FirestoreOrder = { id: string; orderNumber: string; customerName: string; status: string; paymentStatus: string; total: number; createdAt: unknown; items: OrderItem[] }
+type FirestoreOrder = { id: string; orderNumber: string; farmerId: string; customerName: string; status: string; paymentStatus: string; total: number; createdAt: unknown; items: OrderItem[] }
 
 type FirestoreProduct = {
   id: string
+  farmerId: string
   name: string
   category: string
   stock: number
@@ -458,6 +460,8 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
   const [productsLoaded, setProductsLoaded] = useState(false)
   const [ordersError, setOrdersError] = useState('')
   const [productsError, setProductsError] = useState('')
+  const [farmerNames, setFarmerNames] = useState<Record<string, string>>({})
+  const [selectedFarmerId, setSelectedFarmerId] = useState('all')
   const [revenuePeriod, setRevenuePeriod] = useState<Period>('daily')
   const [transactionsPeriod, setTransactionsPeriod] = useState<Period>('daily')
   const [topProductsPeriod, setTopProductsPeriod] = useState<Period>('daily')
@@ -465,16 +469,20 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
   const query = search.trim().toLowerCase()
 
   useEffect(() => {
+    const uid = auth.currentUser?.uid
     // Orders and products are independent collections, so each gets its own
     // real-time listener rather than merging unrelated data into one.
     const unsubscribeOrders = onSnapshot(
-      collection(db, 'orders'),
+      role === ROLES.CCES_ADMIN
+        ? collection(db, 'orders')
+        : firestoreQuery(collection(db, 'orders'), where('farmerId', '==', uid ?? '')),
       (ordersSnapshot) => {
         const loadedOrders: FirestoreOrder[] = ordersSnapshot.docs.map((docSnap) => {
           const data = docSnap.data()
           return {
             id: docSnap.id,
             orderNumber: typeof data.orderNumber === 'string' ? data.orderNumber : docSnap.id,
+            farmerId: typeof data.farmerId === 'string' ? data.farmerId : '',
             customerName: typeof data.customerName === 'string' ? data.customerName : 'Customer',
             status: typeof data.status === 'string' ? data.status : 'pending',
             paymentStatus: typeof data.paymentStatus === 'string' ? data.paymentStatus : '',
@@ -506,12 +514,15 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
     )
 
     const unsubscribeProducts = onSnapshot(
-      collection(db, 'products'),
+      role === ROLES.CCES_ADMIN
+        ? collection(db, 'products')
+        : firestoreQuery(collection(db, 'products'), where('farmerId', '==', uid ?? '')),
       (productsSnapshot) => {
         const loadedProducts: FirestoreProduct[] = productsSnapshot.docs.map((docSnap) => {
           const data = docSnap.data()
           return {
             id: docSnap.id,
+            farmerId: typeof data.farmerId === 'string' ? data.farmerId : '',
             name: typeof data.name === 'string' ? data.name : 'Product',
             category: typeof data.category === 'string' ? data.category : 'VEGETABLES',
             stock: typeof data.stock === 'number' && Number.isFinite(data.stock) ? Math.max(data.stock, 0) : 0,
@@ -532,24 +543,72 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
       }
     )
 
+    const unsubscribeFarmerProfiles = role === ROLES.CCES_ADMIN
+      ? onSnapshot(collection(db, 'farmerProfiles'), (snapshot) => {
+          setFarmerNames(Object.fromEntries(snapshot.docs.map((profile) => {
+            const name = profile.data().farmName
+            return [profile.id, typeof name === 'string' && name.trim() ? name.trim() : profile.id]
+          })))
+        }, (loadError) => {
+          console.error('Loading analytics farmer names failed:', loadError)
+        })
+      : uid
+        ? onSnapshot(doc(db, 'farmerProfiles', uid), (snapshot) => {
+            const name = snapshot.data()?.farmName
+            setFarmerNames(name && typeof name === 'string' ? { [uid]: name } : {})
+          }, (loadError) => {
+            console.error('Loading analytics farmer profile failed:', loadError)
+          })
+        : () => {}
+
     return () => {
       unsubscribeOrders()
       unsubscribeProducts()
+      unsubscribeFarmerProfiles()
     }
-  }, [])
+  }, [role])
+
+  const scopedOrders = useMemo(() => (
+    role === ROLES.CCES_ADMIN && selectedFarmerId !== 'all'
+      ? orders.filter((order) => order.farmerId === selectedFarmerId)
+      : orders
+  ), [orders, role, selectedFarmerId])
+  const scopedProducts = useMemo(() => (
+    role === ROLES.CCES_ADMIN && selectedFarmerId !== 'all'
+      ? products.filter((product) => product.farmerId === selectedFarmerId)
+      : products
+  ), [products, role, selectedFarmerId])
+  const farmerOptions = useMemo(() => {
+    const ids = new Set([
+      ...Object.keys(farmerNames),
+      ...orders.map((order) => order.farmerId).filter(Boolean),
+      ...products.map((product) => product.farmerId).filter(Boolean),
+    ])
+    return [...ids].sort((first, second) =>
+      (farmerNames[first] ?? first).localeCompare(farmerNames[second] ?? second)
+    )
+  }, [farmerNames, orders, products])
+
+  function farmerName(farmerId: string) {
+    return farmerId ? farmerNames[farmerId] ?? farmerId : 'Legacy farmer'
+  }
+  const reportFarmerName = role === ROLES.CCES_ADMIN
+    ? selectedFarmerId === 'all' ? 'All farmers' : farmerName(selectedFarmerId)
+    : farmerName(auth.currentUser?.uid ?? '')
 
   const analytics: AnalyticsData = useMemo(() => {
-    const salesOrders = orders.filter(isOrderEligibleForFinancialTotals)
+    const salesOrders = scopedOrders.filter(isOrderEligibleForFinancialTotals)
     const totalRevenue = salesOrders.reduce((sum, order) => sum + (typeof order.total === 'number' ? order.total : 0), 0)
 
     const productMap = new Map<string, Product>()
     const productLookupByName = new Map<string, string>()
 
-    products.forEach((prod) => {
+    scopedProducts.forEach((prod) => {
       const displayCat = formatCategoryLabel(prod.category)
       const image = resolveProductImage(prod.imageUrl, getProductFallbackImage(prod.name))
       productMap.set(prod.id, {
         id: prod.id,
+        farmerId: prod.farmerId,
         name: prod.name,
         category: displayCat,
         sold: 0,
@@ -594,6 +653,7 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
           } else {
             productMap.set(key, {
               id: key,
+              farmerId: order.farmerId,
               name: rawName,
               category: categoryLabel,
               sold: qty,
@@ -615,7 +675,7 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
       'Fruit',
       'Grain',
       'Flowers',
-      ...products.map((product) => normalizeCategory(product.category) || formatCategoryLabel(product.category)),
+      ...scopedProducts.map((product) => normalizeCategory(product.category) || formatCategoryLabel(product.category)),
       ...salesByCategory.keys(),
     ])]
     const categoryAmounts = categoryLabels.map((label, index) => ({
@@ -645,9 +705,9 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
         : 0
       return orderSum + quantity
     }, 0), 0)
-    const listedProducts = products.length
-    const outOfStockProducts = products.filter((product) => product.stock <= 0).length
-    const inventory = products
+    const listedProducts = scopedProducts.length
+    const outOfStockProducts = scopedProducts.filter((product) => product.stock <= 0).length
+    const inventory = scopedProducts
       .map((product) => productMap.get(product.id))
       .filter((product): product is Product => product !== undefined)
       .sort((a, b) => a.stock - b.stock || a.name.localeCompare(b.name))
@@ -661,9 +721,9 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
       categories,
       inventory,
       allProducts,
-      orders,
+      orders: scopedOrders,
     }
-  }, [orders, products])
+  }, [scopedOrders, scopedProducts])
 
   const revenueTrend = useMemo(() => makeTrendPoints(
     analytics.financialOrders,
@@ -780,6 +840,17 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
       <AdminSidebar active="analytics" role={role} />
       <section className={styles.content}>
         <Header title="ANALYTICS" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
+        {role === ROLES.CCES_ADMIN && (
+          <label className={styles.farmerFilter}>
+            Farmer
+            <select value={selectedFarmerId} onChange={(event) => setSelectedFarmerId(event.target.value)}>
+              <option value="all">All farmers</option>
+              {farmerOptions.map((farmerId) => (
+                <option key={farmerId} value={farmerId}>{farmerName(farmerId)}</option>
+              ))}
+            </select>
+          </label>
+        )}
         {activePanel ? (
           <div className={styles.dashboard}>
             <div className={styles.detailHeader}>
@@ -790,6 +861,7 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
                   {activePanel === 'revenue-trend' || activePanel === 'transactions-trend'
                     ? `Expanded ${activePanel === 'revenue-trend' ? revenuePeriod : transactionsPeriod} trend data.`
                     : 'Expanded information from your live farm market data.'}
+                  {role === ROLES.CCES_ADMIN && ` Report scope: ${selectedFarmerId === 'all' ? 'All farmers' : farmerName(selectedFarmerId)}.`}
                 </p>
               </div>
               <div className={styles.printActions}>
@@ -801,17 +873,17 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
             {activePanel === 'order-value' ? (
               <>
                 <div className={styles.detailSummary}><span>Total value across {analytics.financialOrders.length} paid orders</span><strong>{currency(analytics.totalRevenue)}</strong></div>
-                <div className={styles.dataList}>
-                  <div className={styles.dataListHeading}><span>ORDER</span><span>CUSTOMER</span><span>ITEMS</span><span>ORDER VALUE</span></div>
+                <div className={`${styles.dataList} ${styles.farmerOrderList}`}>
+                  <div className={styles.dataListHeading}><span>ORDER</span><span>FARMER</span><span>CUSTOMER</span><span>ITEMS</span><span>ORDER VALUE</span></div>
                   {analytics.financialOrders.length === 0 ? <p className={styles.emptyState}>No paid orders yet.</p> : analytics.financialOrders.map((order) => (
-                    <div className={styles.dataRow} key={order.id}><strong>{order.orderNumber}</strong><span>{order.customerName}</span><span>{order.items.reduce((sum, item) => sum + (item.quantity ?? 0), 0)} units</span><b>{currency(order.total)}</b></div>
+                    <div className={styles.dataRow} key={order.id}><strong>{order.orderNumber}</strong><span>{farmerName(order.farmerId)}</span><span>{order.customerName}</span><span>{order.items.reduce((sum, item) => sum + (item.quantity ?? 0), 0)} units</span><b>{currency(order.total)}</b></div>
                   ))}
                 </div>
               </>
             ) : activePanel === 'category-sales' ? (
               <div className={`${styles.dataList} ${styles.categorySalesList}`}>
-                <div className={styles.dataListHeading}><span>CATEGORY</span><span>SHARE OF SALES</span><span>SALES VALUE</span></div>
-                {analytics.categories.map((category) => <div className={styles.categoryDetailRow} key={category.label}><i style={{ background: category.color }} /><strong>{category.label}</strong><span className={styles.categoryShare}><i style={{ width: `${category.percentage}%`, background: category.color }} /></span><b>{category.percentage}%</b><strong>{currency(category.value)}</strong></div>)}
+                <div className={styles.dataListHeading}><span>CATEGORY</span><span>FARMER</span><span>SHARE OF SALES</span><span>SALES VALUE</span></div>
+                {analytics.categories.map((category) => <div className={styles.categoryDetailRow} key={category.label}><i style={{ background: category.color }} /><strong>{category.label}</strong><span>{reportFarmerName}</span><span className={styles.categoryShare}><i style={{ width: `${category.percentage}%`, background: category.color }} /></span><b>{category.percentage}%</b><strong>{currency(category.value)}</strong></div>)}
               </div>
             ) : activePanel === 'revenue-trend' || activePanel === 'transactions-trend' ? (
               <>
@@ -824,11 +896,13 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
                 <div className={`${styles.dataList} ${styles.trendDataList}`}>
                   <div className={styles.dataListHeading}>
                     <span>PERIOD</span>
+                    <span>FARMER</span>
                     <span>{activePanel === 'revenue-trend' ? 'REVENUE' : 'TRANSACTIONS'}</span>
                   </div>
                   {(activePanel === 'revenue-trend' ? revenueTrend : transactionsTrend).map((point) => (
                     <div className={styles.dataRow} key={point.tooltip}>
                       <span>{point.tooltip}</span>
+                      <span>{reportFarmerName}</span>
                       <b>{activePanel === 'revenue-trend' ? currency(point.value) : point.value.toLocaleString()}</b>
                     </div>
                   ))}
@@ -840,10 +914,10 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
                   <span>{activePanel === 'out-of-stock' ? 'Products that need restocking' : activePanel === 'inventory' ? 'Current product stock levels' : activePanel === 'units-sold' ? 'Total units ordered' : `Showing ${detailProducts.length} products`}</span>
                   <strong>{activePanel === 'out-of-stock' ? inventoryProducts.length : activePanel === 'products-listed' ? analytics.listedProducts : activePanel === 'units-sold' ? analytics.unitsSold.toLocaleString() : detailProducts.length}</strong>
                 </div>
-                <div className={styles.dataList}>
-                  <div className={styles.dataListHeading}><span>PRODUCT</span><span>CATEGORY</span><span>{activePanel === 'inventory' || activePanel === 'out-of-stock' || activePanel === 'products-listed' ? 'CURRENT STOCK' : 'UNITS SOLD'}</span><span>STATUS</span></div>
+                <div className={`${styles.dataList} ${styles.farmerProductList}`}>
+                  <div className={styles.dataListHeading}><span>PRODUCT</span><span>FARMER</span><span>CATEGORY</span><span>{activePanel === 'inventory' || activePanel === 'out-of-stock' || activePanel === 'products-listed' ? 'CURRENT STOCK' : 'UNITS SOLD'}</span><span>STATUS</span></div>
                   {detailProducts.length === 0 ? <p className={styles.emptyState}>{activePanel === 'out-of-stock' ? 'All listed products have stock.' : 'No product data available yet.'}</p> : detailProducts.map((product) => (
-                    <div className={styles.dataRow} key={product.id}><span className={styles.detailProduct}><img src={product.image} alt="" /><strong>{product.name}</strong></span><span>{product.category}</span><b>{activePanel === 'inventory' || activePanel === 'out-of-stock' || activePanel === 'products-listed' ? `${product.stock} ${product.unit}` : `${product.sold} sold`}</b><span className={product.stock <= 0 ? styles.statusOut : styles.statusAvailable}>{product.stock <= 0 ? 'Out of stock' : product.isAvailable ? 'Available' : 'Not listed'}</span></div>
+                    <div className={styles.dataRow} key={product.id}><span className={styles.detailProduct}><img src={product.image} alt="" /><strong>{product.name}</strong></span><span>{farmerName(product.farmerId)}</span><span>{product.category}</span><b>{activePanel === 'inventory' || activePanel === 'out-of-stock' || activePanel === 'products-listed' ? `${product.stock} ${product.unit}` : `${product.sold} sold`}</b><span className={product.stock <= 0 ? styles.statusOut : styles.statusAvailable}>{product.stock <= 0 ? 'Out of stock' : product.isAvailable ? 'Available' : 'Not listed'}</span></div>
                   ))}
                 </div>
               </>
@@ -851,7 +925,15 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
           </div>
         ) : <div className={styles.dashboard}>
           <div className={styles.metrics}>
-            <MetricCard label="TOTAL ORDER VALUE" value={currency(analytics.totalRevenue)} detail="Value across all orders" icon="sales" onClick={() => openPanel('order-value')} />
+            <MetricCard
+              label="TOTAL ORDER VALUE"
+              value={currency(analytics.totalRevenue)}
+              detail={role === ROLES.CCES_ADMIN
+                ? `Value for ${reportFarmerName.toLowerCase()}`
+                : 'Value across your orders'}
+              icon="sales"
+              onClick={() => openPanel('order-value')}
+            />
             <MetricCard label="UNITS SOLD" value={analytics.unitsSold.toLocaleString()} detail="Items ordered by customers" icon="units" onClick={() => openPanel('units-sold')} />
             <MetricCard label="PRODUCTS LISTED" value={analytics.listedProducts.toLocaleString()} detail="Products in your catalog" icon="products" onClick={() => openPanel('products-listed')} />
             <MetricCard label="OUT OF STOCK" value={analytics.outOfStockProducts.toLocaleString()} detail="Products that may need restocking" icon="stock" onClick={() => openPanel('out-of-stock')} />

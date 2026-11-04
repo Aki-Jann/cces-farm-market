@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { addDoc, collection, doc, onSnapshot, query, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
+import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
@@ -9,7 +9,7 @@ import { LEGACY_FARMER_ROLE, ROLES } from '../../constants/roles'
 import styles from './AdminCustomersPage.module.css'
 import { formatMonthDayYear, formatTime } from '../../utils/dateFormat'
 
-type Message = { id: string; text: string; timestamp: string; sender: typeof ROLES.CUSTOMER | typeof LEGACY_FARMER_ROLE; dayDivider?: string }
+type Message = { id: string; text: string; timestamp: string; sender: typeof ROLES.CUSTOMER | typeof ROLES.FARMER | typeof LEGACY_FARMER_ROLE; dayDivider?: string }
 type LoadedMessage = Omit<Message, 'dayDivider'> & { createdAt: Date | null }
 type Order = { id: string; date: string; status: 'DELIVERED' | 'PENDING' | 'CONFIRMED' | 'PACKED'; total: number }
 type Customer = {
@@ -73,10 +73,9 @@ function CustomerAvatar({ customer, large = false }: { customer: Customer; large
   )
 }
 
-function CustomerList({ customers, selectedId, conversationError, onSelect }: {
+function CustomerList({ customers, selectedId, onSelect }: {
   customers: Customer[]
   selectedId: string
-  conversationError: string
   onSelect: (id: string) => void
 }) {
   return (
@@ -84,7 +83,6 @@ function CustomerList({ customers, selectedId, conversationError, onSelect }: {
       <div className={styles.customerListHeader}>
         <div><h2>Customers</h2><span>{customers.length} profiles</span></div>
       </div>
-      {conversationError && <p className={styles.conversationError} role="alert">{conversationError}</p>}
       {customers.map((customer) => (
         <button className={selectedId === customer.id ? styles.selectedCustomer : ''} key={customer.id} type="button" onClick={() => onSelect(customer.id)}>
           <CustomerAvatar key={`${customer.id}-${customer.photoUrl}`} customer={customer} />
@@ -134,47 +132,72 @@ function Messages({ customer }: { customer: Customer }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState('')
+  const [isLegacyFarmer, setIsLegacyFarmer] = useState(false)
   const messageListRef = useRef<HTMLDivElement | null>(null)
   const shouldScrollToBottom = useRef(true)
 
   useEffect(() => {
     shouldScrollToBottom.current = true
-    const messagesQuery = query(collection(db, 'conversations', customer.id, 'messages'))
-    return onSnapshot(messagesQuery, (snapshot) => {
-      const sortedMessages = snapshot.docs
-        .map((messageDocument): LoadedMessage => {
-          const data = messageDocument.data()
-          const createdAt = parseMessageDate(data.createdAt)
-          return {
-            id: messageDocument.id,
-            sender: data.senderRole === LEGACY_FARMER_ROLE ? LEGACY_FARMER_ROLE : ROLES.CUSTOMER,
-            text: typeof data.text === 'string' ? data.text : '',
-            timestamp: createdAt ? formatTime(createdAt) : 'Pending',
-            createdAt,
-          }
+    const farmer = auth.currentUser
+    let unsubscribeMessages: (() => void) | undefined
+    let isMounted = true
+    if (!farmer) return
+
+    void getDoc(doc(db, 'users', farmer.uid)).then((farmerDocument) => {
+      if (!isMounted) return
+      const legacy = farmerDocument.data()?.role === LEGACY_FARMER_ROLE
+      setIsLegacyFarmer(legacy)
+      const messagesQuery = legacy
+        ? query(collection(db, 'conversations', customer.id, 'messages'))
+        : query(collection(db, 'conversations', customer.id, 'farmers', farmer.uid, 'messages'))
+      unsubscribeMessages = onSnapshot(messagesQuery, (snapshot) => {
+        const sortedMessages = snapshot.docs
+          .map((messageDocument): LoadedMessage => {
+            const data = messageDocument.data()
+            const createdAt = parseMessageDate(data.createdAt)
+            return {
+              id: messageDocument.id,
+              sender: data.senderRole === ROLES.CUSTOMER
+                ? ROLES.CUSTOMER
+                : data.senderRole === LEGACY_FARMER_ROLE ? LEGACY_FARMER_ROLE : ROLES.FARMER,
+              text: typeof data.text === 'string' ? data.text : '',
+              timestamp: createdAt ? formatTime(createdAt) : 'Pending',
+              createdAt,
+            }
+          })
+          .filter((message) => message.text)
+          .sort((first, second) => (first.createdAt?.getTime() ?? 0) - (second.createdAt?.getTime() ?? 0))
+
+        let previousDay = ''
+        const loadedMessages: Message[] = sortedMessages.map(({ createdAt, ...message }) => {
+          const currentDay = createdAt
+            ? `${createdAt.getFullYear()}-${createdAt.getMonth()}-${createdAt.getDate()}`
+            : ''
+          const dayDivider = createdAt && currentDay !== previousDay
+            ? formatMonthDayYear(createdAt)
+            : undefined
+          if (currentDay) previousDay = currentDay
+          return { ...message, ...(dayDivider ? { dayDivider } : {}) }
         })
-        .filter((message) => message.text)
-        .sort((first, second) => (first.createdAt?.getTime() ?? 0) - (second.createdAt?.getTime() ?? 0))
 
-      let previousDay = ''
-      const loadedMessages: Message[] = sortedMessages.map(({ createdAt, ...message }) => {
-        const currentDay = createdAt
-          ? `${createdAt.getFullYear()}-${createdAt.getMonth()}-${createdAt.getDate()}`
-          : ''
-        const dayDivider = createdAt && currentDay !== previousDay
-          ? formatMonthDayYear(createdAt)
-          : undefined
-        if (currentDay) previousDay = currentDay
-        return { ...message, ...(dayDivider ? { dayDivider } : {}) }
+        setMessages(loadedMessages)
+        setIsLoading(false)
+      }, (snapshotError) => {
+        console.error('Loading customer messages failed:', snapshotError)
+        setError('Unable to load messages. Please try again.')
+        setIsLoading(false)
       })
-
-      setMessages(loadedMessages)
-      setIsLoading(false)
-    }, (snapshotError) => {
-      console.error('Loading customer messages failed:', snapshotError)
-      setError('Unable to load messages. Please try again.')
-      setIsLoading(false)
+    }).catch((loadError) => {
+      console.error('Loading farmer account for messages failed:', loadError)
+      if (isMounted) {
+        setError('Unable to load messages. Please try again.')
+        setIsLoading(false)
+      }
     })
+    return () => {
+      isMounted = false
+      unsubscribeMessages?.()
+    }
   }, [customer.id])
 
   useEffect(() => {
@@ -188,9 +211,9 @@ function Messages({ customer }: { customer: Customer }) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const text = draft.trim()
-    const admin = auth.currentUser
-    if (!text || isSending) return
-    if (!admin) {
+    const farmer = auth.currentUser
+    if (!text || isSending || isLoading) return
+    if (!farmer) {
       setError('Please log in to send messages.')
       return
     }
@@ -198,18 +221,27 @@ function Messages({ customer }: { customer: Customer }) {
     setIsSending(true)
     setError('')
     try {
-      const conversationRef = doc(db, 'conversations', customer.id)
-      await addDoc(collection(conversationRef, 'messages'), {
-        senderId: admin.uid,
-        senderRole: LEGACY_FARMER_ROLE,
-        text,
-        createdAt: serverTimestamp(),
-      })
-      await setDoc(conversationRef, {
+      const conversationRef = isLegacyFarmer
+        ? doc(db, 'conversations', customer.id)
+        : doc(db, 'conversations', customer.id, 'farmers', farmer.uid)
+      const batch = writeBatch(db)
+      batch.set(conversationRef, isLegacyFarmer ? {
         customerId: customer.id,
         lastMessage: text,
         updatedAt: serverTimestamp(),
+      } : {
+        customerId: customer.id,
+        farmerId: farmer.uid,
+        lastMessage: text,
+        updatedAt: serverTimestamp(),
       }, { merge: true })
+      batch.set(doc(collection(conversationRef, 'messages')), {
+        senderId: farmer.uid,
+        senderRole: isLegacyFarmer ? LEGACY_FARMER_ROLE : ROLES.FARMER,
+        text,
+        createdAt: serverTimestamp(),
+      })
+      await batch.commit()
       setDraft('')
     } catch (sendError) {
       console.error('Sending customer message failed:', sendError)
@@ -225,12 +257,12 @@ function Messages({ customer }: { customer: Customer }) {
         <span>{message.dayDivider}</span>
       </div>
     )}
-    <article className={`${styles.message} ${message.sender === LEGACY_FARMER_ROLE ? styles.outgoing : styles.incoming}`}>
+    <article className={`${styles.message} ${message.sender !== ROLES.CUSTOMER ? styles.outgoing : styles.incoming}`}>
       <p>{message.text}</p>
       <time>{message.timestamp}</time>
     </article>
   </div>
-))}</div><form className={styles.composer} onSubmit={submit}><input aria-label={`Message ${customer.name}`} placeholder={`Message ${customer.name}...`} value={draft} onChange={(event) => setDraft(event.target.value)} /><button disabled={isSending} type="submit">SEND</button></form>{error && messages.length > 0 && <p role="alert">{error}</p>}</div>
+))}</div><form className={styles.composer} onSubmit={submit}><input aria-label={`Message ${customer.name}`} placeholder={`Message ${customer.name}...`} value={draft} onChange={(event) => setDraft(event.target.value)} /><button disabled={isSending || isLoading} type="submit">SEND</button></form>{error && messages.length > 0 && <p role="alert">{error}</p>}</div>
 }
 
 type RawUserRecord = { id: string; data: Record<string, unknown> }
@@ -239,21 +271,21 @@ type RawOrderRecord = { id: string; data: Record<string, unknown> }
 export function AdminCustomersPage() {
   const [rawUsers, setRawUsers] = useState<RawUserRecord[]>([])
   const [rawOrders, setRawOrders] = useState<RawOrderRecord[]>([])
-  const [conversationActivity, setConversationActivity] = useState<Record<string, number>>({})
   const [usersLoaded, setUsersLoaded] = useState(false)
   const [ordersLoaded, setOrdersLoaded] = useState(false)
-  const [conversationsLoaded, setConversationsLoaded] = useState(false)
   const [selectedId, setSelectedId] = useState('')
   const [tab, setTab] = useState<'profile' | 'messages'>('messages')
   const [search, setSearch] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState('')
-  const [conversationError, setConversationError] = useState('')
-  const isLoading = !usersLoaded || !ordersLoaded || !conversationsLoaded
+  const isLoading = !usersLoaded || !ordersLoaded
 
   const customers = useMemo<Customer[]>(() => {
+    const farmerCustomerIds = new Set(rawOrders
+      .map(({ data }) => data.userId)
+      .filter((userId): userId is string => typeof userId === 'string'))
     return rawUsers.flatMap(({ id, data }) => {
-      if (data.role !== ROLES.CUSTOMER) return []
+      if (data.role !== ROLES.CUSTOMER || !farmerCustomerIds.has(id)) return []
 
       const firstName = typeof data.firstName === 'string' ? data.firstName.trim() : ''
       const lastName = typeof data.lastName === 'string' ? data.lastName.trim() : ''
@@ -299,13 +331,7 @@ export function AdminCustomersPage() {
         customer.segment.toLowerCase().includes(query) ||
         customer.phone.toLowerCase().includes(query)
       )
-      .map((customer, index) => ({ customer, index }))
-      .sort((first, second) =>
-        (conversationActivity[second.customer.id] ?? 0) - (conversationActivity[first.customer.id] ?? 0) ||
-        first.index - second.index
-      )
-      .map(({ customer }) => customer)
-  }, [customers, search, conversationActivity])
+  }, [customers, search])
 
   const selected = visibleCustomers.find((customer) => customer.id === selectedId) ?? visibleCustomers[0]
 
@@ -326,8 +352,13 @@ export function AdminCustomersPage() {
       }
     )
 
+    const farmer = auth.currentUser
+    if (!farmer) {
+      return () => unsubscribeUsers()
+    }
+
     const unsubscribeOrders = onSnapshot(
-      collection(db, 'orders'),
+      query(collection(db, 'orders'), where('farmerId', '==', farmer.uid)),
       (snapshot) => {
         setRawOrders(snapshot.docs.map((orderDocument) => ({ id: orderDocument.id, data: orderDocument.data() })))
         setOrdersLoaded(true)
@@ -339,29 +370,9 @@ export function AdminCustomersPage() {
       }
     )
 
-    const unsubscribeConversations = onSnapshot(
-      collection(db, 'conversations'),
-      (snapshot) => {
-        const activity: Record<string, number> = {}
-        snapshot.docs.forEach((conversationDocument) => {
-          const updatedAt = parseMessageDate(conversationDocument.data().updatedAt)
-          if (updatedAt) activity[conversationDocument.id] = updatedAt.getTime()
-        })
-        setConversationActivity(activity)
-        setConversationError('')
-        setConversationsLoaded(true)
-      },
-      (loadError) => {
-        console.error('Loading conversation activity failed:', loadError)
-        setConversationError('Unable to sort customers by recent conversations.')
-        setConversationsLoaded(true)
-      }
-    )
-
     return () => {
       unsubscribeUsers()
       unsubscribeOrders()
-      unsubscribeConversations()
     }
   }, [])
 
@@ -390,7 +401,7 @@ export function AdminCustomersPage() {
           </div> : !selected ? <div className={styles.workspace}>
             <p>{search.trim() ? 'No customer profiles match your search.' : 'No customer profiles found.'}</p>
           </div> : <div className={styles.workspace}>
-            <CustomerList customers={visibleCustomers} selectedId={selected.id} conversationError={conversationError} onSelect={(id) => { setSelectedId(id); setTab('messages') }} />
+            <CustomerList customers={visibleCustomers} selectedId={selected.id} onSelect={(id) => { setSelectedId(id); setTab('messages') }} />
               <section className={styles.details}>
                 <CustomerHeader customer={selected} onChangeCustomerType={(customerType) => void updateCustomerProfile('customerType', customerType)} />
                   <nav className={styles.tabs}>

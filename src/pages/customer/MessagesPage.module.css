@@ -95,6 +95,26 @@
   padding: 6px 10px;
 }
 
+.farmerSelectLabel {
+  align-items: center;
+  color: #59645e;
+  display: flex;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 8px;
+  padding: 10px 16px;
+}
+
+.farmerSelectLabel select {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text);
+  font: inherit;
+  min-width: 0;
+  padding: 7px 10px;
+}
+
 .messageList {
   background:
     radial-gradient(ellipse at 10% 100%, rgb(231 242 233 / 45%), transparent 34%),
