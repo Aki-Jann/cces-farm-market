@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { collection, doc, onSnapshot, query as firestoreQuery, where } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
+import { FarmerFilter } from '../../components/admin/FarmerFilter'
+import { getFarmerOptions } from '../../utils/farmerFilter'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import { ROLES } from '../../constants/roles'
@@ -578,16 +580,10 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
       ? products.filter((product) => product.farmerId === selectedFarmerId)
       : products
   ), [products, role, selectedFarmerId])
-  const farmerOptions = useMemo(() => {
-    const ids = new Set([
-      ...Object.keys(farmerNames),
-      ...orders.map((order) => order.farmerId).filter(Boolean),
-      ...products.map((product) => product.farmerId).filter(Boolean),
-    ])
-    return [...ids].sort((first, second) =>
-      (farmerNames[first] ?? first).localeCompare(farmerNames[second] ?? second)
-    )
-  }, [farmerNames, orders, products])
+  const farmerOptions = useMemo(
+    () => getFarmerOptions(farmerNames, orders, products),
+    [farmerNames, orders, products],
+  )
 
   function farmerName(farmerId: string) {
     return farmerId ? farmerNames[farmerId] ?? farmerId : 'Legacy farmer'
@@ -841,15 +837,12 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
       <section className={styles.content}>
         <Header title="ANALYTICS" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
         {role === ROLES.CCES_ADMIN && (
-          <label className={styles.farmerFilter}>
-            Farmer
-            <select value={selectedFarmerId} onChange={(event) => setSelectedFarmerId(event.target.value)}>
-              <option value="all">All farmers</option>
-              {farmerOptions.map((farmerId) => (
-                <option key={farmerId} value={farmerId}>{farmerName(farmerId)}</option>
-              ))}
-            </select>
-          </label>
+          <FarmerFilter
+            value={selectedFarmerId}
+            options={farmerOptions}
+            farmerNames={farmerNames}
+            onChange={setSelectedFarmerId}
+          />
         )}
         {activePanel ? (
           <div className={styles.dashboard}>

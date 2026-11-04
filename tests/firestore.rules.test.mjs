@@ -45,6 +45,7 @@ beforeEach(async () => {
         email: 'customer-a@example.com',
       }),
       setDoc(doc(db, 'users/customer-b'), { role: 'customer' }),
+      setDoc(doc(db, 'users/customer-rejected'), { role: 'customer' }),
       setDoc(doc(db, 'users/admin-a'), { role: 'admin' }),
       setDoc(doc(db, 'users/farmer-b'), { role: 'farmer' }),
       setDoc(doc(db, 'users/cces-admin-a'), { role: 'cces_admin' }),
@@ -53,6 +54,7 @@ beforeEach(async () => {
         farmName: 'Valley Farm',
         contactNumber: '09999999999',
         address: 'Valley Road',
+        deliveryFee: 25,
         createdAt: new Date(),
       }),
       setDoc(doc(db, 'farmerApplications/customer-a'), {
@@ -64,6 +66,16 @@ beforeEach(async () => {
         reviewedBy: null,
         reviewedAt: null,
         rejectionReason: '',
+      }),
+      setDoc(doc(db, 'farmerApplications/customer-rejected'), {
+        status: 'rejected',
+        farmName: 'Rejected Farm',
+        contactNumber: '09111111111',
+        address: 'Old Farm Road',
+        createdAt: new Date(),
+        reviewedBy: 'cces-admin-a',
+        reviewedAt: new Date(),
+        rejectionReason: 'Please provide complete details.',
       }),
       setDoc(doc(db, 'products/product-a'), {
         farmerId: 'admin-a',
@@ -79,6 +91,15 @@ beforeEach(async () => {
         name: 'TOMATOES',
         price: 20,
         stock: 5,
+        sold: 0,
+        unit: 'KG',
+        isAvailable: true,
+      }),
+      setDoc(doc(db, 'products/product-other-farmer-second'), {
+        farmerId: 'farmer-b',
+        name: 'CUCUMBERS',
+        price: 30,
+        stock: 7,
         sold: 0,
         unit: 'KG',
         isAvailable: true,
@@ -235,6 +256,25 @@ test('farmers can update only their own storefront settings', async () => {
   await assertFails(updateDoc(doc(farmerDb, 'farmerProfiles/admin-a'), { status: 'suspended' }))
 })
 
+test('farmers can set only a valid delivery fee in their own profile', async () => {
+  const farmerDb = environment.authenticatedContext('farmer-b').firestore()
+  const profileRef = doc(farmerDb, 'farmerProfiles/farmer-b')
+  const settings = {
+    deliveryFee: 50,
+    pickupLocation: 'Gate 2',
+    pickupDays: 'Monday to Friday',
+    pickupHours: '8 AM to 4 PM',
+    gcashAccountName: 'Valley Farm',
+    gcashAccountNumber: '09999999999',
+    gcashQrUrl: '',
+    mayaAccountName: '',
+    mayaAccountNumber: '',
+    mayaQrUrl: '',
+  }
+  await assertSucceeds(updateDoc(profileRef, settings))
+  await assertFails(updateDoc(profileRef, { ...settings, deliveryFee: 10001 }))
+})
+
 test('customers cannot promote their own role or assign themselves the CCES admin role', async () => {
   const db = environment.authenticatedContext('customer-a').firestore()
   await assertFails(updateDoc(doc(db, 'users/customer-a'), { role: 'farmer' }))
@@ -267,6 +307,33 @@ test('applicants can create and read only their own pending application', async 
   await assertSucceeds(getDoc(application))
   await assertFails(getDoc(doc(db, 'farmerApplications/customer-a')))
   await assertFails(updateDoc(application, { status: 'approved' }))
+})
+
+test('a rejected applicant can re-apply only to their own application', async () => {
+  const db = environment.authenticatedContext('customer-rejected').firestore()
+  await assertSucceeds(updateDoc(doc(db, 'farmerApplications/customer-rejected'), {
+    status: 'pending',
+    farmName: 'Updated Farm',
+    contactNumber: '09222222222',
+    address: 'New Farm Road',
+    createdAt: serverTimestamp(),
+    reviewedBy: null,
+    reviewedAt: null,
+    rejectionReason: '',
+  }))
+  await assertFails(updateDoc(doc(db, 'farmerApplications/customer-a'), {
+    status: 'pending',
+    farmName: 'Not Their Farm',
+    contactNumber: '09222222222',
+    address: 'New Farm Road',
+    createdAt: serverTimestamp(),
+    reviewedBy: null,
+    reviewedAt: null,
+    rejectionReason: '',
+  }))
+  await assertFails(updateDoc(doc(db, 'farmerApplications/customer-rejected'), {
+    status: 'approved',
+  }))
 })
 
 test('signup can create a customer profile and pending farmer application atomically', async () => {
@@ -472,10 +539,9 @@ test('customers can create a valid order and decrement inventory in one transact
   assert.equal(productSnapshot.data().sold, 2)
 })
 
-test('split checkout orders from different farmers pass item, stock, tax, and fee validation', async () => {
+test('one checkout order for multiple products from one farmer uses that farmer delivery fee and validates stock and tax', async () => {
   const db = environment.authenticatedContext('customer-a').firestore()
-  const firstOrder = customerOrder('split-order-farmer-a')
-  const secondOrder = customerOrder('split-order-farmer-b', {
+  const order = customerOrder('single-farmer-multi-item', {
     farmerId: 'farmer-b',
     items: [{
       productId: 'product-other-farmer',
@@ -483,26 +549,34 @@ test('split checkout orders from different farmers pass item, stock, tax, and fe
       price: 20,
       quantity: 1,
       unit: 'KG',
+    }, {
+      productId: 'product-other-farmer-second',
+      name: 'CUCUMBERS',
+      price: 30,
+      quantity: 2,
+      unit: 'KG',
     }],
-    subtotal: 20,
-    tax: 1,
-    total: 121,
+    subtotal: 80,
+    deliveryFee: 25,
+    tax: 4,
+    total: 109,
   })
 
-  await assertSucceeds(submitCustomerOrder(db, 'split-order-farmer-a', firstOrder))
-  await assertSucceeds(submitCustomerOrder(db, 'split-order-farmer-b', secondOrder))
+  await assertSucceeds(submitOrderWithInventoryUpdates(db, 'single-farmer-multi-item', order, [
+    { productId: 'product-other-farmer', quantity: 1, itemIndex: 0 },
+    { productId: 'product-other-farmer-second', quantity: 2, itemIndex: 1 },
+  ]))
 
-  const [first, second, firstProduct, secondProduct] = await Promise.all([
-    getDoc(doc(db, 'orders/split-order-farmer-a')),
-    getDoc(doc(db, 'orders/split-order-farmer-b')),
-    getDoc(doc(db, 'products/product-a')),
+  const [savedOrder, firstProduct, secondProduct] = await Promise.all([
+    getDoc(doc(db, 'orders/single-farmer-multi-item')),
     getDoc(doc(db, 'products/product-other-farmer')),
+    getDoc(doc(db, 'products/product-other-farmer-second')),
   ])
-  assert.equal(first.data().checkoutGroupId, second.data().checkoutGroupId)
-  assert.equal(first.data().total, 121)
-  assert.equal(second.data().total, 121)
-  assert.equal(firstProduct.data().stock, 8)
-  assert.equal(secondProduct.data().stock, 4)
+  assert.equal(savedOrder.data().farmerId, 'farmer-b')
+  assert.equal(savedOrder.data().deliveryFee, 25)
+  assert.equal(savedOrder.data().total, 109)
+  assert.equal(firstProduct.data().stock, 4)
+  assert.equal(secondProduct.data().stock, 5)
 })
 
 test('customers can make a second valid purchase when checkoutAction remains sale', async () => {
@@ -1048,7 +1122,7 @@ test('a farmer cannot create a conversation under another farmer id', async () =
   }))
 })
 
-test('customers can review a product from a delivered split-farmer order', async () => {
+test('customers can review a product from a delivered farmer order', async () => {
   const db = environment.authenticatedContext('customer-a').firestore()
   await environment.withSecurityRulesDisabled(async (context) => {
     await setDoc(doc(context.firestore(), 'orders/order-farmer-b-delivered'), {

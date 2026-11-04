@@ -34,7 +34,7 @@ function accountName(account: AccountData) {
   return `${account.firstName} ${account.lastName}`.trim() || 'Customer'
 }
 
-export function AccountPage() {
+export function AccountPage({ applicantOnly = false }: { applicantOnly?: boolean }) {
   const [account, setAccount] = useState<AccountData | null>(null)
   const [draft, setDraft] = useState<AccountData | null>(null)
   const [editing, setEditing] = useState(false)
@@ -245,16 +245,16 @@ export function AccountPage() {
     }
 
   if (isLoading) {
-    return <main className={styles.page}><CustomerSidebar active="account" /><section className={styles.content}><Header title="MY ACCOUNT" /><section className={styles.card}><p>Loading account information...</p></section></section></main>
+    return <main className={styles.page}><CustomerSidebar active="account" applicantOnly={applicantOnly} /><section className={styles.content}><Header title="MY ACCOUNT" /><section className={styles.card}><p>Loading account information...</p></section></section></main>
   }
 
   if (!account || error) {
-    return <main className={styles.page}><CustomerSidebar active="account" /><section className={styles.content}><Header title="MY ACCOUNT" /><section className={styles.card}><p role="alert">{error || 'Account information is unavailable.'}</p></section></section></main>
+    return <main className={styles.page}><CustomerSidebar active="account" applicantOnly={applicantOnly} /><section className={styles.content}><Header title="MY ACCOUNT" /><section className={styles.card}><p role="alert">{error || 'Account information is unavailable.'}</p></section></section></main>
   }
 
   return (
     <main className={styles.page}>
-      <CustomerSidebar active="account" />
+      <CustomerSidebar active="account" applicantOnly={applicantOnly} />
       <section className={styles.content}>
         <Header title="MY ACCOUNT" />
         <section className={styles.card}>

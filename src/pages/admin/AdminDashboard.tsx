@@ -3,6 +3,8 @@ import { onAuthStateChanged } from 'firebase/auth'
 import { collection, doc, onSnapshot, query, where } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
+import { FarmerFilter } from '../../components/admin/FarmerFilter'
+import { getFarmerOptions } from '../../utils/farmerFilter'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import { normalizeRole, ROLES } from '../../constants/roles'
@@ -17,6 +19,7 @@ type InventoryItem = { name: string; category: string; stock: string }
 
 type FirestoreOrder = {
   id: string
+  farmerId: string
   orderNumber?: string
   customerName?: string
   total: number
@@ -27,6 +30,7 @@ type FirestoreOrder = {
 
 type FirestoreProduct = {
   id: string
+  farmerId: string
   name: string
   category: string
   stock: number
@@ -146,6 +150,8 @@ export function AdminDashboard({ role = ROLES.FARMER }: { role?: ManagementRole 
   const readOnly = role === ROLES.CCES_ADMIN
   const [search, setSearch] = useState('')
   const [adminName, setAdminName] = useState('')
+  const [farmerNames, setFarmerNames] = useState<Record<string, string>>({})
+  const [selectedFarmerId, setSelectedFarmerId] = useState('all')
   const [orders, setOrders] = useState<FirestoreOrder[]>([])
   const [products, setProducts] = useState<FirestoreProduct[]>([])
   const [ordersLoaded, setOrdersLoaded] = useState(false)
@@ -196,6 +202,7 @@ export function AdminDashboard({ role = ROLES.FARMER }: { role?: ManagementRole 
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       unsubscribeData?.()
       if (!user) {
+        setFarmerNames({})
         setOrdersLoaded(true)
         setProductsLoaded(true)
         return
@@ -214,6 +221,7 @@ export function AdminDashboard({ role = ROLES.FARMER }: { role?: ManagementRole 
             const data = docSnap.data()
             return {
               id: docSnap.id,
+              farmerId: typeof data.farmerId === 'string' ? data.farmerId : '',
               orderNumber: typeof data.orderNumber === 'string' ? data.orderNumber : undefined,
               customerName: typeof data.customerName === 'string' ? data.customerName : undefined,
               total: typeof data.total === 'number' ? data.total : 0,
@@ -238,6 +246,7 @@ export function AdminDashboard({ role = ROLES.FARMER }: { role?: ManagementRole 
             const data = docSnap.data()
             return {
               id: docSnap.id,
+              farmerId: typeof data.farmerId === 'string' ? data.farmerId : '',
               name: typeof data.name === 'string' ? data.name : 'Product',
               category: typeof data.category === 'string' ? data.category : 'VEGETABLES',
               stock: typeof data.stock === 'number' ? data.stock : 0,
@@ -254,9 +263,26 @@ export function AdminDashboard({ role = ROLES.FARMER }: { role?: ManagementRole 
         }
       )
 
+      const unsubscribeFarmerProfiles = role === ROLES.CCES_ADMIN
+        ? onSnapshot(collection(db, 'farmerProfiles'), (snapshot) => {
+            setFarmerNames(Object.fromEntries(snapshot.docs.map((profile) => {
+              const name = profile.data().farmName
+              return [profile.id, typeof name === 'string' && name.trim() ? name.trim() : profile.id]
+            })))
+          }, (loadError) => {
+            console.error('Loading dashboard farmer names failed:', loadError)
+          })
+        : onSnapshot(doc(db, 'farmerProfiles', user.uid), (snapshot) => {
+            const name = snapshot.data()?.farmName
+            setFarmerNames(name && typeof name === 'string' ? { [user.uid]: name } : {})
+          }, (loadError) => {
+            console.error('Loading dashboard farmer profile failed:', loadError)
+          })
+
       unsubscribeData = () => {
         unsubscribeOrders()
         unsubscribeProducts()
+        unsubscribeFarmerProfiles()
       }
     })
 
@@ -267,6 +293,21 @@ export function AdminDashboard({ role = ROLES.FARMER }: { role?: ManagementRole 
   }, [role])
 
   // Calculate stats and series
+  const farmerOptions = useMemo(
+    () => getFarmerOptions(farmerNames, orders, products),
+    [farmerNames, orders, products],
+  )
+  const scopedOrders = useMemo(() => (
+    readOnly && selectedFarmerId !== 'all'
+      ? orders.filter((order) => order.farmerId === selectedFarmerId)
+      : orders
+  ), [orders, readOnly, selectedFarmerId])
+  const scopedProducts = useMemo(() => (
+    readOnly && selectedFarmerId !== 'all'
+      ? products.filter((product) => product.farmerId === selectedFarmerId)
+      : products
+  ), [products, readOnly, selectedFarmerId])
+
   const { weeklyRevenue, revenuePoints, activeOrdersCount, inStockProductsCount, availableProductsCount, totalProductsCount, recentOrdersList, inventoryList, revenueGrowthText } = useMemo(() => {
     const now = new Date()
 
@@ -309,7 +350,7 @@ export function AdminDashboard({ role = ROLES.FARMER }: { role?: ManagementRole 
 
     const parsedOrders: RecentOrder[] = []
 
-    orders.forEach((order) => {
+    scopedOrders.forEach((order) => {
       const date = parseOrderDate(order.createdAt)
       const time = date ? date.getTime() : 0
       const total = typeof order.total === 'number' ? order.total : 0
@@ -370,7 +411,7 @@ export function AdminDashboard({ role = ROLES.FARMER }: { role?: ManagementRole 
     let inStockCount = 0
     let availableCount = 0
     const invItems: InventoryItem[] = []
-    for (const p of products) {
+    for (const p of scopedProducts) {
       const isAvail = p.isAvailable && p.stock > 0
       if (p.stock > 0) inStockCount += 1
       if (isAvail) availableCount += 1
@@ -387,12 +428,12 @@ export function AdminDashboard({ role = ROLES.FARMER }: { role?: ManagementRole 
       activeOrdersCount: activeOrders,
       inStockProductsCount: inStockCount,
       availableProductsCount: availableCount,
-      totalProductsCount: products.length,
+      totalProductsCount: scopedProducts.length,
       recentOrdersList: parsedOrders,
       inventoryList: invItems,
       revenueGrowthText: growthText,
     }
-  }, [orders, products])
+  }, [scopedOrders, scopedProducts])
 
   const filteredOrders = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -422,6 +463,14 @@ export function AdminDashboard({ role = ROLES.FARMER }: { role?: ManagementRole 
       <AdminSidebar active="dashboard" role={role} />
       <section className={styles.content}>
         <Header title="DASHBOARD" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
+        {readOnly && (
+          <FarmerFilter
+            value={selectedFarmerId}
+            options={farmerOptions}
+            farmerNames={farmerNames}
+            onChange={setSelectedFarmerId}
+          />
+        )}
         <div className={styles.dashboard}>
           <section className={styles.welcome}>
             <div className={styles.welcomeCopy}>

@@ -9,13 +9,15 @@ const links: { key: CustomerNavItem; label: string; href: string }[] = [
   { key: 'messages', label: 'MESSAGE', href: '#/messages' },
 ]
 
-export function CustomerSidebar({ active }: { active: CustomerNavItem }) {
+export function CustomerSidebar({ active, applicantOnly = false }: { active: CustomerNavItem; applicantOnly?: boolean }) {
+  const visibleLinks = applicantOnly ? [] : links
+
   return (
     <nav className={styles.sidebar} aria-label="Customer navigation">
       <div className={styles.top}>
         <div className={styles.logo}><BrandLogo compact /></div>
         <div className={styles.rule} />
-        {links.map((link) => (
+        {visibleLinks.map((link) => (
           <a className={active === link.key ? styles.active : ''} href={link.href} key={link.key}>
             {link.label}
           </a>

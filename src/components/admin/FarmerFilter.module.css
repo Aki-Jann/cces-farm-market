@@ -1,0 +1,29 @@
+.farmerFilter {
+  align-items: center;
+  color: #435248;
+  display: flex;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 9px;
+  margin: 0 24px 12px auto;
+  width: fit-content;
+}
+
+.farmerFilter select {
+  background: #fff;
+  border: 1px solid #d6e2d8;
+  border-radius: 6px;
+  color: #2d4033;
+  font: inherit;
+  min-width: 180px;
+  padding: 8px 10px;
+}
+
+@media (max-width: 640px) {
+  .farmerFilter {
+    align-items: stretch;
+    flex-direction: column;
+    margin: 0 16px 12px;
+    width: auto;
+  }
+}

@@ -18,7 +18,7 @@ const links: { key: AdminNavItem; label: string; href: string }[] = [
 export function AdminSidebar({ active, role = ROLES.FARMER }: { active: AdminNavItem; role?: ManagementRole }) {
   const visibleLinks = role === ROLES.CCES_ADMIN
     ? links.filter((link) => link.key === 'dashboard' || link.key === 'analytics' || link.key === 'applications')
-    : links
+    : links.filter((link) => link.key !== 'applications')
 
   return (
     <nav className={styles.sidebar} aria-label="Management navigation">

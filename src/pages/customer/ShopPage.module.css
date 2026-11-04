@@ -703,6 +703,33 @@
   margin-top: 9px;
 }
 
+.cartRestriction {
+  background: #fff3e0;
+  border: 1px solid #f0c985;
+  border-radius: 6px;
+  color: #704b0b;
+  font-size: 11px;
+  line-height: 1.4;
+  margin-top: 9px;
+  padding: 9px 10px;
+}
+
+.cartRestriction p {
+  margin: 0;
+}
+
+.cartRestriction button {
+  background: transparent;
+  border: 0;
+  color: #704b0b;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  margin-top: 6px;
+  padding: 0;
+  text-decoration: underline;
+}
+
 .placeOrder {
   background: #017632;
   border: 0;

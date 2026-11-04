@@ -181,6 +181,34 @@ service cloud.firestore {
         && request.resource.data.rejectionReason == '';
     }
 
+    function validApplicationReapply(userId) {
+      return isOwner(userId)
+        && isCustomer()
+        && resource.data.status == 'rejected'
+        && request.resource.data.keys().hasOnly([
+          'status', 'farmName', 'contactNumber', 'address',
+          'createdAt', 'reviewedBy', 'reviewedAt', 'rejectionReason'
+        ])
+        && request.resource.data.keys().hasAll([
+          'status', 'farmName', 'contactNumber', 'address',
+          'createdAt', 'reviewedBy', 'reviewedAt', 'rejectionReason'
+        ])
+        && request.resource.data.status == 'pending'
+        && request.resource.data.farmName is string
+        && request.resource.data.farmName.size() > 0
+        && request.resource.data.farmName.size() <= 200
+        && request.resource.data.contactNumber is string
+        && request.resource.data.contactNumber.size() > 0
+        && request.resource.data.contactNumber.size() <= 40
+        && request.resource.data.address is string
+        && request.resource.data.address.size() > 0
+        && request.resource.data.address.size() <= 1000
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.reviewedBy == null
+        && request.resource.data.reviewedAt == null
+        && request.resource.data.rejectionReason == '';
+    }
+
     function orderContainsItem(order, productId, quantity) {
       return order.items is list
         && (
@@ -296,8 +324,13 @@ service cloud.firestore {
     function validOrderTotals() {
       let order = request.resource.data;
       let subtotal = orderSubtotal(order.items);
-      let deliveryFee = order.fulfillmentType == 'delivery' && subtotal > 0 ? 100 : 0;
+      let profilePath = farmerProfilePath(order.farmerId);
+      let legacySettingsPath = /databases/$(database)/documents/settings/storefront;
+      let legacyFee = exists(legacySettingsPath) ? get(legacySettingsPath).data.get('deliveryFee', 100) : 100;
+      let configuredFee = exists(profilePath) ? get(profilePath).data.get('deliveryFee', legacyFee) : legacyFee;
+      let deliveryFee = order.fulfillmentType == 'delivery' && subtotal > 0 ? configuredFee : 0;
       return order.subtotal == subtotal
+        && (order.fulfillmentType != 'delivery' || configuredFee is int && configuredFee >= 0 && configuredFee <= 10000)
         && order.deliveryFee == deliveryFee
         && order.tax == subtotal * 0.05
         && order.total == subtotal + deliveryFee + order.tax;
@@ -483,7 +516,7 @@ service cloud.firestore {
       allow get: if isOwner(userId) || isCcesAdmin();
       allow list: if isCcesAdmin();
       allow create: if validApplicationCreate(userId);
-      allow update: if validApplicationReview(userId);
+      allow update: if validApplicationReview(userId) || validApplicationReapply(userId);
       allow delete: if false;
     }
 
@@ -505,10 +538,14 @@ service cloud.firestore {
         || isOwner(userId)
           && isActiveFarmer()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'pickupLocation', 'pickupDays', 'pickupHours',
+            'deliveryFee', 'pickupLocation', 'pickupDays', 'pickupHours',
             'gcashAccountName', 'gcashAccountNumber', 'gcashQrUrl',
             'mayaAccountName', 'mayaAccountNumber', 'mayaQrUrl'
           ])
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['deliveryFee'])
+            || request.resource.data.deliveryFee is int
+              && request.resource.data.deliveryFee >= 0
+              && request.resource.data.deliveryFee <= 10000)
           && request.resource.data.pickupLocation is string
           && request.resource.data.pickupDays is string
           && request.resource.data.pickupHours is string

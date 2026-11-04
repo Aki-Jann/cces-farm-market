@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
-import { doc, getDoc } from 'firebase/firestore'
+import { doc, getDoc, onSnapshot } from 'firebase/firestore'
 import { AuthPage } from './pages/public/AuthPage'
 import { LandingPage } from './pages/public/LandingPage'
 import { ShopPage } from './pages/customer/ShopPage'
@@ -21,6 +21,8 @@ import { normalizeRole, ROLES } from './constants/roles'
 import type { UserRole } from './constants/roles'
 export type Route = 'landing' | 'shop' | 'orders' | 'messages' | 'account' | 'admin' | 'admin-orders' | 'admin-payment' | 'admin-products' | 'admin-customers' | 'admin-analytics' | 'admin-account' | 'admin-farmer-applications' | 'login' | 'register' | 'forgot-password'
 
+type ApplicationStatus = 'pending' | 'approved' | 'rejected' | null
+
 const protectedRoutes: Route[] = [
   'shop',
   'orders',
@@ -36,8 +38,9 @@ const protectedRoutes: Route[] = [
   'admin-farmer-applications',
 ]
 
-function canAccessRoute(role: UserRole | null, route: Route) {
+function canAccessRoute(role: UserRole | null, route: Route, applicationStatus: ApplicationStatus) {
   if (role === ROLES.CUSTOMER) {
+    if (applicationStatus === 'pending' || applicationStatus === 'rejected') return route === 'account'
     return ['shop', 'orders', 'messages', 'account'].includes(route)
   }
   if (role === ROLES.FARMER) {
@@ -46,8 +49,10 @@ function canAccessRoute(role: UserRole | null, route: Route) {
   return role === ROLES.CCES_ADMIN && ['admin', 'admin-analytics', 'admin-account', 'admin-farmer-applications'].includes(route)
 }
 
-function homeForRole(role: UserRole | null) {
-  if (role === ROLES.CUSTOMER) return '/shop'
+function homeForRole(role: UserRole | null, applicationStatus: ApplicationStatus) {
+  if (role === ROLES.CUSTOMER) {
+    return applicationStatus === 'pending' || applicationStatus === 'rejected' ? '/account' : '/shop'
+  }
   if (role === ROLES.CCES_ADMIN) return '/admin/analytics'
   return role === ROLES.FARMER ? '/admin' : '/login'
 }
@@ -75,7 +80,10 @@ function getRoute(): Route {
 function App() {
   const [route, setRoute] = useState<Route>(getRoute)
   const [role, setRole] = useState<UserRole | null>(null)
+  const [applicationStatus, setApplicationStatus] = useState<ApplicationStatus>(null)
   const [authResolved, setAuthResolved] = useState(false)
+  const isApplicantRestricted = role === ROLES.CUSTOMER
+    && (applicationStatus === 'pending' || applicationStatus === 'rejected')
 
   useEffect(() => {
     const handleHashChange = () => setRoute(getRoute())
@@ -86,11 +94,15 @@ function App() {
   useEffect(() => {
     let isMounted = true
     let requestId = 0
+    let unsubscribeApplication: (() => void) | undefined
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       const currentRequest = ++requestId
+      unsubscribeApplication?.()
+      unsubscribeApplication = undefined
       if (!user) {
         if (isMounted) {
           setRole(null)
+          setApplicationStatus(null)
           setAuthResolved(true)
         }
         return
@@ -98,11 +110,44 @@ function App() {
 
       setAuthResolved(false)
       setRole(null)
+      setApplicationStatus(null)
       try {
         const profile = await getDoc(doc(db, 'users', user.uid))
         if (!isMounted || currentRequest !== requestId) return
         const storedRole = profile.exists() ? profile.data().role : null
-        setRole(normalizeRole(storedRole))
+        const normalizedRole = normalizeRole(storedRole)
+        if (normalizedRole === ROLES.CUSTOMER) {
+          let applicationLoadFailed = false
+          await new Promise<void>((resolve) => {
+            let isInitialSnapshot = true
+            unsubscribeApplication = onSnapshot(
+              doc(db, 'farmerApplications', user.uid),
+              (application) => {
+                if (!isMounted || currentRequest !== requestId) return
+                const status = application.exists() ? application.data().status : null
+                setApplicationStatus(
+                  status === 'pending' || status === 'rejected' || status === 'approved' ? status : null
+                )
+                if (isInitialSnapshot) {
+                  isInitialSnapshot = false
+                  resolve()
+                }
+              },
+              (applicationError) => {
+                console.error('Loading authenticated user farmer application failed:', applicationError)
+                applicationLoadFailed = true
+                if (isMounted && currentRequest === requestId) setRole(null)
+                if (isInitialSnapshot) {
+                  isInitialSnapshot = false
+                  resolve()
+                }
+              }
+            )
+          })
+          if (isMounted && currentRequest === requestId && !applicationLoadFailed) setRole(normalizedRole)
+        } else {
+          setRole(normalizedRole)
+        }
       } catch (error) {
         console.error('Loading authenticated user role failed:', error)
         if (isMounted && currentRequest === requestId) setRole(null)
@@ -114,17 +159,22 @@ function App() {
     return () => {
       isMounted = false
       unsubscribe()
+      unsubscribeApplication?.()
     }
   }, [])
 
   useEffect(() => {
-    if (!authResolved || !protectedRoutes.includes(route)) return
-    if (!canAccessRoute(role, route)) {
-      window.location.hash = homeForRole(role)
+    if (!authResolved) return
+    if (isApplicantRestricted && route !== 'account') {
+      window.location.hash = '/account'
+    } else if (protectedRoutes.includes(route) && !canAccessRoute(role, route, applicationStatus)) {
+      window.location.hash = homeForRole(role, applicationStatus)
     }
-  }, [authResolved, role, route])
+  }, [applicationStatus, authResolved, isApplicantRestricted, role, route])
 
-  if (protectedRoutes.includes(route) && (!authResolved || !canAccessRoute(role, route))) {
+  if (!authResolved && auth.currentUser) return null
+  if (isApplicantRestricted && route !== 'account') return null
+  if (protectedRoutes.includes(route) && (!authResolved || !canAccessRoute(role, route, applicationStatus))) {
     return null
   }
 
@@ -145,7 +195,7 @@ function App() {
   }
 
   if (route === 'account') {
-    return <AccountPage />
+    return <AccountPage applicantOnly={applicationStatus === 'pending' || applicationStatus === 'rejected'} />
   }
 
   if (route === 'admin-account') {

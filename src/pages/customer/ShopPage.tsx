@@ -38,14 +38,12 @@ type FarmerStoreSettings = StoreSettings & {
 type CheckoutDetails = {
   fulfillmentType: FulfillmentType
   sellerNotes: string
-  payments: Array<{
-    farmerId: string
-    paymentMethod: PaymentMethod
-    receiptFile: File | null
-  }>
+  paymentMethod: PaymentMethod
+  receiptFile: File | null
 }
 
 type StoreSettings = {
+  deliveryFee: number
   pickupLocation: string
   pickupDays: string
   pickupHours: string
@@ -94,6 +92,9 @@ function readStoreSettings(data: Record<string, unknown>, fallbackName: string):
   return {
     farmName: getFarmerDisplayName(data, fallbackName),
     status: data.status === 'suspended' ? 'suspended' : 'active',
+    deliveryFee: typeof data.deliveryFee === 'number' && Number.isInteger(data.deliveryFee) && data.deliveryFee >= 0
+      ? data.deliveryFee
+      : 100,
     pickupLocation: typeof data.pickupLocation === 'string' ? data.pickupLocation : '',
     pickupDays: typeof data.pickupDays === 'string' ? data.pickupDays : '',
     pickupHours: typeof data.pickupHours === 'string' ? data.pickupHours : '',
@@ -131,7 +132,7 @@ function cartGroups(items: CartItem[], stores: Record<string, FarmerStoreSetting
   })
 
   return [...grouped.values()].map((group) => {
-    const deliveryFee = fulfillmentType === 'delivery' && group.subtotal > 0 ? 100 : 0
+    const deliveryFee = fulfillmentType === 'delivery' && group.subtotal > 0 ? group.settings.deliveryFee : 0
     const tax = group.subtotal * 0.05
     return { ...group, deliveryFee, tax, total: group.subtotal + deliveryFee + tax }
   })
@@ -266,6 +267,7 @@ function Cart({
   onEmptyCartAttempt,
   onAddressError,
   orderMessage,
+  cartRestriction,
   addressError,
   isCheckingOut,
   farmerStores,
@@ -280,6 +282,7 @@ function Cart({
   onEmptyCartAttempt: () => void
   onAddressError: (message: string) => void
   orderMessage: string
+  cartRestriction: string
   addressError: string
   isCheckingOut: boolean
   farmerStores: Record<string, FarmerStoreSettings>
@@ -290,8 +293,8 @@ function Cart({
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>('delivery')
   const [sellerNotes, setSellerNotes] = useState('')
-  const [paymentMethods, setPaymentMethods] = useState<Record<string, PaymentMethod>>({})
-  const [receiptFiles, setReceiptFiles] = useState<Record<string, File | null>>({})
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD')
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
   const [receiptError, setReceiptError] = useState('')
   const [revealedItemId, setRevealedItemId] = useState<string | null>(null)
   const cartItemPointerStart = useRef<{ x: number; y: number } | null>(null)
@@ -301,6 +304,11 @@ function Cart({
   const delivery = groups.reduce((sum, group) => sum + group.deliveryFee, 0)
   const tax = groups.reduce((sum, group) => sum + group.tax, 0)
   const total = groups.reduce((sum, group) => sum + group.total, 0)
+  const group = groups[0]
+  const paymentProviderName = paymentMethod === 'GCASH' ? 'GCash' : 'Maya'
+  const paymentQrUrl = paymentMethod === 'GCASH' ? group?.settings.gcashQrUrl : group?.settings.mayaQrUrl
+  const paymentAccountName = paymentMethod === 'GCASH' ? group?.settings.gcashAccountName : group?.settings.mayaAccountName
+  const paymentAccountNumber = paymentMethod === 'GCASH' ? group?.settings.gcashAccountNumber : group?.settings.mayaAccountNumber
 
   useEffect(() => {
     if (!isConfirmOpen) return
@@ -312,6 +320,11 @@ function Cart({
   }, [isConfirmOpen])
 
   function openCheckout() {
+    if (groups.length !== 1) {
+      onAddressError('')
+      setReceiptError('Your cart can only contain products from one farmer. Clear your cart and try again.')
+      return
+    }
     if (fulfillmentType === 'delivery' && !address.trim()) {
       onAddressError('Delivery address is required.')
       setIsEditingAddress(true)
@@ -329,18 +342,16 @@ function Cart({
       setIsEditingAddress(true)
       return
     }
-    const groupMissingQr = groups.find((group) => {
-      const method = paymentMethods[group.farmerId || 'legacy'] ?? 'COD'
-      return (method === 'GCASH' && !group.settings.gcashQrUrl)
-        || (method === 'MAYA' && !group.settings.mayaQrUrl)
-    })
-    if (groupMissingQr) {
-      setReceiptError(`${groupMissingQr.farmName} has not configured the selected payment QR code.`)
+    if (groups.length !== 1 || !group) {
+      setReceiptError('Your cart can only contain products from one farmer. Clear your cart and try again.')
       return
     }
-    if (groups.some((group) => (paymentMethods[group.farmerId || 'legacy'] ?? 'COD') !== 'COD'
-      && !receiptFiles[group.farmerId || 'legacy'])) {
-      setReceiptError('Upload a payment receipt for every farmer using online payment.')
+    if ((paymentMethod === 'GCASH' || paymentMethod === 'MAYA') && !paymentQrUrl) {
+      setReceiptError(`${group.farmName} has not configured the selected payment QR code.`)
+      return
+    }
+    if (paymentMethod !== 'COD' && !receiptFile) {
+      setReceiptError('Upload a payment receipt to continue.')
       return
     }
     setIsConfirmOpen(true)
@@ -351,11 +362,8 @@ function Cart({
     onPlaceOrder({
       fulfillmentType,
       sellerNotes: sellerNotes.trim(),
-      payments: groups.map((group) => ({
-        farmerId: group.farmerId,
-        paymentMethod: paymentMethods[group.farmerId || 'legacy'] ?? 'COD',
-        receiptFile: receiptFiles[group.farmerId || 'legacy'] ?? null,
-      })),
+      paymentMethod,
+      receiptFile,
     })
   }
 
@@ -493,6 +501,27 @@ function Cart({
           <hr />
           <SummaryRow label="Total Amount" value={currency(total)} strong />
         </div>
+        <div className={styles.paymentOptions} role="group" aria-label="Payment method">
+          {(['COD', 'GCASH', 'MAYA'] as const).map((method) => (
+            <button
+              type="button"
+              className={paymentMethod === method ? styles.activePayment : ''}
+              key={method}
+              onClick={() => {
+                setPaymentMethod(method)
+                setReceiptError('')
+              }}
+            >
+              {method}
+            </button>
+          ))}
+        </div>
+        {cartRestriction && (
+          <div className={styles.cartRestriction} role="alert">
+            <p>{cartRestriction}</p>
+            <button type="button" onClick={onClearAll}>Clear cart</button>
+          </div>
+        )}
         <button type="button" className={styles.placeOrder} disabled={isCheckingOut} onClick={() => {
           if (items.length === 0) {
             onEmptyCartAttempt()
@@ -526,16 +555,8 @@ function Cart({
             {fulfillmentType === 'delivery' && (
               <p className={styles.checkoutAddress}>Delivering to: {address}</p>
             )}
-            <div className={styles.checkoutFarmerGroups}>
-              {groups.map((group) => {
-                const key = group.farmerId || 'legacy'
-                const method = paymentMethods[key] ?? 'COD'
-                const providerName = method === 'GCASH' ? 'GCash' : 'Maya'
-                const qrUrl = method === 'GCASH' ? group.settings.gcashQrUrl : group.settings.mayaQrUrl
-                const accountName = method === 'GCASH' ? group.settings.gcashAccountName : group.settings.mayaAccountName
-                const accountNumber = method === 'GCASH' ? group.settings.gcashAccountNumber : group.settings.mayaAccountNumber
-                return (
-                  <section className={styles.checkoutFarmerGroup} key={key}>
+            {group && (
+              <section className={styles.checkoutFarmerGroup}>
                     <h3>{group.farmName}</h3>
                     <div className={styles.pickupDetails}>
                       <p><strong>Subtotal:</strong> {currency(group.subtotal)}</p>
@@ -550,43 +571,26 @@ function Cart({
                         </>
                       )}
                     </div>
-                    <fieldset className={styles.farmerPaymentOptions}>
-                      <legend>Payment for {group.farmName}</legend>
-                      {(['COD', 'GCASH', 'MAYA'] as const).map((option) => (
-                        <label className={method === option ? styles.optionSelected : ''} key={option}>
-                          <input
-                            type="radio"
-                            name={`payment-${key}`}
-                            checked={method === option}
-                            onChange={() => {
-                              setPaymentMethods((current) => ({ ...current, [key]: option }))
-                              setReceiptError('')
-                            }}
-                          />
-                          {option}
-                        </label>
-                      ))}
-                    </fieldset>
-                    {method !== 'COD' && (
+                    {paymentMethod !== 'COD' && (
                       <div className={styles.onlinePayment}>
-                        <h4>Pay {currency(group.total)} with {providerName}</h4>
+                        <h4>Pay {currency(group.total)} with {paymentProviderName}</h4>
                         <div className={styles.qrPlaceholder}>
-                          {qrUrl ? (
-                            <img className={styles.paymentQr} src={qrUrl} alt={`${group.farmName} ${providerName} payment QR code`} />
+                          {paymentQrUrl ? (
+                            <img className={styles.paymentQr} src={paymentQrUrl} alt={`${group.farmName} ${paymentProviderName} payment QR code`} />
                           ) : (
                             <>
                               <span>QR</span>
-                              <strong>{providerName} QR not configured</strong>
+                              <strong>{paymentProviderName} QR not configured</strong>
                               <small>Contact this farmer for payment details before paying.</small>
                             </>
                           )}
-                          {accountName && <strong>{accountName}</strong>}
-                          {accountNumber && <small>{accountNumber}</small>}
+                          {paymentAccountName && <strong>{paymentAccountName}</strong>}
+                          {paymentAccountNumber && <small>{paymentAccountNumber}</small>}
                         </div>
                         <div className={styles.receiptUpload}>
                           <span>Payment receipt for {group.farmName}</span>
                           <div className={styles.fileRow}>
-                            <span className={styles.fileStatus}>{receiptFiles[key]?.name ?? 'No file chosen.'}</span>
+                            <span className={styles.fileStatus}>{receiptFile?.name ?? 'No file chosen.'}</span>
                             <label className={styles.fileLink}>
                               Choose File
                               <input
@@ -596,16 +600,16 @@ function Cart({
                                 onChange={(event) => {
                                   const file = event.target.files?.[0] ?? null
                                   if (file && !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-                                    setReceiptFiles((current) => ({ ...current, [key]: null }))
+                                    setReceiptFile(null)
                                     setReceiptError('Upload a JPG, PNG, or WebP receipt image.')
                                     return
                                   }
                                   if (file && file.size > 5 * 1024 * 1024) {
-                                    setReceiptFiles((current) => ({ ...current, [key]: null }))
+                                    setReceiptFile(null)
                                     setReceiptError('Receipt images must be 5 MB or smaller.')
                                     return
                                   }
-                                  setReceiptFiles((current) => ({ ...current, [key]: file }))
+                                  setReceiptFile(file)
                                   setReceiptError('')
                                 }}
                               />
@@ -614,10 +618,8 @@ function Cart({
                         </div>
                       </div>
                     )}
-                  </section>
-                )
-              })}
-            </div>
+              </section>
+            )}
             <label className={styles.sellerNotes}>
               <span>Note to seller <small>(optional)</small></span>
               <textarea value={sellerNotes} onChange={(event) => setSellerNotes(event.target.value)} placeholder="Add instructions for the seller" rows={3} />
@@ -628,7 +630,7 @@ function Cart({
             <div className={styles.checkoutActions}>
               <button type="button" disabled={isCheckingOut} onClick={() => setIsCheckoutOpen(false)}>Cancel</button>
               <button type="button" disabled={isCheckingOut} onClick={submitCheckout}>
-                {isCheckingOut ? 'PLACING ORDERS...' : 'REVIEW ORDERS'}
+                {isCheckingOut ? 'PLACING ORDER...' : 'REVIEW ORDER'}
               </button>
             </div>
           </section>
@@ -647,22 +649,16 @@ function Cart({
           >
             <h2 id="confirm-order-title">Confirm your order</h2>
             <p className={styles.confirmLead} id="confirm-order-description">
-              {groups.length > 1
-                ? `Your cart includes ${groups.length} farmers, so checkout will create ${groups.length} separate orders. Each farmer has a separate total and payment. `
-                : 'Please review before you continue. '}
+              Please review your order before you continue.{' '}
               <strong>Once placed, an order cannot be cancelled or changed by you.</strong>
             </p>
             <div className={styles.confirmOrders}>
-              {groups.map((group) => {
-                const method = paymentMethods[group.farmerId || 'legacy'] ?? 'COD'
-                const label = method === 'COD' ? 'Cash on Delivery' : method === 'GCASH' ? 'GCash' : 'Maya'
-                return (
-                  <div className={styles.confirmSummary} key={group.farmerId || 'legacy'}>
-                    <span>{group.farmName} · {group.items.length} {group.items.length === 1 ? 'product' : 'products'} · {fulfillmentType === 'delivery' ? 'Delivery' : 'Pickup'} · {label}</span>
-                    <strong>{currency(group.total)}</strong>
-                  </div>
-                )
-              })}
+              {group && (
+              <div className={styles.confirmSummary}>
+                <span>{group.farmName} · {group.items.length} {group.items.length === 1 ? 'product' : 'products'} · {fulfillmentType === 'delivery' ? 'Delivery' : 'Pickup'} · {paymentMethod === 'COD' ? 'Cash on Delivery' : paymentProviderName}</span>
+                <strong>{currency(group.total)}</strong>
+              </div>
+              )}
             </div>
             <ul className={styles.confirmList}>
               <li>Products, quantities and prices are final once the order is placed.</li>
@@ -695,6 +691,7 @@ export function ShopPage() {
   const [farmerStores, setFarmerStores] = useState<Record<string, FarmerStoreSettings>>({})
   const [storeSettingsError, setStoreSettingsError] = useState('')
   const [orderMessage, setOrderMessage] = useState('')
+  const [cartRestriction, setCartRestriction] = useState('')
   const [quantityNotice, setQuantityNotice] = useState<{ message: string } | null>(null)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
   const isSubmittingOrder = useRef(false)
@@ -854,7 +851,7 @@ export function ShopPage() {
                 if (!isMounted || auth.currentUser?.uid !== user.uid) return
                 if (profileSnapshot.exists()) {
                   legacyFarmerIds.delete(farmerId)
-                  const store = readStoreSettings(profileSnapshot.data(), 'Farm')
+                  const store = readStoreSettings({ ...legacySettings, ...profileSnapshot.data() }, 'Farm')
                   setFarmerStores((current) => ({ ...current, [farmerId]: store }))
                   setProducts((current) => current.map((product) =>
                     product.farmerId === farmerId ? { ...product, farmName: store.farmName } : product
@@ -884,13 +881,32 @@ export function ShopPage() {
             }))
           }
           const availableProductIds = new Set(loadedProducts.filter((product) => product.isAvailable).map((product) => product.id))
-          const nextQuantities = Object.fromEntries(
+          const availableQuantities = Object.fromEntries(
             Object.entries(cartQuantitiesRef.current).filter(([productId, quantity]) =>
               quantity > 0 && availableProductIds.has(productId)
             )
           )
-          if (Object.keys(nextQuantities).length < Object.keys(cartQuantitiesRef.current).filter((productId) => cartQuantitiesRef.current[productId] > 0).length) {
+          if (Object.keys(availableQuantities).length < Object.keys(cartQuantitiesRef.current).filter((productId) => cartQuantitiesRef.current[productId] > 0).length) {
             setQuantityNotice({ message: 'An unavailable product was removed from your cart.' })
+          }
+          const firstCartProduct = loadedProducts.find((product) =>
+            Object.prototype.hasOwnProperty.call(availableQuantities, product.id)
+          )
+          const firstFarmerId = firstCartProduct?.farmerId ?? ''
+          const mixedSavedCart = loadedProducts.some((product) =>
+            Object.prototype.hasOwnProperty.call(availableQuantities, product.id)
+            && product.farmerId !== firstFarmerId
+          )
+          const nextQuantities = mixedSavedCart
+            ? Object.fromEntries(Object.entries(availableQuantities).filter(([productId]) =>
+                loadedProducts.find((product) => product.id === productId)?.farmerId === firstFarmerId
+              ))
+            : availableQuantities
+          if (mixedSavedCart) {
+            const farmName = firstCartProduct?.farmName || 'that farmer'
+            setCartRestriction(`Your cart has items from ${farmName}. Check out or clear your cart before adding products from another farmer.`)
+          } else {
+            setCartRestriction('')
           }
           updateCartQuantities(nextQuantities)
           setProducts(loadedProducts)
@@ -947,62 +963,75 @@ export function ShopPage() {
     }
     if (quantity > 0 && (!product.isAvailable || product.stock <= 0 || !isFarmerActive(product, farmerStores))) return
 
-    updateCartQuantities((current) => {
-      const next = { ...current }
-      if (quantity <= 0) delete next[id]
-      else next[id] = Math.min(quantity, product.stock)
-      return next
-    })
+    if (quantity > 0) {
+      const currentCartProduct = Object.keys(cartQuantitiesRef.current)
+        .filter((productId) => cartQuantitiesRef.current[productId] > 0 && productId !== id)
+        .map((productId) => products.find((candidate) => candidate.id === productId))
+        .find((candidate) => candidate !== undefined)
+      if (currentCartProduct && (currentCartProduct.farmerId ?? '') !== (product.farmerId ?? '')) {
+        const farmName = currentCartProduct.farmName || 'that farmer'
+        setCartRestriction(`Your cart has items from ${farmName}. Check out or clear your cart before adding products from another farmer.`)
+        return
+      }
+    }
+
+    const next = { ...cartQuantitiesRef.current }
+    if (quantity <= 0) delete next[id]
+    else next[id] = Math.min(quantity, product.stock)
+    if (quantity <= 0) {
+      const remainingFarmerIds = new Set(Object.keys(next)
+        .filter((productId) => next[productId] > 0)
+        .map((productId) => products.find((candidate) => candidate.id === productId)?.farmerId)
+        .filter((farmerId): farmerId is string => Boolean(farmerId)))
+      if (remainingFarmerIds.size <= 1) setCartRestriction('')
+    }
+    updateCartQuantities(next)
   }
 
-  async function placeOrder({ fulfillmentType, sellerNotes, payments }: CheckoutDetails) {
+  async function placeOrder({ fulfillmentType, sellerNotes, paymentMethod, receiptFile }: CheckoutDetails) {
     if (isSubmittingOrder.current || cartItems.length === 0) return
+    const cartFarmerIds = new Set(cartItems.map((item) => item.farmerId ?? ''))
+    if (cartFarmerIds.size !== 1 || cartFarmerIds.has('')) {
+      setOrderMessage('Your cart can only contain products from one farmer. Clear your cart and try again.')
+      return
+    }
     if (cartItems.length > 5) {
       setOrderMessage('Orders can include up to 5 different products. Remove an item and try again.')
       return
     }
     const groups = cartGroups(cartItems, farmerStores, fulfillmentType)
-    if (groups.some((group) => !group.farmerId)) {
-      setOrderMessage('Some products still need farmer ownership data. Please refresh after the store migration is complete.')
+    if (groups.length !== 1 || !groups[0]?.farmerId) {
+      setOrderMessage('Your cart can only contain products from one farmer. Clear your cart and try again.')
       return
     }
-    if (groups.some((group) => group.items.length > 5)) {
-      setOrderMessage('Each farmer order can include up to 5 different products.')
-      return
-    }
+    const [group] = groups
     const addressForOrder = fulfillmentType === 'delivery' ? deliveryAddress.trim() : ''
     if (fulfillmentType === 'delivery' && !addressForOrder) {
       setAddressError('Delivery address is required.')
       return
     }
     setAddressError('')
-    for (const group of groups) {
-      const payment = payments.find((candidate) => candidate.farmerId === group.farmerId)
-      const method = payment?.paymentMethod ?? 'COD'
-      const settings = group.settings
-      if (fulfillmentType === 'pickup' && !settings.pickupLocation.trim()) {
-        setOrderMessage(`${group.farmName} has not configured pickup details. Please contact the farmer.`)
+    if (fulfillmentType === 'pickup' && !group.settings.pickupLocation.trim()) {
+      setOrderMessage(`${group.farmName} has not configured pickup details. Please contact the farmer.`)
+      return
+    }
+    if (paymentMethod !== 'COD') {
+      const qrUrl = paymentMethod === 'GCASH' ? group.settings.gcashQrUrl : group.settings.mayaQrUrl
+      if (!qrUrl) {
+        setOrderMessage(`${group.farmName} has not configured a ${paymentMethod} QR code. Please choose another payment method or contact the farmer.`)
         return
       }
-      if (method !== 'COD') {
-        const qrUrl = method === 'GCASH' ? settings.gcashQrUrl : settings.mayaQrUrl
-        if (!qrUrl) {
-          setOrderMessage(`${group.farmName} has not configured a ${method} QR code. Please choose another payment method or contact the farmer.`)
-          return
-        }
-        const receiptFile = payment?.receiptFile
-        if (!receiptFile) {
-          setOrderMessage(`Upload a payment receipt for ${group.farmName}.`)
-          return
-        }
-        if (!['image/jpeg', 'image/png', 'image/webp'].includes(receiptFile.type)) {
-          setOrderMessage('Upload a JPG, PNG, or WebP receipt image.')
-          return
-        }
-        if (receiptFile.size > 5 * 1024 * 1024) {
-          setOrderMessage('Receipt images must be 5 MB or smaller.')
-          return
-        }
+      if (!receiptFile) {
+        setOrderMessage(`Upload a payment receipt for ${group.farmName}.`)
+        return
+      }
+      if (!['image/jpeg', 'image/png', 'image/webp'].includes(receiptFile.type)) {
+        setOrderMessage('Upload a JPG, PNG, or WebP receipt image.')
+        return
+      }
+      if (receiptFile.size > 5 * 1024 * 1024) {
+        setOrderMessage('Receipt images must be 5 MB or smaller.')
+        return
       }
     }
     const user = auth.currentUser
@@ -1016,26 +1045,12 @@ export function ShopPage() {
     setOrderMessage('')
 
     try {
-      const checkoutGroupId = doc(collection(db, 'orders')).id
-      const groupsWithOrders = groups.map((group) => {
-        const payment = payments.find((candidate) => candidate.farmerId === group.farmerId)
-        const orderRef = doc(collection(db, 'orders'))
-        return {
-          ...group,
-          orderRef,
-          orderNumber: `ORD-${Date.now()}-${orderRef.id.slice(0, 6)}`,
-          paymentMethod: payment?.paymentMethod ?? 'COD',
-          receiptFile: payment?.receiptFile ?? null,
-          paymentReceiptUrl: '',
-        }
-      })
-      await Promise.all(groupsWithOrders.map(async (group) => {
-        if (group.paymentMethod === 'COD' || !group.receiptFile) return
-        group.paymentReceiptUrl = await uploadImageToCloudinary(
-          group.receiptFile,
-          `payment-receipts/${user.uid}/${group.orderRef.id}`,
-        )
-      }))
+      const orderRef = doc(collection(db, 'orders'))
+      const checkoutGroupId = orderRef.id
+      const orderNumber = `ORD-${Date.now()}-${orderRef.id.slice(0, 6)}`
+      const paymentReceiptUrl = receiptFile && paymentMethod !== 'COD'
+        ? await uploadImageToCloudinary(receiptFile, `payment-receipts/${user.uid}/${orderRef.id}`)
+        : ''
       const profileRef = doc(db, 'users', user.uid)
       const productRefs = cartItems.map((item) => doc(db, 'products', item.id))
       try {
@@ -1048,79 +1063,70 @@ export function ShopPage() {
             throw new Error('CUSTOMER_PROFILE_REQUIRED')
           }
 
-          const groupByProductId = new Map<string, { group: typeof groupsWithOrders[number]; itemIndex: number }>()
-          groupsWithOrders.forEach((group) => {
-            group.items.forEach((item, itemIndex) => groupByProductId.set(item.id, { group, itemIndex }))
-          })
           productSnapshots.forEach((productSnapshot, index) => {
             const item = cartItems[index]
-            const groupInfo = groupByProductId.get(item.id)
-            if (!productSnapshot.exists() || !groupInfo) throw new Error('PRODUCT_NOT_FOUND')
+            if (!productSnapshot.exists()) throw new Error('PRODUCT_NOT_FOUND')
             const product = productSnapshot.data()
             const stock = typeof product.stock === 'number' ? product.stock : 0
             if (product.isAvailable !== true || item.quantity > stock) throw new Error('INSUFFICIENT_STOCK')
             if (typeof product.price !== 'number' || product.price !== item.price) throw new Error('PRICE_CHANGED')
-            if (product.farmerId !== groupInfo.group.farmerId) throw new Error('FARMER_CHANGED')
+            if (product.farmerId !== group.farmerId) throw new Error('FARMER_CHANGED')
             const sold = typeof product.sold === 'number' && Number.isFinite(product.sold) ? product.sold : 0
             transaction.update(productRefs[index], {
               stock: stock - item.quantity,
               sold: sold + item.quantity,
-              checkoutOrderId: groupInfo.group.orderRef.id,
+              checkoutOrderId: orderRef.id,
               checkoutQuantity: item.quantity,
               checkoutAction: 'sale',
-              checkoutItemIndex: groupInfo.itemIndex,
+              checkoutItemIndex: index,
             })
           })
 
           const profile = profileSnapshot.data()
-          groupsWithOrders.forEach((group) => {
-            const orderItems = group.items.map((item) => ({
-              productId: item.id,
-              name: item.name,
-              price: item.price,
-              quantity: item.quantity,
-              unit: item.unit,
-            }))
-            transaction.set(group.orderRef, {
-              orderNumber: group.orderNumber,
-              checkoutGroupId,
-              farmerId: group.farmerId,
-              userId: user.uid,
-              customerName: `${typeof profile.firstName === 'string' ? profile.firstName : ''} ${typeof profile.lastName === 'string' ? profile.lastName : ''}`.trim(),
-              customerEmail: typeof profile.email === 'string' ? profile.email : user.email ?? '',
-              items: orderItems,
-              subtotal: group.subtotal,
-              deliveryFee: group.deliveryFee,
-              tax: group.tax,
-              total: group.total,
-              paymentMethod: group.paymentMethod,
-              paymentStatus: group.paymentMethod === 'COD' ? 'unpaid' : 'awaiting_verification',
-              status: 'pending',
-              fulfillmentType,
-              deliveryAddress: fulfillmentType === 'pickup' ? group.settings.pickupLocation : addressForOrder,
-              pickupHours: fulfillmentType === 'pickup' ? group.settings.pickupHours : '',
-              pickupDays: fulfillmentType === 'pickup' ? group.settings.pickupDays : '',
-              sellerNotes,
-              paymentReceiptUrl: group.paymentReceiptUrl,
-              createdAt: serverTimestamp(),
-            })
+          const orderItems = cartItems.map((item) => ({
+            productId: item.id,
+            name: item.name,
+            price: item.price,
+            quantity: item.quantity,
+            unit: item.unit,
+          }))
+          transaction.set(orderRef, {
+            orderNumber,
+            checkoutGroupId,
+            farmerId: group.farmerId,
+            userId: user.uid,
+            customerName: `${typeof profile.firstName === 'string' ? profile.firstName : ''} ${typeof profile.lastName === 'string' ? profile.lastName : ''}`.trim(),
+            customerEmail: typeof profile.email === 'string' ? profile.email : user.email ?? '',
+            items: orderItems,
+            subtotal: group.subtotal,
+            deliveryFee: group.deliveryFee,
+            tax: group.tax,
+            total: group.total,
+            paymentMethod,
+            paymentStatus: paymentMethod === 'COD' ? 'unpaid' : 'awaiting_verification',
+            status: 'pending',
+            fulfillmentType,
+            deliveryAddress: fulfillmentType === 'pickup' ? group.settings.pickupLocation : addressForOrder,
+            pickupHours: fulfillmentType === 'pickup' ? group.settings.pickupHours : '',
+            pickupDays: fulfillmentType === 'pickup' ? group.settings.pickupDays : '',
+            sellerNotes,
+            paymentReceiptUrl,
+            createdAt: serverTimestamp(),
           })
         })
       } catch (transactionError) {
-        let allOrdersCommitted = false
+        let orderCommitted = false
         try {
-          const savedOrders = await Promise.all(groupsWithOrders.map((group) => getDoc(group.orderRef)))
-          allOrdersCommitted = savedOrders.every((snapshot) =>
-            snapshot.exists()
-            && snapshot.data().userId === user.uid
-            && snapshot.data().checkoutGroupId === checkoutGroupId
-          )
+          const savedOrder = await getDoc(orderRef)
+          orderCommitted = savedOrder.exists()
+            && savedOrder.data().userId === user.uid
+            && savedOrder.data().checkoutGroupId === checkoutGroupId
         } catch (verificationError) {
-          console.error('Verifying split checkout result failed:', verificationError)
+          console.error('Verifying checkout result failed:', verificationError)
         }
-        if (!allOrdersCommitted) throw transactionError
+        if (!orderCommitted) throw transactionError
       }
-      groupsWithOrders.forEach((group) => notifyOrder(group.orderRef.id))
+      notifyOrder(orderRef.id)
       try {
         localStorage.removeItem(`cces-farm-market-cart:${user.uid}`)
       } catch (storageError) {
@@ -1132,8 +1138,8 @@ export function ShopPage() {
           'cces-farm-market-order-placed',
           JSON.stringify({
             checkoutGroupId,
-            orderNumbers: groupsWithOrders.map((group) => group.orderNumber),
-            paymentMethods: groupsWithOrders.map((group) => group.paymentMethod),
+            orderNumbers: [orderNumber],
+            paymentMethods: [paymentMethod],
           })
         )
       } catch (storageError) {
@@ -1215,12 +1221,16 @@ export function ShopPage() {
           )}
         </div>
       </section>
-      <Cart items={cartItems} onChange={updateQuantity} onClearAll={() => updateCartQuantities({})} address={deliveryAddress} onAddressChange={(value) => {
+      <Cart items={cartItems} onChange={updateQuantity} onClearAll={() => {
+        updateCartQuantities({})
+        setCartRestriction('')
+        setOrderMessage('')
+      }} address={deliveryAddress} onAddressChange={(value) => {
         setDeliveryAddress(value)
         if (value.trim()) setAddressError('')
       }} onPlaceOrder={placeOrder} onEmptyCartAttempt={() => {
         setQuantityNotice({ message: 'Add products to your cart before placing an order.' })
-      }} onAddressError={setAddressError} orderMessage={orderMessage} addressError={addressError} isCheckingOut={isCheckingOut} farmerStores={farmerStores} storeSettingsError={storeSettingsError} />
+      }} onAddressError={setAddressError} orderMessage={orderMessage} cartRestriction={cartRestriction} addressError={addressError} isCheckingOut={isCheckingOut} farmerStores={farmerStores} storeSettingsError={storeSettingsError} />
       {quantityNotice && <div className={styles.quantityToast} role="status" aria-live="polite">{quantityNotice.message}</div>}
     </main>
   )

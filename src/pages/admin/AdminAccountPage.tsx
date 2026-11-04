@@ -23,6 +23,7 @@ type AdminProfile = {
 }
 
 type StoreSettings = {
+  deliveryFee: number
   pickupLocation: string
   pickupDays: string
   pickupHours: string
@@ -39,6 +40,7 @@ type StoreSettings = {
 type PaymentProvider = 'gcash' | 'maya'
 
 const emptyStoreSettings: StoreSettings = {
+  deliveryFee: 100,
   pickupLocation: '',
   pickupDays: '',
   pickupHours: '',
@@ -54,6 +56,9 @@ const emptyStoreSettings: StoreSettings = {
 
 function readStoreSettings(data: Record<string, unknown>): StoreSettings {
   return {
+    deliveryFee: typeof data.deliveryFee === 'number' && Number.isInteger(data.deliveryFee) && data.deliveryFee >= 0
+      ? data.deliveryFee
+      : 100,
     pickupLocation: typeof data.pickupLocation === 'string' ? data.pickupLocation : '',
     pickupDays: typeof data.pickupDays === 'string' ? data.pickupDays : '',
     pickupHours: typeof data.pickupHours === 'string' ? data.pickupHours : '',
@@ -196,37 +201,47 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
           if (!unsubscribeSettings) {
             const farmerProfileRef = doc(db, 'farmerProfiles', user.uid)
             const storefrontRef = doc(db, 'settings', 'storefront')
-            unsubscribeSettings = onSnapshot(farmerProfileRef, (settingsSnapshot) => {
-              if (!isMounted) return
-              setHasFarmerProfile(settingsSnapshot.exists())
-              const legacySettings = settingsSnapshot.exists() ? settingsSnapshot.data() : {}
-              const loadedSettings = settingsSnapshot.exists()
-                ? readStoreSettings(legacySettings)
-                : emptyStoreSettings
+            let farmerSettingsData: Record<string, unknown> | null = null
+            let legacySettingsData: Record<string, unknown> = {}
+            function applyStoreSettings() {
+              const loadedSettings = farmerSettingsData
+                ? readStoreSettings({ ...legacySettingsData, ...farmerSettingsData })
+                : readStoreSettings(legacySettingsData)
+              setHasFarmerProfile(farmerSettingsData !== null)
               setStoreSettings(loadedSettings)
               if (!storeSettingsDirty.current) setStoreSettingsDraft(loadedSettings)
               setSettingsError('')
               setHasLoadedSettings(true)
               setIsSettingsLoading(false)
+            }
+            const unsubscribeFarmerProfile = onSnapshot(farmerProfileRef, (settingsSnapshot) => {
+              if (!isMounted) return
+              farmerSettingsData = settingsSnapshot.exists() ? settingsSnapshot.data() : null
+              applyStoreSettings()
             }, (loadError) => {
               console.error('Loading farmer profile settings failed:', loadError)
-              onSnapshot(storefrontRef, (legacySnapshot) => {
-                if (!isMounted) return
-                const loadedSettings = legacySnapshot.exists() ? readStoreSettings(legacySnapshot.data()) : emptyStoreSettings
-                setStoreSettings(loadedSettings)
-                if (!storeSettingsDirty.current) setStoreSettingsDraft(loadedSettings)
-                setSettingsError('')
-                setHasLoadedSettings(true)
+              if (isMounted) {
+                setSettingsError('Unable to load farmer profile settings.')
+                setHasLoadedSettings(false)
                 setIsSettingsLoading(false)
-              }, (legacyError) => {
-                console.error('Loading legacy storefront settings failed:', legacyError)
-                if (isMounted) {
-                  setSettingsError('Unable to load store pickup and payment settings.')
-                  setHasLoadedSettings(false)
-                  setIsSettingsLoading(false)
-                }
-              })
+              }
             })
+            const unsubscribeStorefront = onSnapshot(storefrontRef, (settingsSnapshot) => {
+              if (!isMounted) return
+              legacySettingsData = settingsSnapshot.exists() ? settingsSnapshot.data() : {}
+              applyStoreSettings()
+            }, (loadError) => {
+              console.error('Loading legacy storefront settings failed:', loadError)
+              if (isMounted) {
+                setSettingsError('Unable to load legacy storefront settings.')
+                if (!farmerSettingsData) setHasLoadedSettings(false)
+                setIsSettingsLoading(false)
+              }
+            })
+            unsubscribeSettings = () => {
+              unsubscribeFarmerProfile()
+              unsubscribeStorefront()
+            }
           }
         },
         (loadError) => {
@@ -374,7 +389,7 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
     }
   }
 
-  function updateStoreField(field: keyof StoreSettings, value: string) {
+  function updateStoreField(field: keyof StoreSettings, value: string | number) {
     storeSettingsDirty.current = true
     setStoreSettingsDraft((current) => ({ ...current, [field]: value }))
     setSettingsError('')
@@ -410,6 +425,7 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
     setIsSavingSettings(true)
     const nextSettings: StoreSettings = {
       ...storeSettingsDraft,
+      deliveryFee: Number(storeSettingsDraft.deliveryFee),
       pickupLocation: storeSettingsDraft.pickupLocation.trim(),
       pickupDays: storeSettingsDraft.pickupDays.trim(),
       pickupHours: storeSettingsDraft.pickupHours.trim(),
@@ -417,6 +433,11 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
       gcashAccountNumber: storeSettingsDraft.gcashAccountNumber.trim(),
       mayaAccountName: storeSettingsDraft.mayaAccountName.trim(),
       mayaAccountNumber: storeSettingsDraft.mayaAccountNumber.trim(),
+    }
+    if (!Number.isInteger(nextSettings.deliveryFee) || nextSettings.deliveryFee < 0 || nextSettings.deliveryFee > 10000) {
+      setSettingsError('Delivery fee must be a whole amount between ₱0 and ₱10,000.')
+      setIsSavingSettings(false)
+      return
     }
 
     try {
@@ -447,6 +468,7 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
           doc(db, 'farmerProfiles', user.uid),
           {
             pickupLocation: nextSettings.pickupLocation,
+            deliveryFee: nextSettings.deliveryFee,
             pickupDays: nextSettings.pickupDays,
             pickupHours: nextSettings.pickupHours,
             gcashAccountName: nextSettings.gcashAccountName,
@@ -464,6 +486,7 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
           {
             farmName: profile ? displayName(profile, 'Original farm') : 'Original farm',
             pickupLocation: nextSettings.pickupLocation,
+            deliveryFee: nextSettings.deliveryFee,
             pickupDays: nextSettings.pickupDays,
             pickupHours: nextSettings.pickupHours,
             gcashAccountName: nextSettings.gcashAccountName,
@@ -639,7 +662,7 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
             {!isCcesAdmin && <section className={styles.storeSettings} aria-labelledby="store-settings-heading">
               <div className={styles.sectionHeading}>
                 <div>
-                  <h3 id="store-settings-heading">Pickup &amp; payment settings</h3>
+                  <h3 id="store-settings-heading">Pickup, delivery &amp; payment settings</h3>
                   <p>These details are shown to customers during checkout.</p>
                 </div>
               </div>
@@ -651,6 +674,7 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
                 <form onSubmit={(event) => void saveStoreSettings(event)}>
                   <div className={styles.form}>
                     <label className={styles.fullWidth}>Pickup Location<input disabled={isSavingSettings} value={storeSettingsDraft.pickupLocation} onChange={(event) => updateStoreField('pickupLocation', event.target.value)} placeholder="Enter the pickup address" /></label>
+                    <label>Delivery Fee<input type="number" min={0} max={10000} step={1} disabled={isSavingSettings} value={storeSettingsDraft.deliveryFee} onChange={(event) => updateStoreField('deliveryFee', Number(event.target.value))} /></label>
                     <label>Pickup Days<input disabled={isSavingSettings} value={storeSettingsDraft.pickupDays} onChange={(event) => updateStoreField('pickupDays', event.target.value)} placeholder="For example: Monday–Saturday" /></label>
                     <label>Pickup Hours<input disabled={isSavingSettings} value={storeSettingsDraft.pickupHours} onChange={(event) => updateStoreField('pickupHours', event.target.value)} placeholder="For example: 9 AM–5 PM" /></label>
                   </div>
