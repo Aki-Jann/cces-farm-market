@@ -187,7 +187,7 @@ export function AdminDashboard({ role = ROLES.FARMER }: { role?: ManagementRole 
       unsubscribeAuth()
       unsubscribeProfile?.()
     }
-  }, [])
+  }, [role])
 
   // Orders and products are independent collections, so each gets its own
   // real-time listener rather than merging unrelated data into one.

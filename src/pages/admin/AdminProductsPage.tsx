@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { collection, deleteDoc, doc, getDocs, onSnapshot, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore'
+import { auth } from '../../firebase/auth'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { ProductRating } from '../../components/common/ProductRating'
@@ -12,6 +13,7 @@ import styles from './AdminProductsPage.module.css'
 type ProductCategory = string
 type Product = {
   id: string
+  farmerId?: string
   name: string
   category: ProductCategory
   price: number
@@ -372,6 +374,7 @@ export function AdminProductsPage() {
           const imageUrl = resolveProductImage(data.imageUrl, 'shop-apple.png')
           return {
             id: product.id,
+            farmerId: typeof data.farmerId === 'string' ? data.farmerId : '',
             name: typeof data.name === 'string' ? data.name : '',
             category: typeof data.category === 'string' && data.category.trim() ? data.category.trim().toUpperCase() : 'VEGETABLES',
             price: typeof data.price === 'number' ? data.price : 0,
@@ -567,7 +570,9 @@ export function AdminProductsPage() {
         }
       }
 
+      const farmerId = auth.currentUser?.uid ?? selectedProduct?.farmerId ?? ''
       const productData = {
+        farmerId,
         name: normalized.name,
         category: normalized.category,
         price: Number(normalized.price),

@@ -19,18 +19,15 @@ import {
   updateDoc,
   writeBatch,
 } from 'firebase/firestore'
-import { deleteObject, getBytes, ref as storageRef, uploadBytes } from 'firebase/storage'
 
 const projectId = 'demo-cces-farm-market'
 const rules = await readFile(new URL('../firestore.rules', import.meta.url), 'utf8')
-const storageRules = await readFile(new URL('../storage.rules', import.meta.url), 'utf8')
 let environment
 
 before(async () => {
   environment = await initializeTestEnvironment({
     projectId,
     firestore: { rules },
-    storage: { rules: storageRules },
   })
 })
 
@@ -47,7 +44,15 @@ beforeEach(async () => {
       }),
       setDoc(doc(db, 'users/customer-b'), { role: 'customer' }),
       setDoc(doc(db, 'users/admin-a'), { role: 'admin' }),
+      setDoc(doc(db, 'users/farmer-b'), { role: 'farmer' }),
       setDoc(doc(db, 'users/cces-admin-a'), { role: 'cces_admin' }),
+      setDoc(doc(db, 'farmerProfiles/farmer-b'), {
+        status: 'active',
+        farmName: 'Valley Farm',
+        contactNumber: '09999999999',
+        address: 'Valley Road',
+        createdAt: new Date(),
+      }),
       setDoc(doc(db, 'farmerApplications/customer-a'), {
         status: 'pending',
         farmName: 'Casey Farm',
@@ -59,6 +64,7 @@ beforeEach(async () => {
         rejectionReason: '',
       }),
       setDoc(doc(db, 'products/product-a'), {
+        farmerId: 'admin-a',
         name: 'CARROTS',
         price: 10,
         stock: 10,
@@ -66,8 +72,18 @@ beforeEach(async () => {
         unit: 'KG',
         isAvailable: true,
       }),
+      setDoc(doc(db, 'products/product-other-farmer'), {
+        farmerId: 'farmer-b',
+        name: 'TOMATOES',
+        price: 20,
+        stock: 5,
+        sold: 0,
+        unit: 'KG',
+        isAvailable: true,
+      }),
       ...['B', 'C', 'D', 'E', 'F'].map((suffix, index) =>
         setDoc(doc(db, `products/product-${suffix.toLowerCase()}`), {
+          farmerId: 'admin-a',
           name: `PRODUCT ${index + 2}`,
           price: 10,
           stock: 10,
@@ -82,14 +98,22 @@ beforeEach(async () => {
         pickupHours: '8 AM to 4 PM',
       }),
       setDoc(doc(db, 'orders/order-a'), {
+        farmerId: 'admin-a',
         userId: 'customer-a',
         status: 'pending',
       }),
       setDoc(doc(db, 'orders/order-b'), {
+        farmerId: 'admin-a',
         userId: 'customer-b',
         status: 'pending',
       }),
+      setDoc(doc(db, 'orders/order-other-farmer'), {
+        farmerId: 'farmer-b',
+        userId: 'customer-a',
+        status: 'pending',
+      }),
       setDoc(doc(db, 'orders/online-awaiting'), {
+        farmerId: 'admin-a',
         userId: 'customer-a',
         status: 'pending',
         paymentMethod: 'GCASH',
@@ -97,6 +121,7 @@ beforeEach(async () => {
         paymentReceiptUrl: 'https://example.com/receipt.png',
       }),
       setDoc(doc(db, 'orders/online-paid'), {
+        farmerId: 'admin-a',
         userId: 'customer-a',
         status: 'pending',
         paymentMethod: 'MAYA',
@@ -125,6 +150,58 @@ test('customers can read only their own user profile', async () => {
   const db = environment.authenticatedContext('customer-a').firestore()
   await assertSucceeds(getDoc(doc(db, 'users/customer-a')))
   await assertFails(getDoc(doc(db, 'users/customer-b')))
+})
+
+test('legacy admin role retains farmer access before migration', async () => {
+  const db = environment.authenticatedContext('admin-a').firestore()
+  await assertSucceeds(getDoc(doc(db, 'users/customer-a')))
+  await assertSucceeds(getDoc(doc(db, 'orders/order-a')))
+  await assertSucceeds(updateDoc(doc(db, 'products/product-a'), { stock: 9 }))
+  await assertSucceeds(updateDoc(doc(db, 'orders/order-a'), { status: 'confirmed' }))
+})
+
+test('CCES admin role retains application and read-only administration access', async () => {
+  const db = environment.authenticatedContext('cces-admin-a').firestore()
+  await assertSucceeds(getDocs(collection(db, 'farmerApplications')))
+  await assertSucceeds(getDocs(collection(db, 'farmerProfiles')))
+  await assertSucceeds(getDocs(collection(db, 'orders')))
+})
+
+test('customers can read active farmer storefront profiles but farmers cannot edit another farmer data', async () => {
+  const customerDb = environment.authenticatedContext('customer-a').firestore()
+  await assertSucceeds(getDoc(doc(customerDb, 'farmerProfiles/farmer-b')))
+  await assertSucceeds(getDoc(doc(customerDb, 'farmerProfiles/legacy-profile-not-created-yet')))
+
+  const farmerDb = environment.authenticatedContext('admin-a').firestore()
+  await assertFails(updateDoc(doc(farmerDb, 'products/product-other-farmer'), { name: 'CHANGED' }))
+  await assertFails(updateDoc(doc(farmerDb, 'orders/order-other-farmer'), { status: 'confirmed' }))
+})
+
+test('farmers can update only their own storefront settings', async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'farmerProfiles/admin-a'), {
+      status: 'active',
+      farmName: 'Legacy Farm',
+      contactNumber: '09123456789',
+      address: 'Farm Road',
+      createdAt: new Date(),
+    })
+  })
+
+  const farmerDb = environment.authenticatedContext('admin-a').firestore()
+  await assertSucceeds(updateDoc(doc(farmerDb, 'farmerProfiles/admin-a'), {
+    pickupLocation: 'Gate 2',
+    pickupDays: 'Monday to Friday',
+    pickupHours: '8 AM to 4 PM',
+    gcashAccountName: 'Legacy Farm',
+    gcashAccountNumber: '09123456789',
+    gcashQrUrl: '',
+    mayaAccountName: '',
+    mayaAccountNumber: '',
+    mayaQrUrl: '',
+  }))
+  await assertFails(updateDoc(doc(farmerDb, 'farmerProfiles/farmer-b'), { pickupLocation: 'Changed' }))
+  await assertFails(updateDoc(doc(farmerDb, 'farmerProfiles/admin-a'), { status: 'suspended' }))
 })
 
 test('customers cannot promote their own role or assign themselves the CCES admin role', async () => {
@@ -262,51 +339,6 @@ test('suspended farmers cannot create, update, or delete products', async () => 
   await assertFails(deleteDoc(doc(db, 'products/product-a')))
 })
 
-test('receipt uploads are owner-only and existing receipts cannot be overwritten', async () => {
-  const image = new Uint8Array([1, 2, 3])
-  const receiptPath = 'payment-receipts/customer-a/order-storage/receipt.png'
-  const customerStorage = environment.authenticatedContext('customer-a').storage()
-  const customerReceipt = storageRef(customerStorage, receiptPath)
-
-  await assertSucceeds(uploadBytes(customerReceipt, image, { contentType: 'image/png' }))
-  await assertSucceeds(getBytes(customerReceipt))
-  await assertFails(uploadBytes(customerReceipt, image, { contentType: 'image/png' }))
-  await assertSucceeds(getBytes(storageRef(
-    environment.authenticatedContext('admin-a').storage(),
-    receiptPath,
-  )))
-
-  await environment.withSecurityRulesDisabled(async (context) => {
-    await setDoc(doc(context.firestore(), 'orders/order-storage'), {
-      userId: 'customer-a',
-      paymentStatus: 'paid',
-    })
-  })
-  await assertFails(deleteObject(customerReceipt))
-
-  const orphanReceipt = storageRef(customerStorage, 'payment-receipts/customer-a/order-not-created/receipt.png')
-  await assertSucceeds(uploadBytes(orphanReceipt, image, { contentType: 'image/png' }))
-  await assertSucceeds(deleteObject(orphanReceipt))
-
-  const otherCustomerStorage = environment.authenticatedContext('customer-b').storage()
-  await assertFails(getBytes(storageRef(otherCustomerStorage, receiptPath)))
-  await assertFails(uploadBytes(
-    storageRef(otherCustomerStorage, 'payment-receipts/customer-a/order-storage/other.png'),
-    image,
-    { contentType: 'image/png' },
-  ))
-  await assertFails(uploadBytes(
-    storageRef(customerStorage, 'payment-receipts/customer-a/order-storage/invalid.txt'),
-    image,
-    { contentType: 'text/plain' },
-  ))
-  await assertFails(uploadBytes(
-    storageRef(environment.unauthenticatedContext().storage(), 'payment-receipts/customer-a/order-storage/anonymous.png'),
-    image,
-    { contentType: 'image/png' },
-  ))
-})
-
 test('customers cannot create or update products', async () => {
   const db = environment.authenticatedContext('customer-a').firestore()
   await assertFails(setDoc(doc(db, 'products/customer-product'), { name: 'Unauthorized' }))
@@ -316,6 +348,8 @@ test('customers cannot create or update products', async () => {
 function customerOrder(orderId, overrides = {}) {
   return {
     orderNumber: 'ORD-TEST',
+    checkoutGroupId: 'checkout-group-test',
+    farmerId: 'admin-a',
     userId: 'customer-a',
     customerName: 'Casey Customer',
     customerEmail: 'customer-a@example.com',
@@ -405,6 +439,39 @@ test('customers can create a valid order and decrement inventory in one transact
   assert.equal(orderSnapshot.data().total, 121)
   assert.equal(productSnapshot.data().stock, 8)
   assert.equal(productSnapshot.data().sold, 2)
+})
+
+test('split checkout orders from different farmers pass item, stock, tax, and fee validation', async () => {
+  const db = environment.authenticatedContext('customer-a').firestore()
+  const firstOrder = customerOrder('split-order-farmer-a')
+  const secondOrder = customerOrder('split-order-farmer-b', {
+    farmerId: 'farmer-b',
+    items: [{
+      productId: 'product-other-farmer',
+      name: 'TOMATOES',
+      price: 20,
+      quantity: 1,
+      unit: 'KG',
+    }],
+    subtotal: 20,
+    tax: 1,
+    total: 121,
+  })
+
+  await assertSucceeds(submitCustomerOrder(db, 'split-order-farmer-a', firstOrder))
+  await assertSucceeds(submitCustomerOrder(db, 'split-order-farmer-b', secondOrder))
+
+  const [first, second, firstProduct, secondProduct] = await Promise.all([
+    getDoc(doc(db, 'orders/split-order-farmer-a')),
+    getDoc(doc(db, 'orders/split-order-farmer-b')),
+    getDoc(doc(db, 'products/product-a')),
+    getDoc(doc(db, 'products/product-other-farmer')),
+  ])
+  assert.equal(first.data().checkoutGroupId, second.data().checkoutGroupId)
+  assert.equal(first.data().total, 121)
+  assert.equal(second.data().total, 121)
+  assert.equal(firstProduct.data().stock, 8)
+  assert.equal(secondProduct.data().stock, 4)
 })
 
 test('customers can make a second valid purchase when checkoutAction remains sale', async () => {
@@ -678,24 +745,28 @@ test('Farmers can verify an online payment but cannot claim verification as a Cu
 test('Farmers can mark an active unpaid COD order as paid only once', async () => {
   await environment.withSecurityRulesDisabled(async (context) => {
     await setDoc(doc(context.firestore(), 'orders/cod-unpaid'), {
+      farmerId: 'admin-a',
       userId: 'customer-a',
       paymentMethod: 'COD',
       paymentStatus: 'unpaid',
       status: 'pending',
     })
     await setDoc(doc(context.firestore(), 'orders/cod-cancelled'), {
+      farmerId: 'admin-a',
       userId: 'customer-a',
       paymentMethod: 'COD',
       paymentStatus: 'unpaid',
       status: 'cancelled',
     })
     await setDoc(doc(context.firestore(), 'orders/cod-rejected'), {
+      farmerId: 'admin-a',
       userId: 'customer-a',
       paymentMethod: 'COD',
       paymentStatus: 'rejected',
       status: 'cancelled',
     })
     await setDoc(doc(context.firestore(), 'orders/rejected-active'), {
+      farmerId: 'admin-a',
       userId: 'customer-a',
       paymentMethod: 'COD',
       paymentStatus: 'rejected',

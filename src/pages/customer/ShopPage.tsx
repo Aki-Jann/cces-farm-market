@@ -15,6 +15,8 @@ type Category = string
 
 type Product = {
   id: string
+  farmerId?: string
+  farmName: string
   name: string
   category: string
   price: number
@@ -27,10 +29,19 @@ type Product = {
 
 type CartItem = Product & { quantity: number }
 type FulfillmentType = 'delivery' | 'pickup'
+type PaymentMethod = 'COD' | 'GCASH' | 'MAYA'
+type FarmerStoreSettings = StoreSettings & {
+  farmName: string
+  status: 'active' | 'suspended' | 'legacy' | 'loading'
+}
 type CheckoutDetails = {
   fulfillmentType: FulfillmentType
   sellerNotes: string
-  receiptFile: File | null
+  payments: Array<{
+    farmerId: string
+    paymentMethod: PaymentMethod
+    receiptFile: File | null
+  }>
 }
 
 type StoreSettings = {
@@ -46,17 +57,6 @@ type StoreSettings = {
 }
 
 const defaultCategories = ['VEGETABLES', 'FRUITS', 'GRAINS', 'FLOWERS']
-const defaultStoreSettings: StoreSettings = {
-  pickupLocation: '',
-  pickupDays: '',
-  pickupHours: '',
-  gcashAccountName: '',
-  gcashAccountNumber: '',
-  gcashQrUrl: '',
-  mayaAccountName: '',
-  mayaAccountNumber: '',
-  mayaQrUrl: '',
-}
 const localImages: Record<string, string> = {
   APPLE: productImages['shop-apple.png'],
   BANANA: productImages['shop-banana.png'],
@@ -71,6 +71,58 @@ const localImages: Record<string, string> = {
 
 function currency(value: number) {
   return `₱${value.toFixed(2)}`
+}
+
+function readStoreSettings(data: Record<string, unknown>, fallbackName: string): FarmerStoreSettings {
+  return {
+    farmName: typeof data.farmName === 'string' && data.farmName.trim() ? data.farmName.trim() : fallbackName,
+    status: data.status === 'suspended' ? 'suspended' : 'active',
+    pickupLocation: typeof data.pickupLocation === 'string' ? data.pickupLocation : '',
+    pickupDays: typeof data.pickupDays === 'string' ? data.pickupDays : '',
+    pickupHours: typeof data.pickupHours === 'string' ? data.pickupHours : '',
+    gcashAccountName: typeof data.gcashAccountName === 'string' ? data.gcashAccountName : '',
+    gcashAccountNumber: typeof data.gcashAccountNumber === 'string' ? data.gcashAccountNumber : '',
+    gcashQrUrl: typeof data.gcashQrUrl === 'string' ? data.gcashQrUrl : '',
+    mayaAccountName: typeof data.mayaAccountName === 'string' ? data.mayaAccountName : '',
+    mayaAccountNumber: typeof data.mayaAccountNumber === 'string' ? data.mayaAccountNumber : '',
+    mayaQrUrl: typeof data.mayaQrUrl === 'string' ? data.mayaQrUrl : '',
+  }
+}
+
+function cartGroups(items: CartItem[], stores: Record<string, FarmerStoreSettings>, fulfillmentType: FulfillmentType) {
+  const grouped = new Map<string, { farmerId: string; farmName: string; items: CartItem[]; subtotal: number; deliveryFee: number; tax: number; total: number; settings: FarmerStoreSettings }>()
+  items.forEach((item) => {
+    const farmerId = item.farmerId ?? ''
+    const key = farmerId || 'legacy'
+    const group = grouped.get(key)
+    if (group) {
+      group.items.push(item)
+      group.subtotal += item.quantity * item.price
+    } else {
+      const settings = stores[key] ?? readStoreSettings({}, item.farmName || 'Farm')
+      grouped.set(key, {
+        farmerId,
+        farmName: settings.farmName || item.farmName || 'Farm',
+        items: [item],
+        subtotal: item.quantity * item.price,
+        deliveryFee: 0,
+        tax: 0,
+        total: 0,
+        settings,
+      })
+    }
+  })
+
+  return [...grouped.values()].map((group) => {
+    const deliveryFee = fulfillmentType === 'delivery' && group.subtotal > 0 ? 100 : 0
+    const tax = group.subtotal * 0.05
+    return { ...group, deliveryFee, tax, total: group.subtotal + deliveryFee + tax }
+  })
+}
+
+function isFarmerActive(product: Product, stores: Record<string, FarmerStoreSettings>) {
+  const store = stores[product.farmerId || 'legacy']
+  return store?.status === 'active' || store?.status === 'legacy'
 }
 
 function readSavedCart(userId: string): Record<string, number> {
@@ -137,6 +189,7 @@ function ProductCard({
         <div className={styles.productDetails}>
           <small className={styles.categoryLabel}>{product.category.toUpperCase()}</small>
           <strong>{product.name}</strong>
+          <small className={styles.farmName}>{product.farmName || 'Local farm'}</small>
           <div className={styles.productMetrics}>
             <small className={styles.stockText}>{product.stock} {product.unit} in stock · {product.sold} sold</small>
             <ProductRating productId={product.id} showReviews />
@@ -192,15 +245,13 @@ function Cart({
   onClearAll,
   address,
   onAddressChange,
-  paymentMethod,
-  onPaymentChange,
   onPlaceOrder,
   onEmptyCartAttempt,
   onAddressError,
   orderMessage,
   addressError,
   isCheckingOut,
-  storeSettings,
+  farmerStores,
   storeSettingsError,
 }: {
   items: CartItem[]
@@ -208,15 +259,13 @@ function Cart({
   onClearAll: () => void
   address: string
   onAddressChange: (address: string) => void
-  paymentMethod: 'COD' | 'GCASH' | 'MAYA'
-  onPaymentChange: (method: 'COD' | 'GCASH' | 'MAYA') => void
   onPlaceOrder: (details: CheckoutDetails) => void
   onEmptyCartAttempt: () => void
   onAddressError: (message: string) => void
   orderMessage: string
   addressError: string
   isCheckingOut: boolean
-  storeSettings: StoreSettings
+  farmerStores: Record<string, FarmerStoreSettings>
   storeSettingsError: string
 }) {
   const [isEditingAddress, setIsEditingAddress] = useState(false)
@@ -224,20 +273,17 @@ function Cart({
   const [isConfirmOpen, setIsConfirmOpen] = useState(false)
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>('delivery')
   const [sellerNotes, setSellerNotes] = useState('')
-  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [paymentMethods, setPaymentMethods] = useState<Record<string, PaymentMethod>>({})
+  const [receiptFiles, setReceiptFiles] = useState<Record<string, File | null>>({})
   const [receiptError, setReceiptError] = useState('')
   const [revealedItemId, setRevealedItemId] = useState<string | null>(null)
   const cartItemPointerStart = useRef<{ x: number; y: number } | null>(null)
   const didSwipeCartItem = useRef(false)
-  const subtotal = items.reduce((sum, item) => sum + item.quantity * item.price, 0)
-  const delivery = fulfillmentType === 'delivery' && subtotal > 0 ? 100 : 0
-  const tax = subtotal * 0.05
-  const total = subtotal + delivery + tax
-  const paymentProviderName = paymentMethod === 'GCASH' ? 'GCash' : 'Maya'
-  const paymentLabel = paymentMethod === 'COD' ? 'Cash on Delivery' : paymentProviderName
-  const paymentQrUrl = paymentMethod === 'GCASH' ? storeSettings.gcashQrUrl : storeSettings.mayaQrUrl
-  const paymentAccountName = paymentMethod === 'GCASH' ? storeSettings.gcashAccountName : storeSettings.mayaAccountName
-  const paymentAccountNumber = paymentMethod === 'GCASH' ? storeSettings.gcashAccountNumber : storeSettings.mayaAccountNumber
+  const groups = cartGroups(items, farmerStores, fulfillmentType)
+  const subtotal = groups.reduce((sum, group) => sum + group.subtotal, 0)
+  const delivery = groups.reduce((sum, group) => sum + group.deliveryFee, 0)
+  const tax = groups.reduce((sum, group) => sum + group.tax, 0)
+  const total = groups.reduce((sum, group) => sum + group.total, 0)
 
   useEffect(() => {
     if (!isConfirmOpen) return
@@ -266,8 +312,18 @@ function Cart({
       setIsEditingAddress(true)
       return
     }
-    if (paymentMethod !== 'COD' && !receiptFile) {
-      setReceiptError('Upload a screenshot of your payment receipt to continue.')
+    const groupMissingQr = groups.find((group) => {
+      const method = paymentMethods[group.farmerId || 'legacy'] ?? 'COD'
+      return (method === 'GCASH' && !group.settings.gcashQrUrl)
+        || (method === 'MAYA' && !group.settings.mayaQrUrl)
+    })
+    if (groupMissingQr) {
+      setReceiptError(`${groupMissingQr.farmName} has not configured the selected payment QR code.`)
+      return
+    }
+    if (groups.some((group) => (paymentMethods[group.farmerId || 'legacy'] ?? 'COD') !== 'COD'
+      && !receiptFiles[group.farmerId || 'legacy'])) {
+      setReceiptError('Upload a payment receipt for every farmer using online payment.')
       return
     }
     setIsConfirmOpen(true)
@@ -275,7 +331,15 @@ function Cart({
 
   function confirmOrder() {
     setIsConfirmOpen(false)
-    onPlaceOrder({ fulfillmentType, sellerNotes: sellerNotes.trim(), receiptFile })
+    onPlaceOrder({
+      fulfillmentType,
+      sellerNotes: sellerNotes.trim(),
+      payments: groups.map((group) => ({
+        farmerId: group.farmerId,
+        paymentMethod: paymentMethods[group.farmerId || 'legacy'] ?? 'COD',
+        receiptFile: receiptFiles[group.farmerId || 'legacy'] ?? null,
+      })),
+    })
   }
 
   return (
@@ -339,60 +403,69 @@ function Cart({
             <strong>Your cart is empty</strong>
             <p>Fresh finds are waiting. Add a few favorites to get started.</p>
           </div>
-        ) : items.map((item) => (
-          <div
-            className={`${styles.cartItemShell} ${revealedItemId === item.id ? styles.cartItemShellRevealed : ''}`}
-            key={item.id}
-            onPointerDown={(event) => {
-              cartItemPointerStart.current = { x: event.clientX, y: event.clientY }
-              didSwipeCartItem.current = false
-            }}
-            onPointerUp={(event) => {
-              const start = cartItemPointerStart.current
-              cartItemPointerStart.current = null
-              if (!start) return
-
-              const deltaX = event.clientX - start.x
-              const deltaY = event.clientY - start.y
-              if (Math.abs(deltaX) < 40 || Math.abs(deltaX) < Math.abs(deltaY)) return
-
-              didSwipeCartItem.current = true
-              setRevealedItemId(deltaX < 0 ? item.id : null)
-              window.setTimeout(() => { didSwipeCartItem.current = false }, 0)
-            }}
-            onPointerCancel={() => { cartItemPointerStart.current = null }}
-            onClick={(event) => {
-              if (didSwipeCartItem.current) return
-              if (event.target instanceof Element && event.target.closest('button')) return
-              setRevealedItemId((current) => current === item.id ? null : item.id)
-            }}
-          >
-            <button
-              type="button"
-              className={styles.cartItemDelete}
-              aria-label={`Remove ${item.name} from cart`}
-              aria-hidden={revealedItemId !== item.id}
-              disabled={revealedItemId !== item.id}
-              onClick={() => {
-                onChange(item.id, 0)
-                setRevealedItemId(null)
-              }}
-            >
-              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="m19 6-1 14H6L5 6" /><path d="M10 11v5M14 11v5" /></svg>
-            </button>
-            <div className={`${styles.cartItem} ${revealedItemId === item.id ? styles.cartItemPriceShift : ''}`}>
-              <img src={item.image} alt="" />
-              <div>
-                <strong>{item.name}</strong>
-                <span>{currency(item.price)}<small>{item.quantity}x</small></span>
+        ) : groups.map((group) => (
+          <section className={styles.cartFarmerGroup} key={group.farmerId || 'legacy'}>
+            <h2>{group.farmName}</h2>
+            {group.items.map((item) => (
+              <div
+                className={`${styles.cartItemShell} ${revealedItemId === item.id ? styles.cartItemShellRevealed : ''}`}
+                key={item.id}
+                onPointerDown={(event) => {
+                  cartItemPointerStart.current = { x: event.clientX, y: event.clientY }
+                  didSwipeCartItem.current = false
+                }}
+                onPointerUp={(event) => {
+                  const start = cartItemPointerStart.current
+                  cartItemPointerStart.current = null
+                  if (!start) return
+                  const deltaX = event.clientX - start.x
+                  const deltaY = event.clientY - start.y
+                  if (Math.abs(deltaX) < 40 || Math.abs(deltaX) < Math.abs(deltaY)) return
+                  didSwipeCartItem.current = true
+                  setRevealedItemId(deltaX < 0 ? item.id : null)
+                  window.setTimeout(() => { didSwipeCartItem.current = false }, 0)
+                }}
+                onPointerCancel={() => { cartItemPointerStart.current = null }}
+                onClick={(event) => {
+                  if (didSwipeCartItem.current) return
+                  if (event.target instanceof Element && event.target.closest('button')) return
+                  setRevealedItemId((current) => current === item.id ? null : item.id)
+                }}
+              >
+                <button
+                  type="button"
+                  className={styles.cartItemDelete}
+                  aria-label={`Remove ${item.name} from cart`}
+                  aria-hidden={revealedItemId !== item.id}
+                  disabled={revealedItemId !== item.id}
+                  onClick={() => {
+                    onChange(item.id, 0)
+                    setRevealedItemId(null)
+                  }}
+                >
+                  <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="m19 6-1 14H6L5 6" /><path d="M10 11v5M14 11v5" /></svg>
+                </button>
+                <div className={`${styles.cartItem} ${revealedItemId === item.id ? styles.cartItemPriceShift : ''}`}>
+                  <img src={item.image} alt="" />
+                  <div>
+                    <strong>{item.name}</strong>
+                    <span>{currency(item.price)}<small>{item.quantity}x</small></span>
+                  </div>
+                  <strong>{currency(item.quantity * item.price)}</strong>
+                  <div className={styles.cartQuantity}>
+                    <button type="button" aria-label={`Remove one ${item.name}`} onClick={() => onChange(item.id, item.quantity - 1)}>-</button>
+                    <button type="button" aria-label={`Add one ${item.name}`} onClick={() => onChange(item.id, item.quantity + 1)}>+</button>
+                  </div>
+                </div>
               </div>
-              <strong>{currency(item.quantity * item.price)}</strong>
-              <div className={styles.cartQuantity}>
-                <button type="button" aria-label={`Remove one ${item.name}`} onClick={() => onChange(item.id, item.quantity - 1)}>-</button>
-                <button type="button" aria-label={`Add one ${item.name}`} onClick={() => onChange(item.id, item.quantity + 1)}>+</button>
-              </div>
+            ))}
+            <div className={styles.cartFarmerTotals}>
+              <SummaryRow label="Subtotal" value={currency(group.subtotal)} />
+              <SummaryRow label="Delivery" value={currency(group.deliveryFee)} />
+              <SummaryRow label="Tax 5%" value={currency(group.tax)} />
+              <SummaryRow label="Farm total" value={currency(group.total)} strong />
             </div>
-          </div>
+          </section>
         ))}
       </div>
       <div className={styles.cartFooter}>
@@ -402,9 +475,6 @@ function Cart({
           <SummaryRow label="Tax 5%" value={currency(tax)} />
           <hr />
           <SummaryRow label="Total Amount" value={currency(total)} strong />
-        </div>
-        <div className={styles.paymentOptions}>
-          {(['COD', 'GCASH', 'MAYA'] as const).map((method) => <button type="button" className={paymentMethod === method ? styles.activePayment : ''} key={method} onClick={() => onPaymentChange(method)}>{method}</button>)}
         </div>
         <button type="button" className={styles.placeOrder} disabled={isCheckingOut} onClick={() => {
           if (items.length === 0) {
@@ -436,73 +506,112 @@ function Cart({
                 Pickup
               </label>
             </fieldset>
-            {fulfillmentType === 'delivery' ? (
+            {fulfillmentType === 'delivery' && (
               <p className={styles.checkoutAddress}>Delivering to: {address}</p>
-            ) : (
-              <div className={styles.pickupDetails}>
-                <p><strong>Pickup location:</strong> {storeSettings.pickupLocation || 'To be confirmed by the seller.'}</p>
-                {storeSettings.pickupDays && <p><strong>Pickup days:</strong> {storeSettings.pickupDays}</p>}
-                {storeSettings.pickupHours && <p><strong>Pickup hours:</strong> {storeSettings.pickupHours}</p>}
-              </div>
             )}
+            <div className={styles.checkoutFarmerGroups}>
+              {groups.map((group) => {
+                const key = group.farmerId || 'legacy'
+                const method = paymentMethods[key] ?? 'COD'
+                const providerName = method === 'GCASH' ? 'GCash' : 'Maya'
+                const qrUrl = method === 'GCASH' ? group.settings.gcashQrUrl : group.settings.mayaQrUrl
+                const accountName = method === 'GCASH' ? group.settings.gcashAccountName : group.settings.mayaAccountName
+                const accountNumber = method === 'GCASH' ? group.settings.gcashAccountNumber : group.settings.mayaAccountNumber
+                return (
+                  <section className={styles.checkoutFarmerGroup} key={key}>
+                    <h3>{group.farmName}</h3>
+                    <div className={styles.pickupDetails}>
+                      <p><strong>Subtotal:</strong> {currency(group.subtotal)}</p>
+                      <p><strong>Delivery fee:</strong> {currency(group.deliveryFee)}</p>
+                      <p><strong>Tax:</strong> {currency(group.tax)}</p>
+                      <p><strong>Order total:</strong> {currency(group.total)}</p>
+                      {fulfillmentType === 'pickup' && (
+                        <>
+                          <p><strong>Pickup location:</strong> {group.settings.pickupLocation || 'To be confirmed by the seller.'}</p>
+                          {group.settings.pickupDays && <p><strong>Pickup days:</strong> {group.settings.pickupDays}</p>}
+                          {group.settings.pickupHours && <p><strong>Pickup hours:</strong> {group.settings.pickupHours}</p>}
+                        </>
+                      )}
+                    </div>
+                    <fieldset className={styles.farmerPaymentOptions}>
+                      <legend>Payment for {group.farmName}</legend>
+                      {(['COD', 'GCASH', 'MAYA'] as const).map((option) => (
+                        <label className={method === option ? styles.optionSelected : ''} key={option}>
+                          <input
+                            type="radio"
+                            name={`payment-${key}`}
+                            checked={method === option}
+                            onChange={() => {
+                              setPaymentMethods((current) => ({ ...current, [key]: option }))
+                              setReceiptError('')
+                            }}
+                          />
+                          {option}
+                        </label>
+                      ))}
+                    </fieldset>
+                    {method !== 'COD' && (
+                      <div className={styles.onlinePayment}>
+                        <h4>Pay {currency(group.total)} with {providerName}</h4>
+                        <div className={styles.qrPlaceholder}>
+                          {qrUrl ? (
+                            <img className={styles.paymentQr} src={qrUrl} alt={`${group.farmName} ${providerName} payment QR code`} />
+                          ) : (
+                            <>
+                              <span>QR</span>
+                              <strong>{providerName} QR not configured</strong>
+                              <small>Contact this farmer for payment details before paying.</small>
+                            </>
+                          )}
+                          {accountName && <strong>{accountName}</strong>}
+                          {accountNumber && <small>{accountNumber}</small>}
+                        </div>
+                        <div className={styles.receiptUpload}>
+                          <span>Payment receipt for {group.farmName}</span>
+                          <div className={styles.fileRow}>
+                            <span className={styles.fileStatus}>{receiptFiles[key]?.name ?? 'No file chosen.'}</span>
+                            <label className={styles.fileLink}>
+                              Choose File
+                              <input
+                                className={styles.fileInput}
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                onChange={(event) => {
+                                  const file = event.target.files?.[0] ?? null
+                                  if (file && !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                                    setReceiptFiles((current) => ({ ...current, [key]: null }))
+                                    setReceiptError('Upload a JPG, PNG, or WebP receipt image.')
+                                    return
+                                  }
+                                  if (file && file.size > 5 * 1024 * 1024) {
+                                    setReceiptFiles((current) => ({ ...current, [key]: null }))
+                                    setReceiptError('Receipt images must be 5 MB or smaller.')
+                                    return
+                                  }
+                                  setReceiptFiles((current) => ({ ...current, [key]: file }))
+                                  setReceiptError('')
+                                }}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </section>
+                )
+              })}
+            </div>
             <label className={styles.sellerNotes}>
               <span>Note to seller <small>(optional)</small></span>
               <textarea value={sellerNotes} onChange={(event) => setSellerNotes(event.target.value)} placeholder="Add instructions for the seller" rows={3} />
             </label>
             <p className={styles.messagePrompt}>Need to discuss your order? <a href="#/messages">Message the seller</a></p>
-            {paymentMethod !== 'COD' && (
-              <div className={styles.onlinePayment}>
-                <h3>Pay with {paymentProviderName}</h3>
-                <div className={styles.qrPlaceholder}>
-                  {paymentQrUrl ? (
-                    <img
-                      className={styles.paymentQr}
-                      src={paymentQrUrl}
-                      alt={`${paymentProviderName} payment QR code`}
-                    />
-                  ) : null}
-                  {!paymentQrUrl && (
-                    <>
-                      <span>QR</span>
-                      <strong>{paymentProviderName} QR not configured</strong>
-                      <small>Contact the seller for payment details before paying.</small>
-                    </>
-                  )}
-                  {paymentAccountName && <strong>{paymentAccountName}</strong>}
-                  {paymentAccountNumber && <small>{paymentAccountNumber}</small>}
-                </div>
-                <div className={styles.receiptUpload}>
-                <span>Payment receipt screenshot</span>
-                  <div className={styles.fileRow}>
-                    <span className={styles.fileStatus}>{receiptFile ? receiptFile.name + '.' : 'No file chosen.'}</span>
-                    <label className={styles.fileLink}>
-                      Choose File
-                      <input
-                        className={styles.fileInput}
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp"
-                        onChange={(event) => {
-                          const file = event.target.files?.[0] ?? null
-                          if (file && file.size > 5 * 1024 * 1024) {
-                            setReceiptFile(null)
-                            setReceiptError('Receipt images must be 5 MB or smaller.')
-                            return
-                          }
-                          setReceiptFile(file)
-                          setReceiptError('')
-                        }}
-                      />
-                    </label>
-                  </div>
-                </div>
-                {receiptError && <p className={styles.checkoutError} role="alert">{receiptError}</p>}
-              </div>
-            )}
+            {receiptError && <p className={styles.checkoutError} role="alert">{receiptError}</p>}
             {orderMessage && <p className={styles.checkoutError} role="alert">{orderMessage}</p>}
             <div className={styles.checkoutActions}>
               <button type="button" disabled={isCheckingOut} onClick={() => setIsCheckoutOpen(false)}>Cancel</button>
               <button type="button" disabled={isCheckingOut} onClick={submitCheckout}>
-                {isCheckingOut ? 'PLACING ORDER...' : paymentMethod === 'COD' ? 'PLACE ORDER' : 'UPLOAD RECEIPT & PLACE ORDER'}
+                {isCheckingOut ? 'PLACING ORDERS...' : 'REVIEW ORDERS'}
               </button>
             </div>
           </section>
@@ -521,14 +630,22 @@ function Cart({
           >
             <h2 id="confirm-order-title">Confirm your order</h2>
             <p className={styles.confirmLead} id="confirm-order-description">
-              Please review before you continue.{' '}
+              {groups.length > 1
+                ? `Your cart includes ${groups.length} farmers, so checkout will create ${groups.length} separate orders. Each farmer has a separate total and payment. `
+                : 'Please review before you continue. '}
               <strong>Once placed, an order cannot be cancelled or changed by you.</strong>
             </p>
-            <div className={styles.confirmSummary}>
-              <span>
-                {items.length} {items.length === 1 ? 'product' : 'products'} · {fulfillmentType === 'delivery' ? 'Delivery' : 'Pickup'} · {paymentLabel}
-              </span>
-              <strong>{currency(total)}</strong>
+            <div className={styles.confirmOrders}>
+              {groups.map((group) => {
+                const method = paymentMethods[group.farmerId || 'legacy'] ?? 'COD'
+                const label = method === 'COD' ? 'Cash on Delivery' : method === 'GCASH' ? 'GCash' : 'Maya'
+                return (
+                  <div className={styles.confirmSummary} key={group.farmerId || 'legacy'}>
+                    <span>{group.farmName} · {group.items.length} {group.items.length === 1 ? 'product' : 'products'} · {fulfillmentType === 'delivery' ? 'Delivery' : 'Pickup'} · {label}</span>
+                    <strong>{currency(group.total)}</strong>
+                  </div>
+                )
+              })}
             </div>
             <ul className={styles.confirmList}>
               <li>Products, quantities and prices are final once the order is placed.</li>
@@ -558,8 +675,7 @@ export function ShopPage() {
   const [quantities, setQuantities] = useState<Record<string, number>>({})
   const [deliveryAddress, setDeliveryAddress] = useState('')
   const [addressError, setAddressError] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<'COD' | 'GCASH' | 'MAYA'>('COD')
-  const [storeSettings, setStoreSettings] = useState<StoreSettings>(defaultStoreSettings)
+  const [farmerStores, setFarmerStores] = useState<Record<string, FarmerStoreSettings>>({})
   const [storeSettingsError, setStoreSettingsError] = useState('')
   const [orderMessage, setOrderMessage] = useState('')
   const [quantityNotice, setQuantityNotice] = useState<{ message: string } | null>(null)
@@ -598,22 +714,28 @@ export function ShopPage() {
     let isMounted = true
     let unsubscribeProducts: (() => void) | undefined
     let unsubscribeStoreSettings: (() => void) | undefined
+    const farmerProfileUnsubscribers = new Map<string, () => void>()
+    const legacyFarmerIds = new Set<string>()
+    let legacySettings = readStoreSettings({}, 'Original farm')
 
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      // Tear down any previous products listener before attaching a new one.
-      if (unsubscribeProducts) {
-        unsubscribeProducts()
-        unsubscribeProducts = undefined
-      }
+      unsubscribeProducts?.()
+      unsubscribeProducts = undefined
       unsubscribeStoreSettings?.()
       unsubscribeStoreSettings = undefined
+      farmerProfileUnsubscribers.forEach((unsubscribe) => unsubscribe())
+      farmerProfileUnsubscribers.clear()
+      legacyFarmerIds.clear()
+      setFarmerStores({})
+      setProducts([])
+      setStoreSettingsError('')
 
       if (!user) {
         if (isMounted) {
           cartOwnerId.current = null
           updateCartQuantities({})
           setDeliveryAddress('')
-          setStoreSettings(defaultStoreSettings)
+          setFarmerStores({})
           setStoreSettingsError('')
           setIsLoading(false)
           setError('Please log in to view the shop.')
@@ -626,29 +748,33 @@ export function ShopPage() {
       unsubscribeStoreSettings = onSnapshot(
         doc(db, 'settings', 'storefront'),
         (snapshot) => {
-          if (!isMounted) return
-          if (!snapshot.exists()) {
-            setStoreSettings(defaultStoreSettings)
-            setStoreSettingsError('')
-            return
-          }
-          const data = snapshot.data()
-          setStoreSettings({
-            pickupLocation: typeof data.pickupLocation === 'string' ? data.pickupLocation : '',
-            pickupDays: typeof data.pickupDays === 'string' ? data.pickupDays : '',
-            pickupHours: typeof data.pickupHours === 'string' ? data.pickupHours : '',
-            gcashAccountName: typeof data.gcashAccountName === 'string' ? data.gcashAccountName : '',
-            gcashAccountNumber: typeof data.gcashAccountNumber === 'string' ? data.gcashAccountNumber : '',
-            gcashQrUrl: typeof data.gcashQrUrl === 'string' ? data.gcashQrUrl : '',
-            mayaAccountName: typeof data.mayaAccountName === 'string' ? data.mayaAccountName : '',
-            mayaAccountNumber: typeof data.mayaAccountNumber === 'string' ? data.mayaAccountNumber : '',
-            mayaQrUrl: typeof data.mayaQrUrl === 'string' ? data.mayaQrUrl : '',
+          if (!isMounted || auth.currentUser?.uid !== user.uid) return
+          const settings = snapshot.exists() ? snapshot.data() : {}
+          legacySettings = readStoreSettings(settings, 'Original farm')
+          setFarmerStores((current) => {
+            const next: Record<string, FarmerStoreSettings> = {
+              ...current,
+              legacy: { ...legacySettings, status: 'legacy' as const },
+            }
+            Object.keys(next).forEach((farmerId) => {
+              if (next[farmerId].status === 'legacy') {
+                next[farmerId] = { ...legacySettings, status: 'legacy' }
+              }
+            })
+            return next
           })
+          setProducts((current) => current.map((product) =>
+            !product.farmerId || legacyFarmerIds.has(product.farmerId)
+              ? { ...product, farmName: legacySettings.farmName }
+              : product
+          ))
           setStoreSettingsError('')
         },
         (settingsError) => {
           console.error('Loading store settings for checkout failed:', settingsError)
-          setStoreSettingsError('Store pickup and payment settings could not be loaded. Contact the seller before paying or arranging pickup.')
+          if (isMounted && auth.currentUser?.uid === user.uid) {
+            setStoreSettingsError('Legacy storefront settings could not be loaded. Contact the seller before arranging pickup or payment.')
+          }
         }
       )
 
@@ -668,9 +794,10 @@ export function ShopPage() {
       unsubscribeProducts = onSnapshot(
         collection(db, 'products'),
         (snapshot) => {
-          if (!isMounted) return
+          if (!isMounted || auth.currentUser?.uid !== user.uid) return
           const loadedProducts = snapshot.docs.flatMap((product) => {
             const data = product.data()
+            const farmerId = typeof data.farmerId === 'string' ? data.farmerId : ''
             const name = typeof data.name === 'string' ? data.name.toUpperCase() : ''
             const categoryName = typeof data.category === 'string' && data.category.trim()
               ? data.category.trim().toUpperCase()
@@ -678,6 +805,10 @@ export function ShopPage() {
 
             return [{
               id: product.id,
+              farmerId,
+              farmName: typeof data.farmName === 'string'
+                ? data.farmName
+                : farmerId ? '' : legacySettings.farmName,
               name,
               category: categoryName,
               price: typeof data.price === 'number' ? data.price : 0,
@@ -688,6 +819,52 @@ export function ShopPage() {
               sold: typeof data.sold === 'number' && Number.isFinite(data.sold) ? data.sold : 0,
             }]
           })
+          const farmerIds = new Set(loadedProducts.map((product) => product.farmerId).filter((id): id is string => Boolean(id)))
+          farmerProfileUnsubscribers.forEach((unsubscribe, farmerId) => {
+            if (!farmerIds.has(farmerId)) {
+              unsubscribe()
+              farmerProfileUnsubscribers.delete(farmerId)
+              legacyFarmerIds.delete(farmerId)
+            }
+          })
+          farmerIds.forEach((farmerId) => {
+            if (farmerProfileUnsubscribers.has(farmerId)) return
+            setFarmerStores((current) => ({
+              ...current,
+              [farmerId]: { ...readStoreSettings({}, 'Loading farm'), status: 'loading' },
+            }))
+            const unsubscribe = onSnapshot(
+              doc(db, 'farmerProfiles', farmerId),
+              (profileSnapshot) => {
+                if (!isMounted || auth.currentUser?.uid !== user.uid) return
+                if (profileSnapshot.exists()) {
+                  legacyFarmerIds.delete(farmerId)
+                  const store = readStoreSettings(profileSnapshot.data(), 'Farm')
+                  setFarmerStores((current) => ({ ...current, [farmerId]: store }))
+                  setProducts((current) => current.map((product) =>
+                    product.farmerId === farmerId ? { ...product, farmName: store.farmName } : product
+                  ))
+                } else {
+                  legacyFarmerIds.add(farmerId)
+                  const store = { ...legacySettings, status: 'legacy' as const }
+                  setFarmerStores((current) => ({ ...current, [farmerId]: store }))
+                  setProducts((current) => current.map((product) =>
+                    product.farmerId === farmerId ? { ...product, farmName: store.farmName } : product
+                  ))
+                }
+              },
+              (profileError) => {
+                console.error(`Loading farmer profile ${farmerId} failed:`, profileError)
+                if (isMounted && auth.currentUser?.uid === user.uid) {
+                  setStoreSettingsError('A farmer’s pickup and payment settings could not be loaded.')
+                }
+              }
+            )
+            farmerProfileUnsubscribers.set(farmerId, unsubscribe)
+          })
+          if (loadedProducts.some((product) => !product.farmerId)) {
+            setFarmerStores((current) => ({ ...current, legacy: { ...legacySettings, status: 'legacy' } }))
+          }
           const availableProductIds = new Set(loadedProducts.filter((product) => product.isAvailable).map((product) => product.id))
           const nextQuantities = Object.fromEntries(
             Object.entries(cartQuantitiesRef.current).filter(([productId, quantity]) =>
@@ -704,7 +881,7 @@ export function ShopPage() {
         },
         (loadError) => {
           console.error('Loading shop products failed:', loadError)
-          if (isMounted) {
+          if (isMounted && auth.currentUser?.uid === user.uid) {
             setError('Unable to load products. Please try again.')
             setIsLoading(false)
           }
@@ -717,24 +894,25 @@ export function ShopPage() {
       unsubscribeAuth()
       if (unsubscribeProducts) unsubscribeProducts()
       unsubscribeStoreSettings?.()
+      farmerProfileUnsubscribers.forEach((unsubscribe) => unsubscribe())
     }
   }, [])
 
   const visibleProducts = useMemo(() => {
     const query = search.trim().toLowerCase()
     return products.filter((product) => {
-      const matchesCategory = product.isAvailable && (category === 'All' || product.category === category)
+      const matchesCategory = product.isAvailable && isFarmerActive(product, farmerStores) && (category === 'All' || product.category === category)
       const matchesSearch = !query || product.name.toLowerCase().includes(query)
       return matchesCategory && matchesSearch
     })
-  }, [category, products, search])
+  }, [category, farmerStores, products, search])
   const productCategories = useMemo(() => [...new Set([
     ...defaultCategories,
-    ...products.filter((product) => product.isAvailable).map((product) => product.category),
-  ])], [products])
+    ...products.filter((product) => product.isAvailable && isFarmerActive(product, farmerStores)).map((product) => product.category),
+  ])], [farmerStores, products])
 
   const cartItems = products
-    .filter((product) => (quantities[product.id] ?? 0) > 0)
+    .filter((product) => (quantities[product.id] ?? 0) > 0 && isFarmerActive(product, farmerStores))
     .map((product) => ({ ...product, quantity: quantities[product.id] }))
 
   function updateQuantity(id: string, quantity: number) {
@@ -749,7 +927,7 @@ export function ShopPage() {
     ) {
       setQuantityNotice({ message: `Maximum quantity reached for ${product.name}.` })
     }
-    if (quantity > 0 && (!product.isAvailable || product.stock <= 0)) return
+    if (quantity > 0 && (!product.isAvailable || product.stock <= 0 || !isFarmerActive(product, farmerStores))) return
 
     updateCartQuantities((current) => {
       const next = { ...current }
@@ -759,19 +937,19 @@ export function ShopPage() {
     })
   }
 
-  async function placeOrder({ fulfillmentType, sellerNotes, receiptFile }: CheckoutDetails) {
+  async function placeOrder({ fulfillmentType, sellerNotes, payments }: CheckoutDetails) {
     if (isSubmittingOrder.current || cartItems.length === 0) return
     if (cartItems.length > 5) {
       setOrderMessage('Orders can include up to 5 different products. Remove an item and try again.')
       return
     }
-    if (fulfillmentType === 'pickup' && !storeSettings.pickupLocation.trim()) {
-      setOrderMessage('Pickup location is not configured yet. Please contact the seller.')
+    const groups = cartGroups(cartItems, farmerStores, fulfillmentType)
+    if (groups.some((group) => !group.farmerId)) {
+      setOrderMessage('Some products still need farmer ownership data. Please refresh after the store migration is complete.')
       return
     }
-    const paymentQrUrl = paymentMethod === 'GCASH' ? storeSettings.gcashQrUrl : storeSettings.mayaQrUrl
-    if (paymentMethod !== 'COD' && !paymentQrUrl) {
-      setOrderMessage('The selected payment QR code is not configured yet. Please contact the seller.')
+    if (groups.some((group) => group.items.length > 5)) {
+      setOrderMessage('Each farmer order can include up to 5 different products.')
       return
     }
     const addressForOrder = fulfillmentType === 'delivery' ? deliveryAddress.trim() : ''
@@ -780,17 +958,34 @@ export function ShopPage() {
       return
     }
     setAddressError('')
-    if (paymentMethod !== 'COD' && !receiptFile) {
-      setOrderMessage('Upload a screenshot of your payment receipt to continue.')
-      return
-    }
-    if (receiptFile && !['image/jpeg', 'image/png', 'image/webp'].includes(receiptFile.type)) {
-      setOrderMessage('Upload a JPG, PNG, or WebP receipt image.')
-      return
-    }
-    if (receiptFile && receiptFile.size > 5 * 1024 * 1024) {
-      setOrderMessage('Receipt images must be 5 MB or smaller.')
-      return
+    for (const group of groups) {
+      const payment = payments.find((candidate) => candidate.farmerId === group.farmerId)
+      const method = payment?.paymentMethod ?? 'COD'
+      const settings = group.settings
+      if (fulfillmentType === 'pickup' && !settings.pickupLocation.trim()) {
+        setOrderMessage(`${group.farmName} has not configured pickup details. Please contact the farmer.`)
+        return
+      }
+      if (method !== 'COD') {
+        const qrUrl = method === 'GCASH' ? settings.gcashQrUrl : settings.mayaQrUrl
+        if (!qrUrl) {
+          setOrderMessage(`${group.farmName} has not configured a ${method} QR code. Please choose another payment method or contact the farmer.`)
+          return
+        }
+        const receiptFile = payment?.receiptFile
+        if (!receiptFile) {
+          setOrderMessage(`Upload a payment receipt for ${group.farmName}.`)
+          return
+        }
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(receiptFile.type)) {
+          setOrderMessage('Upload a JPG, PNG, or WebP receipt image.')
+          return
+        }
+        if (receiptFile.size > 5 * 1024 * 1024) {
+          setOrderMessage('Receipt images must be 5 MB or smaller.')
+          return
+        }
+      }
     }
     const user = auth.currentUser
     if (!user) {
@@ -801,102 +996,112 @@ export function ShopPage() {
     isSubmittingOrder.current = true
     setIsCheckingOut(true)
     setOrderMessage('')
-    let paymentReceiptUrl = ''
 
     try {
-      const orderRef = doc(collection(db, 'orders'))
-      if (receiptFile && paymentMethod !== 'COD') {
-        paymentReceiptUrl = await uploadImageToCloudinary(
-          receiptFile,
-          `payment-receipts/${user.uid}/${orderRef.id}`,
+      const checkoutGroupId = doc(collection(db, 'orders')).id
+      const groupsWithOrders = groups.map((group) => {
+        const payment = payments.find((candidate) => candidate.farmerId === group.farmerId)
+        const orderRef = doc(collection(db, 'orders'))
+        return {
+          ...group,
+          orderRef,
+          orderNumber: `ORD-${Date.now()}-${orderRef.id.slice(0, 6)}`,
+          paymentMethod: payment?.paymentMethod ?? 'COD',
+          receiptFile: payment?.receiptFile ?? null,
+          paymentReceiptUrl: '',
+        }
+      })
+      await Promise.all(groupsWithOrders.map(async (group) => {
+        if (group.paymentMethod === 'COD' || !group.receiptFile) return
+        group.paymentReceiptUrl = await uploadImageToCloudinary(
+          group.receiptFile,
+          `payment-receipts/${user.uid}/${group.orderRef.id}`,
         )
-      }
-      const productRefs = cartItems.map((item) => ({
-        item,
-        ref: doc(db, 'products', item.id),
       }))
       const profileRef = doc(db, 'users', user.uid)
-      const subtotal = cartItems.reduce((sum, item) => sum + item.quantity * item.price, 0)
-      const deliveryFee = fulfillmentType === 'delivery' && subtotal > 0 ? 100 : 0
-      const tax = subtotal * 0.05
-      const items = cartItems.map((item) => ({
-        productId: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-        unit: item.unit,
-      }))
-      const orderNumber = `ORD-${Date.now()}`;
-
+      const productRefs = cartItems.map((item) => doc(db, 'products', item.id))
       try {
         await runTransaction(db, async (transaction) => {
           const [profileSnapshot, ...productSnapshots] = await Promise.all([
             transaction.get(profileRef),
-            ...productRefs.map(({ ref }) => transaction.get(ref)),
+            ...productRefs.map((ref) => transaction.get(ref)),
           ])
           if (!profileSnapshot.exists() || normalizeRole(profileSnapshot.data().role) !== ROLES.CUSTOMER) {
             throw new Error('CUSTOMER_PROFILE_REQUIRED')
           }
+
+          const groupByProductId = new Map<string, { group: typeof groupsWithOrders[number]; itemIndex: number }>()
+          groupsWithOrders.forEach((group) => {
+            group.items.forEach((item, itemIndex) => groupByProductId.set(item.id, { group, itemIndex }))
+          })
           productSnapshots.forEach((productSnapshot, index) => {
-            const { item, ref } = productRefs[index]
-            if (!productSnapshot.exists()) throw new Error('PRODUCT_NOT_FOUND')
+            const item = cartItems[index]
+            const groupInfo = groupByProductId.get(item.id)
+            if (!productSnapshot.exists() || !groupInfo) throw new Error('PRODUCT_NOT_FOUND')
             const product = productSnapshot.data()
             const stock = typeof product.stock === 'number' ? product.stock : 0
-            if (product.isAvailable !== true || item.quantity > stock) {
-              throw new Error('INSUFFICIENT_STOCK')
-            }
-            if (typeof product.price !== 'number' || product.price !== item.price) {
-              throw new Error('PRICE_CHANGED')
-            }
-            const sold = typeof product.sold === 'number' && Number.isFinite(product.sold)
-              ? product.sold
-              : 0
-            transaction.update(ref, {
+            if (product.isAvailable !== true || item.quantity > stock) throw new Error('INSUFFICIENT_STOCK')
+            if (typeof product.price !== 'number' || product.price !== item.price) throw new Error('PRICE_CHANGED')
+            if (product.farmerId !== groupInfo.group.farmerId) throw new Error('FARMER_CHANGED')
+            const sold = typeof product.sold === 'number' && Number.isFinite(product.sold) ? product.sold : 0
+            transaction.update(productRefs[index], {
               stock: stock - item.quantity,
               sold: sold + item.quantity,
-              checkoutOrderId: orderRef.id,
+              checkoutOrderId: groupInfo.group.orderRef.id,
               checkoutQuantity: item.quantity,
               checkoutAction: 'sale',
-              checkoutItemIndex: index,
+              checkoutItemIndex: groupInfo.itemIndex,
             })
           })
 
           const profile = profileSnapshot.data()
-          transaction.set(orderRef, {
-            orderNumber,
-            userId: user.uid,
-            customerName: `${typeof profile.firstName === 'string' ? profile.firstName : ''} ${typeof profile.lastName === 'string' ? profile.lastName : ''}`.trim(),
-            customerEmail: typeof profile.email === 'string' ? profile.email : user.email ?? '',
-            items,
-            subtotal,
-            deliveryFee,
-            tax,
-            total: subtotal + deliveryFee + tax,
-            paymentMethod,
-            paymentStatus: paymentMethod === 'COD' ? 'unpaid' : 'awaiting_verification',
-            status: 'pending',
-            fulfillmentType,
-            deliveryAddress: fulfillmentType === 'pickup'
-              ? storeSettings.pickupLocation
-              : addressForOrder,
-            pickupHours: fulfillmentType === 'pickup' ? storeSettings.pickupHours : '',
-            pickupDays: fulfillmentType === 'pickup' ? storeSettings.pickupDays : '',
-            sellerNotes,
-            paymentReceiptUrl,
-            createdAt: serverTimestamp(),
+          groupsWithOrders.forEach((group) => {
+            const orderItems = group.items.map((item) => ({
+              productId: item.id,
+              name: item.name,
+              price: item.price,
+              quantity: item.quantity,
+              unit: item.unit,
+            }))
+            transaction.set(group.orderRef, {
+              orderNumber: group.orderNumber,
+              checkoutGroupId,
+              farmerId: group.farmerId,
+              userId: user.uid,
+              customerName: `${typeof profile.firstName === 'string' ? profile.firstName : ''} ${typeof profile.lastName === 'string' ? profile.lastName : ''}`.trim(),
+              customerEmail: typeof profile.email === 'string' ? profile.email : user.email ?? '',
+              items: orderItems,
+              subtotal: group.subtotal,
+              deliveryFee: group.deliveryFee,
+              tax: group.tax,
+              total: group.total,
+              paymentMethod: group.paymentMethod,
+              paymentStatus: group.paymentMethod === 'COD' ? 'unpaid' : 'awaiting_verification',
+              status: 'pending',
+              fulfillmentType,
+              deliveryAddress: fulfillmentType === 'pickup' ? group.settings.pickupLocation : addressForOrder,
+              pickupHours: fulfillmentType === 'pickup' ? group.settings.pickupHours : '',
+              pickupDays: fulfillmentType === 'pickup' ? group.settings.pickupDays : '',
+              sellerNotes,
+              paymentReceiptUrl: group.paymentReceiptUrl,
+              createdAt: serverTimestamp(),
+            })
           })
         })
       } catch (transactionError) {
-        let orderWasCreated = false
+        let allOrdersCommitted = false
         try {
-          const persistedOrder = await getDoc(orderRef)
-          orderWasCreated = persistedOrder.exists() && persistedOrder.data().userId === user.uid
+          const savedOrders = await Promise.all(groupsWithOrders.map((group) => getDoc(group.orderRef)))
+          allOrdersCommitted = savedOrders.every((snapshot) =>
+            snapshot.exists()
+            && snapshot.data().userId === user.uid
+            && snapshot.data().checkoutGroupId === checkoutGroupId
+          )
         } catch (verificationError) {
-          console.error('Verifying transaction result failed:', verificationError)
+          console.error('Verifying split checkout result failed:', verificationError)
         }
-        if (!orderWasCreated) throw transactionError
+        if (!allOrdersCommitted) throw transactionError
       }
-
       try {
         localStorage.removeItem(`cces-farm-market-cart:${user.uid}`)
       } catch (storageError) {
@@ -904,14 +1109,14 @@ export function ShopPage() {
       }
       updateCartQuantities({})
       try {
-        const paymentLabels = { COD: 'Cash on Delivery (COD)', GCASH: 'GCash', MAYA: 'Maya' }
         sessionStorage.setItem(
-        'cces-farm-market-order-placed',
-        JSON.stringify({
-          orderNumber,
-          paymentMethod: paymentLabels[paymentMethod],
+          'cces-farm-market-order-placed',
+          JSON.stringify({
+            checkoutGroupId,
+            orderNumbers: groupsWithOrders.map((group) => group.orderNumber),
+            paymentMethods: groupsWithOrders.map((group) => group.paymentMethod),
           })
-        );
+        )
       } catch (storageError) {
         console.error('Saving order confirmation failed:', storageError)
       }
@@ -930,6 +1135,8 @@ export function ShopPage() {
         setOrderMessage('The requested quantity is no longer available. Please review your cart.')
       } else if (checkoutError instanceof Error && checkoutError.message === 'PRICE_CHANGED') {
         setOrderMessage('A product price changed. Review your cart and try again.')
+      } else if (checkoutError instanceof Error && checkoutError.message === 'FARMER_CHANGED') {
+        setOrderMessage('A product’s farmer changed. Refresh your cart and try again.')
       } else if (errorCode === 'permission-denied') {
         setOrderMessage('Your order could not be authorized. Refresh your cart and try again.')
       } else {
@@ -992,9 +1199,9 @@ export function ShopPage() {
       <Cart items={cartItems} onChange={updateQuantity} onClearAll={() => updateCartQuantities({})} address={deliveryAddress} onAddressChange={(value) => {
         setDeliveryAddress(value)
         if (value.trim()) setAddressError('')
-      }} paymentMethod={paymentMethod} onPaymentChange={setPaymentMethod} onPlaceOrder={placeOrder} onEmptyCartAttempt={() => {
+      }} onPlaceOrder={placeOrder} onEmptyCartAttempt={() => {
         setQuantityNotice({ message: 'Add products to your cart before placing an order.' })
-      }} onAddressError={setAddressError} orderMessage={orderMessage} addressError={addressError} isCheckingOut={isCheckingOut} storeSettings={storeSettings} storeSettingsError={storeSettingsError} />
+      }} onAddressError={setAddressError} orderMessage={orderMessage} addressError={addressError} isCheckingOut={isCheckingOut} farmerStores={farmerStores} storeSettingsError={storeSettingsError} />
       {quantityNotice && <div className={styles.quantityToast} role="status" aria-live="polite">{quantityNotice.message}</div>}
     </main>
   )

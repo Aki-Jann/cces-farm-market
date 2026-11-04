@@ -25,6 +25,8 @@ const orderFilters: { value: OrderStatusFilter; label: string }[] = [
 type Order = {
   firestoreId: string
   id: string
+  checkoutGroupId: string
+  farmerId: string
   date: string
   createdAtTime: number
   total: number
@@ -319,34 +321,36 @@ export function OrdersPage() {
   const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null)
   const [deliveryError, setDeliveryError] = useState<{ orderId: string; message: string } | null>(null)
   const [placedOrder] = useState(() => {
-  try {
-    const stored = sessionStorage.getItem(
-      'cces-farm-market-order-placed'
-    );
+    try {
+      const stored = sessionStorage.getItem('cces-farm-market-order-placed')
+      if (!stored) return null
+      const parsed: unknown = JSON.parse(stored)
+      if (!parsed || typeof parsed !== 'object') return null
 
-    if (!stored) return null;
+      if ('checkoutGroupId' in parsed && 'orderNumbers' in parsed && 'paymentMethods' in parsed
+        && typeof parsed.checkoutGroupId === 'string'
+        && Array.isArray(parsed.orderNumbers) && parsed.orderNumbers.every((value) => typeof value === 'string')
+        && Array.isArray(parsed.paymentMethods) && parsed.paymentMethods.every((value) => typeof value === 'string')) {
+        return {
+          checkoutGroupId: parsed.checkoutGroupId,
+          orderNumbers: parsed.orderNumbers,
+          paymentMethods: parsed.paymentMethods,
+        }
+      }
 
-    const parsed: unknown = JSON.parse(stored);
-
-    if (
-      typeof parsed !== 'object' ||
-      parsed === null ||
-      !('orderNumber' in parsed) ||
-      !('paymentMethod' in parsed) ||
-      typeof parsed.orderNumber !== 'string' ||
-      typeof parsed.paymentMethod !== 'string'
-    ) {
-      return null;
+      if ('orderNumber' in parsed && 'paymentMethod' in parsed
+        && typeof parsed.orderNumber === 'string' && typeof parsed.paymentMethod === 'string') {
+        return {
+          checkoutGroupId: '',
+          orderNumbers: [parsed.orderNumber],
+          paymentMethods: [parsed.paymentMethod === 'Cash on Delivery (COD)' ? 'COD' : parsed.paymentMethod],
+        }
+      }
+      return null
+    } catch {
+      return null
     }
-
-    return {
-      orderNumber: parsed.orderNumber,
-      paymentMethod: parsed.paymentMethod,
-    };
-  } catch {
-    return null;
-  }
-});
+  })
   const notifiedRef = useRef(false)
   const emptyState = window.location.hash.includes('empty')
   const visibleOrders = useMemo(() => {
@@ -355,11 +359,42 @@ export function OrdersPage() {
       (statusFilter === 'ALL' || order.status === statusFilter) &&
       (!query ||
         order.id.toLowerCase().includes(query) ||
+        order.checkoutGroupId.toLowerCase().includes(query) ||
         order.items.some((item) => item.name.toLowerCase().includes(query)) ||
         order.payment.toLowerCase().includes(query) ||
         order.status.toLowerCase().includes(query))
     )
   }, [orders, search, statusFilter])
+  const visibleOrderGroups = useMemo(() => {
+    const allGroups = new Map<string, { total: number; orderCount: number }>()
+    orders.forEach((order) => {
+      const key = order.checkoutGroupId || order.firestoreId
+      const group = allGroups.get(key)
+      if (group) {
+        group.total += order.total
+        group.orderCount += 1
+      } else {
+        allGroups.set(key, { total: order.total, orderCount: 1 })
+      }
+    })
+    const groups = new Map<string, { checkoutGroupId: string; orders: Order[]; total: number; orderCount: number }>()
+    visibleOrders.forEach((order) => {
+      const checkoutGroupId = order.checkoutGroupId || order.firestoreId
+      const group = groups.get(checkoutGroupId)
+      const allGroup = allGroups.get(checkoutGroupId)
+      if (group) {
+        group.orders.push(order)
+      } else {
+        groups.set(checkoutGroupId, {
+          checkoutGroupId,
+          orders: [order],
+          total: allGroup?.total ?? order.total,
+          orderCount: allGroup?.orderCount ?? 1,
+        })
+      }
+    })
+    return [...groups.values()]
+  }, [orders, visibleOrders])
 
   function countOrders(filter: OrderStatusFilter) {
     return filter === 'ALL' ? orders.length : orders.filter((order) => order.status === filter).length
@@ -419,6 +454,8 @@ export function OrdersPage() {
             return {
               firestoreId: orderDocument.id,
               id: typeof data.orderNumber === 'string' ? data.orderNumber : orderDocument.id,
+              checkoutGroupId: typeof data.checkoutGroupId === 'string' ? data.checkoutGroupId : '',
+              farmerId: typeof data.farmerId === 'string' ? data.farmerId : '',
               date,
               createdAtTime,
               total: typeof data.total === 'number' ? data.total : 0,
@@ -469,10 +506,13 @@ export function OrdersPage() {
     }
   }, [])
 
-  // Right after checkout, find the new order in the loaded list and email the farmers (once).
+  // The notification endpoint will be routed per farmer in the notification phase.
   useEffect(() => {
     if (!placedOrder || notifiedRef.current || isLoading) return
-    const newOrder = orders.find((order) => order.id === placedOrder.orderNumber)
+    const newOrder = orders.find((order) =>
+      order.id === placedOrder.orderNumbers[0]
+      && (!placedOrder.checkoutGroupId || order.checkoutGroupId === placedOrder.checkoutGroupId)
+    )
     if (!newOrder) return
     notifiedRef.current = true
     void notifyFarmers(newOrder.firestoreId)
@@ -503,8 +543,10 @@ export function OrdersPage() {
         <section className={styles.orderPanel}>
           {placedOrder && (
             <p className={styles.orderPlacedNotice} role="status">
-              {`Order ${placedOrder.orderNumber} placed!`}
-              {placedOrder.paymentMethod !== 'Cash on Delivery (COD)' &&
+              {placedOrder.orderNumbers.length > 1
+                ? `${placedOrder.orderNumbers.length} separate farmer orders placed: ${placedOrder.orderNumbers.join(', ')}.`
+                : `Order ${placedOrder.orderNumbers[0]} placed!`}
+              {placedOrder.paymentMethods.some((method) => method !== 'COD' && method !== 'Cash on Delivery (COD)') &&
                 ' The seller will verify your receipt.'}
             </p>
           )}
@@ -570,33 +612,46 @@ export function OrdersPage() {
             )
           ) : (
             <div className={styles.orderList}>
-              {visibleOrders.map((order) => (
-                <div className={styles.orderGroup} key={order.id}>
-                  <div className={styles.orderLine}>
-                    <button className={styles.orderRow} type="button" aria-expanded={selectedId === order.id} onClick={() => setSelectedId(selectedId === order.id ? null : order.id)}>
-                      <strong className={styles.orderId}>{order.id}</strong>
-                      <span className={styles.orderDate}>{order.date}</span>
-                      <strong className={`${styles.green} ${styles.orderTotal}`}>{currency(order.total)}</strong>
-                      <span className={styles.orderPayment}>{order.payment || 'Not specified'}</span>
-                      <span className={`${styles.status} ${styles[order.status.toLowerCase()]}`}>{order.status}</span>
-                    </button>
-                    <span className={styles.receiptColumn}>
-                      {isOnlinePayment(order.payment)
-                        ? order.paymentReceiptUrl
-                          ? <ReceiptViewer className={styles.receiptAction} url={order.paymentReceiptUrl} label="View receipt" ariaLabel={`View digital receipt for order ${order.id}`}/>
-                          : <span className={styles.receiptPending}>Not uploaded</span>
-                        : <span className={styles.receiptNotNeeded}>—</span>}
-                    </span>
-                  </div>
-                  {selectedId === order.id && (
-                    <OrderDetails
-                      order={order}
-                      onConfirmDelivery={() => void confirmDelivery(order)}
-                      isConfirmingDelivery={confirmingOrderId === order.firestoreId}
-                      deliveryError={deliveryError?.orderId === order.firestoreId ? deliveryError.message : ''}
-                    />
+              {visibleOrderGroups.map((group) => (
+                <section className={styles.checkoutGroup} key={group.checkoutGroupId}>
+                  {group.orderCount > 1 && (
+                    <div className={styles.checkoutGroupHeading}>
+                      <div>
+                        <strong>Orders from the same checkout</strong>
+                        <span>{group.orderCount} farmer orders · checkout {group.checkoutGroupId.slice(0, 8)}</span>
+                      </div>
+                      <strong>{currency(group.total)}</strong>
+                    </div>
                   )}
-                </div>
+                  {group.orders.map((order) => (
+                    <div className={styles.orderGroup} key={order.id}>
+                      <div className={styles.orderLine}>
+                        <button className={styles.orderRow} type="button" aria-expanded={selectedId === order.id} onClick={() => setSelectedId(selectedId === order.id ? null : order.id)}>
+                          <strong className={styles.orderId}>{order.id}</strong>
+                          <span className={styles.orderDate}>{order.date}</span>
+                          <strong className={`${styles.green} ${styles.orderTotal}`}>{currency(order.total)}</strong>
+                          <span className={styles.orderPayment}>{order.payment || 'Not specified'}</span>
+                          <span className={`${styles.status} ${styles[order.status.toLowerCase()]}`}>{order.status}</span>
+                        </button>
+                        <span className={styles.receiptColumn}>
+                          {isOnlinePayment(order.payment)
+                            ? order.paymentReceiptUrl
+                              ? <ReceiptViewer className={styles.receiptAction} url={order.paymentReceiptUrl} label="View receipt" ariaLabel={`View digital receipt for order ${order.id}`}/>
+                              : <span className={styles.receiptPending}>Not uploaded</span>
+                            : <span className={styles.receiptNotNeeded}>—</span>}
+                        </span>
+                      </div>
+                      {selectedId === order.id && (
+                        <OrderDetails
+                          order={order}
+                          onConfirmDelivery={() => void confirmDelivery(order)}
+                          isConfirmingDelivery={confirmingOrderId === order.firestoreId}
+                          deliveryError={deliveryError?.orderId === order.firestoreId ? deliveryError.message : ''}
+                        />
+                      )}
+                    </div>
+                  ))}
+                </section>
               ))}
             </div>
           )}

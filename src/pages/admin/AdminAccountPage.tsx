@@ -93,6 +93,7 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
   const [draft, setDraft] = useState<AdminProfile | null>(null)
   const [storeSettings, setStoreSettings] = useState<StoreSettings>(emptyStoreSettings)
   const [storeSettingsDraft, setStoreSettingsDraft] = useState<StoreSettings>(emptyStoreSettings)
+  const [hasFarmerProfile, setHasFarmerProfile] = useState(false)
   const [hasLoadedSettings, setHasLoadedSettings] = useState(false)
   const [qrFiles, setQrFiles] = useState<Record<PaymentProvider, File | null>>({ gcash: null, maya: null })
   const [qrInputRevision, setQrInputRevision] = useState<Record<PaymentProvider, number>>({ gcash: 0, maya: 0 })
@@ -193,28 +194,39 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
             return
           }
           if (!unsubscribeSettings) {
-            unsubscribeSettings = onSnapshot(
-              doc(db, 'settings', 'storefront'),
-              (settingsSnapshot) => {
+            const farmerProfileRef = doc(db, 'farmerProfiles', user.uid)
+            const storefrontRef = doc(db, 'settings', 'storefront')
+            unsubscribeSettings = onSnapshot(farmerProfileRef, (settingsSnapshot) => {
+              if (!isMounted) return
+              setHasFarmerProfile(settingsSnapshot.exists())
+              const legacySettings = settingsSnapshot.exists() ? settingsSnapshot.data() : {}
+              const loadedSettings = settingsSnapshot.exists()
+                ? readStoreSettings(legacySettings)
+                : emptyStoreSettings
+              setStoreSettings(loadedSettings)
+              if (!storeSettingsDirty.current) setStoreSettingsDraft(loadedSettings)
+              setSettingsError('')
+              setHasLoadedSettings(true)
+              setIsSettingsLoading(false)
+            }, (loadError) => {
+              console.error('Loading farmer profile settings failed:', loadError)
+              onSnapshot(storefrontRef, (legacySnapshot) => {
                 if (!isMounted) return
-                const loadedSettings = settingsSnapshot.exists()
-                  ? readStoreSettings(settingsSnapshot.data())
-                  : emptyStoreSettings
+                const loadedSettings = legacySnapshot.exists() ? readStoreSettings(legacySnapshot.data()) : emptyStoreSettings
                 setStoreSettings(loadedSettings)
                 if (!storeSettingsDirty.current) setStoreSettingsDraft(loadedSettings)
                 setSettingsError('')
                 setHasLoadedSettings(true)
                 setIsSettingsLoading(false)
-              },
-              (loadError) => {
-                console.error('Loading store settings failed:', loadError)
+              }, (legacyError) => {
+                console.error('Loading legacy storefront settings failed:', legacyError)
                 if (isMounted) {
                   setSettingsError('Unable to load store pickup and payment settings.')
                   setHasLoadedSettings(false)
                   setIsSettingsLoading(false)
                 }
-              }
-            )
+              })
+            })
           }
         },
         (loadError) => {
@@ -430,15 +442,40 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
         }
       }
 
-      await setDoc(
-        doc(db, 'settings', 'storefront'),
-        {
-          pickupLocation: nextSettings.pickupLocation,
-          pickupDays: nextSettings.pickupDays,
-          pickupHours: nextSettings.pickupHours,
-        },
-        { merge: true }
-      )
+      if (hasFarmerProfile) {
+        await setDoc(
+          doc(db, 'farmerProfiles', user.uid),
+          {
+            pickupLocation: nextSettings.pickupLocation,
+            pickupDays: nextSettings.pickupDays,
+            pickupHours: nextSettings.pickupHours,
+            gcashAccountName: nextSettings.gcashAccountName,
+            gcashAccountNumber: nextSettings.gcashAccountNumber,
+            gcashQrUrl: nextSettings.gcashQrUrl,
+            mayaAccountName: nextSettings.mayaAccountName,
+            mayaAccountNumber: nextSettings.mayaAccountNumber,
+            mayaQrUrl: nextSettings.mayaQrUrl,
+          },
+          { merge: true }
+        )
+      } else {
+        await setDoc(
+          doc(db, 'settings', 'storefront'),
+          {
+            farmName: profile ? displayName(profile, 'Original farm') : 'Original farm',
+            pickupLocation: nextSettings.pickupLocation,
+            pickupDays: nextSettings.pickupDays,
+            pickupHours: nextSettings.pickupHours,
+            gcashAccountName: nextSettings.gcashAccountName,
+            gcashAccountNumber: nextSettings.gcashAccountNumber,
+            gcashQrUrl: nextSettings.gcashQrUrl,
+            mayaAccountName: nextSettings.mayaAccountName,
+            mayaAccountNumber: nextSettings.mayaAccountNumber,
+            mayaQrUrl: nextSettings.mayaQrUrl,
+          },
+          { merge: true }
+        )
+      }
       storeSettingsDirty.current = false
       setStoreSettings(nextSettings)
       setStoreSettingsDraft(nextSettings)

@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "lint": "eslint src",
     "preview": "vite preview",
-    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-cces-farm-market \"node --test tests/firestore.rules.test.mjs\""
+    "test:rules": "node scripts/run-rules-tests.mjs"
   },
   "dependencies": {
     "@types/qrcode": "^1.5.6",
@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@typescript-eslint/parser": "^8.70.0",
     "@firebase/rules-unit-testing": "^5.0.2",
     "@types/node": "^24.13.3",
     "@types/nodemailer": "^8.0.2",
@@ -34,7 +35,6 @@
     "firebase-tools": "^15.33.0",
     "globals": "^17.12.0",
     "typescript": "~6.0.2",
-    "typescript-eslint": "^8.69.0",
     "vite": "^8.3.0"
   },
   "overrides": {

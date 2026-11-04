@@ -40,7 +40,13 @@
 .tableHeader { border-bottom: 1px solid #d9d9d9; color: #6c7175; font-size: 12px; font-weight: 700; padding: 0 16px 14px; text-transform: uppercase; }
 .orderPlacedNotice { background: #eaf5ed; border: 1px solid #cfe0d3; border-radius: var(--radius-control); color: #017632; font-size: 13px; font-weight: 600; margin: 0 0 14px; padding: 12px 14px; }
 .orderList { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
+.checkoutGroup { border: 1px solid var(--color-border); border-radius: var(--radius-control); overflow: hidden; }
+.checkoutGroupHeading { align-items: center; background: #eaf5ed; color: #183b28; display: flex; justify-content: space-between; gap: 12px; padding: 12px 16px; }
+.checkoutGroupHeading > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.checkoutGroupHeading span { color: #56645a; font-size: 11px; overflow-wrap: anywhere; }
+.checkoutGroupHeading > strong:last-child { color: #087b3b; white-space: nowrap; }
 .orderGroup { border: 1px solid var(--color-border); border-radius: var(--radius-control); overflow: hidden; }
+.checkoutGroup > .orderGroup { border: 0; border-top: 1px solid var(--color-border); border-radius: 0; }
 .orderLine { align-items: stretch; background: #fff; display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 1.2fr 1fr; }
 .orderRow { align-items: center; background: #fff; border: 0; cursor: pointer; display: grid; font: inherit; font-size: 14px; gap: 12px; grid-column: 1 / 6; grid-row: 1; grid-template-columns: 1.4fr 1fr 1fr 1fr 1.2fr; min-height: 63px; padding: 16px; text-align: center; width: 100%; }
 .orderRow:hover, .orderRow:focus-visible { background: #f7faf8; outline: 0; }

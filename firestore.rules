@@ -197,6 +197,7 @@ service cloud.firestore {
         && itemIndex < orderAfter.items.size()
         && item is map
         && item.productId == productId
+        && resource.data.farmerId == orderAfter.farmerId
         && item.quantity == quantity
         && quantity <= 1000
         && item.name == resource.data.name
@@ -253,7 +254,8 @@ service cloud.firestore {
         && item.productId is string
         && product.checkoutOrderId == orderId
         && product.checkoutItemIndex == index
-        && product.checkoutAction == 'sale';
+        && product.checkoutAction == 'sale'
+        && product.farmerId == request.resource.data.farmerId;
     }
 
     function orderSubtotal(items) {
@@ -290,10 +292,19 @@ service cloud.firestore {
           && order.pickupHours == ''
           && order.pickupDays == ''
         || order.fulfillmentType == 'pickup'
-          && exists(/databases/$(database)/documents/settings/storefront)
-          && order.deliveryAddress == get(/databases/$(database)/documents/settings/storefront).data.pickupLocation
-          && order.pickupHours == get(/databases/$(database)/documents/settings/storefront).data.pickupHours
-          && order.pickupDays == get(/databases/$(database)/documents/settings/storefront).data.pickupDays;
+          && (
+            exists(farmerProfilePath(order.farmerId))
+              && get(farmerProfilePath(order.farmerId)).data.get('status', '') == 'active'
+              && order.deliveryAddress == get(farmerProfilePath(order.farmerId)).data.get('pickupLocation', '')
+              && order.pickupHours == get(farmerProfilePath(order.farmerId)).data.get('pickupHours', '')
+              && order.pickupDays == get(farmerProfilePath(order.farmerId)).data.get('pickupDays', '')
+            || !exists(farmerProfilePath(order.farmerId))
+              && get(/databases/$(database)/documents/users/$(order.farmerId)).data.get('role', '') == 'admin'
+              && exists(/databases/$(database)/documents/settings/storefront)
+              && order.deliveryAddress == get(/databases/$(database)/documents/settings/storefront).data.pickupLocation
+              && order.pickupHours == get(/databases/$(database)/documents/settings/storefront).data.pickupHours
+              && order.pickupDays == get(/databases/$(database)/documents/settings/storefront).data.pickupDays
+          );
     }
 
     function validOrderCreate(orderId) {
@@ -302,18 +313,29 @@ service cloud.firestore {
       return isCustomer()
         && orderId.matches('^[A-Za-z0-9_-]{1,128}$')
         && order.keys().hasOnly([
-          'orderNumber', 'userId', 'customerName', 'customerEmail', 'items',
+          'orderNumber', 'checkoutGroupId', 'farmerId', 'userId', 'customerName', 'customerEmail', 'items',
           'subtotal', 'deliveryFee', 'tax', 'total', 'paymentMethod',
           'paymentStatus', 'status', 'fulfillmentType', 'deliveryAddress',
           'pickupHours', 'pickupDays', 'sellerNotes', 'paymentReceiptUrl', 'createdAt'
         ])
         && order.keys().hasAll([
-          'orderNumber', 'userId', 'customerName', 'customerEmail', 'items',
+          'orderNumber', 'checkoutGroupId', 'farmerId', 'userId', 'customerName', 'customerEmail', 'items',
           'subtotal', 'deliveryFee', 'tax', 'total', 'paymentMethod',
           'paymentStatus', 'status', 'fulfillmentType', 'deliveryAddress',
           'pickupHours', 'pickupDays', 'sellerNotes', 'paymentReceiptUrl', 'createdAt'
         ])
         && order.userId == request.auth.uid
+        && order.checkoutGroupId is string
+        && order.checkoutGroupId.matches('^[A-Za-z0-9_-]{1,128}$')
+        && order.farmerId is string
+        && exists(/databases/$(database)/documents/users/$(order.farmerId))
+        && get(/databases/$(database)/documents/users/$(order.farmerId)).data.get('role', '') in ['farmer', 'admin']
+        && (
+          exists(farmerProfilePath(order.farmerId))
+            && get(farmerProfilePath(order.farmerId)).data.get('status', '') == 'active'
+          || !exists(farmerProfilePath(order.farmerId))
+            && get(/databases/$(database)/documents/users/$(order.farmerId)).data.get('role', '') == 'admin'
+        )
         && order.customerName is string
         && order.customerEmail == profile.get('email', '')
         && order.items is list
@@ -354,7 +376,8 @@ service cloud.firestore {
     function validOrderRejection(orderId) {
       let order = resource.data;
       let nextOrder = request.resource.data;
-      return isFarmer()
+      return isActiveFarmer()
+        && order.get('farmerId', '') == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'status', 'paymentStatus', 'paymentRejectedAt', 'paymentRejectedBy'
         ])
@@ -383,7 +406,8 @@ service cloud.firestore {
     function validOrderCancellation(orderId) {
       let order = resource.data;
       let nextOrder = request.resource.data;
-      return isFarmer()
+      return isActiveFarmer()
+        && order.get('farmerId', '') == request.auth.uid
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
         && request.resource.data.diff(resource.data).affectedKeys().hasAll(['status'])
         && order.status in ['pending', 'confirmed', 'packed']
@@ -445,7 +469,12 @@ service cloud.firestore {
     }
 
     match /farmerProfiles/{userId} {
-      allow get: if isOwner(userId) || isCcesAdmin();
+      allow get: if isOwner(userId) || isCcesAdmin()
+        || isCustomer()
+          && (
+            !exists(farmerProfilePath(userId))
+            || resource.data.get('status', '') == 'active'
+          );
       allow list: if isCcesAdmin();
       allow create: if validFarmerProfileCreate(userId);
       allow update: if isCcesAdmin()
@@ -453,14 +482,50 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasAll(['status'])
         && resource.data.get('status', '') in ['active', 'suspended']
         && request.resource.data.status in ['active', 'suspended']
-        && get(/databases/$(database)/documents/users/$(userId)).data.get('role', '') == 'farmer';
+        && get(/databases/$(database)/documents/users/$(userId)).data.get('role', '') == 'farmer'
+        || isOwner(userId)
+          && isActiveFarmer()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'pickupLocation', 'pickupDays', 'pickupHours',
+            'gcashAccountName', 'gcashAccountNumber', 'gcashQrUrl',
+            'mayaAccountName', 'mayaAccountNumber', 'mayaQrUrl'
+          ])
+          && request.resource.data.pickupLocation is string
+          && request.resource.data.pickupDays is string
+          && request.resource.data.pickupHours is string
+          && request.resource.data.gcashAccountName is string
+          && request.resource.data.gcashAccountNumber is string
+          && request.resource.data.gcashQrUrl is string
+          && request.resource.data.mayaAccountName is string
+          && request.resource.data.mayaAccountNumber is string
+          && request.resource.data.mayaQrUrl is string;
       allow delete: if false;
     }
 
     match /products/{productId} {
       allow read: if true;
-      allow create, delete: if isActiveFarmer();
+      allow create: if isActiveFarmer()
+        && request.resource.data.farmerId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'name', 'category', 'price', 'stock', 'unit', 'imageUrl', 'isAvailable',
+          'sold', 'farmerId', 'createdAt', 'checkoutOrderId', 'checkoutQuantity',
+          'checkoutAction', 'checkoutItemIndex'
+        ])
+        && request.resource.data.keys().hasAll(['name', 'category', 'price', 'stock', 'unit', 'imageUrl', 'isAvailable', 'sold', 'farmerId'])
+        && request.resource.data.name is string
+        && request.resource.data.category is string
+        && request.resource.data.price is number
+        && request.resource.data.stock is int
+        && request.resource.data.unit is string
+        && request.resource.data.imageUrl is string
+        && request.resource.data.isAvailable is bool
+        && request.resource.data.sold is int
+        && request.resource.data.createdAt == request.time;
+      allow delete: if isActiveFarmer() && resource.data.farmerId == request.auth.uid;
       allow update: if isActiveFarmer()
+          && resource.data.farmerId == request.auth.uid
+          && request.resource.data.farmerId == resource.data.farmerId
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['farmerId'])
           && (
             !request.resource.data.diff(resource.data).affectedKeys().hasAny(['checkoutAction'])
             || validAdminInventoryRestore(productId)
@@ -502,14 +567,17 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      allow get: if isFarmer() || isCcesAdmin()
-        || isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow list: if isFarmer() || isCcesAdmin()
-        || isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow get: if isCcesAdmin()
+        || isAuthenticated() && resource.data.userId == request.auth.uid
+        || isActiveFarmer() && resource.data.farmerId == request.auth.uid;
+      allow list: if isCcesAdmin()
+        || isAuthenticated() && resource.data.userId == request.auth.uid
+        || isActiveFarmer() && resource.data.farmerId == request.auth.uid;
 
       allow create: if validOrderCreate(orderId);
 
-      allow update: if isFarmer()
+      allow update: if isActiveFarmer()
+          && resource.data.farmerId == request.auth.uid
           && resource.data.status in ['pending', 'confirmed', 'packed', 'delivered']
           && resource.data.get('paymentStatus', '') != 'rejected'
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
@@ -518,7 +586,8 @@ service cloud.firestore {
             resource.data.get('paymentMethod', 'COD') in ['COD', 'CASH']
             || resource.data.get('paymentStatus', '') == 'paid'
           )
-        || isFarmer()
+        || isActiveFarmer()
+          && resource.data.farmerId == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'paymentStatus', 'paymentVerifiedAt', 'paymentVerifiedBy'
           ])
@@ -533,7 +602,8 @@ service cloud.firestore {
           && request.resource.data.paymentStatus == 'paid'
           && request.resource.data.paymentVerifiedAt == request.time
           && request.resource.data.paymentVerifiedBy == request.auth.uid
-        || isFarmer()
+        || isActiveFarmer()
+          && resource.data.farmerId == request.auth.uid
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'paymentStatus', 'paymentVerifiedAt', 'paymentVerifiedBy'
           ])
@@ -558,7 +628,7 @@ service cloud.firestore {
           && request.resource.data.deliveryConfirmed == true
           && request.resource.data.deliveryConfirmedAt == request.time;
 
-      allow delete: if isFarmer();
+      allow delete: if isActiveFarmer() && resource.data.farmerId == request.auth.uid;
     }
 
     match /conversations/{customerId} {
