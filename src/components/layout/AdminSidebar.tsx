@@ -3,7 +3,7 @@ import { ROLES } from '../../constants/roles'
 import type { ManagementRole } from '../../constants/roles'
 import styles from './AdminSidebar.module.css'
 
-type AdminNavItem = 'dashboard' | 'orders' | 'payments' | 'products' | 'customers' | 'analytics' | 'account'
+type AdminNavItem = 'dashboard' | 'orders' | 'payments' | 'products' | 'customers' | 'analytics' | 'applications' | 'account'
 
 const links: { key: AdminNavItem; label: string; href: string }[] = [
   { key: 'dashboard', label: 'DASHBOARD', href: '#/admin' },
@@ -12,11 +12,12 @@ const links: { key: AdminNavItem; label: string; href: string }[] = [
   { key: 'products', label: 'PRODUCTS', href: '#/admin/products' },
   { key: 'customers', label: 'MESSAGES', href: '#/admin/customers' },
   { key: 'analytics', label: 'ANALYTICS', href: '#/admin/analytics' },
+  { key: 'applications', label: 'FARMER APPLICATIONS', href: '#/admin/farmer-applications' },
 ]
 
 export function AdminSidebar({ active, role = ROLES.FARMER }: { active: AdminNavItem; role?: ManagementRole }) {
   const visibleLinks = role === ROLES.CCES_ADMIN
-    ? links.filter((link) => link.key === 'dashboard' || link.key === 'analytics')
+    ? links.filter((link) => link.key === 'dashboard' || link.key === 'analytics' || link.key === 'applications')
     : links
 
   return (

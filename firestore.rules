@@ -10,10 +10,21 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function isAdmin() {
+    function isFarmer() {
       return isAuthenticated()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin';
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in ['farmer', 'admin'];
+    }
+
+    function isActiveFarmer() {
+      return isAuthenticated()
+        && isFarmer()
+        && (
+          exists(/databases/$(database)/documents/farmerProfiles/$(request.auth.uid))
+            && get(/databases/$(database)/documents/farmerProfiles/$(request.auth.uid)).data.get('status', '') == 'active'
+          || !exists(/databases/$(database)/documents/farmerProfiles/$(request.auth.uid))
+            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin'
+        );
     }
 
     function isCcesAdmin() {
@@ -34,6 +45,121 @@ service cloud.firestore {
 
     function productPath(productId) {
       return /databases/$(database)/documents/products/$(productId);
+    }
+
+    function applicationPath(userId) {
+      return /databases/$(database)/documents/farmerApplications/$(userId);
+    }
+
+    function farmerProfilePath(userId) {
+      return /databases/$(database)/documents/farmerProfiles/$(userId);
+    }
+
+    function validFarmerRoleChange(userId) {
+      return isCcesAdmin()
+        && request.auth.uid != userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role'])
+        && (
+          resource.data.get('role', '') == 'customer'
+            && request.resource.data.role == 'farmer'
+            && existsAfter(applicationPath(userId))
+            && getAfter(applicationPath(userId)).data.get('status', '') == 'approved'
+            && existsAfter(farmerProfilePath(userId))
+            && getAfter(farmerProfilePath(userId)).data.get('status', '') == 'active'
+          || resource.data.get('role', '') == 'farmer'
+            && request.resource.data.role == 'customer'
+            && existsAfter(applicationPath(userId))
+            && getAfter(applicationPath(userId)).data.get('status', '') == 'rejected'
+            && existsAfter(farmerProfilePath(userId))
+            && getAfter(farmerProfilePath(userId)).data.get('status', '') == 'suspended'
+        );
+    }
+
+    function validApplicationReview(userId) {
+      let application = resource.data;
+      let nextApplication = request.resource.data;
+      let userPath = /databases/$(database)/documents/users/$(userId);
+      return isCcesAdmin()
+        && nextApplication.diff(application).affectedKeys().hasOnly([
+          'status', 'reviewedBy', 'reviewedAt', 'rejectionReason'
+        ])
+        && nextApplication.diff(application).affectedKeys().hasAll([
+          'status', 'reviewedBy', 'reviewedAt'
+        ])
+        && nextApplication.reviewedBy == request.auth.uid
+        && nextApplication.reviewedAt == request.time
+        && nextApplication.rejectionReason is string
+        && nextApplication.rejectionReason.size() <= 1000
+        && (
+          application.status == 'pending'
+            && nextApplication.status == 'approved'
+            && nextApplication.rejectionReason == ''
+            && existsAfter(userPath)
+            && getAfter(userPath).data.get('role', '') == 'farmer'
+            && existsAfter(farmerProfilePath(userId))
+            && getAfter(farmerProfilePath(userId)).data.get('status', '') == 'active'
+          || application.status == 'pending'
+            && nextApplication.status == 'rejected'
+            && existsAfter(userPath)
+            && getAfter(userPath).data.get('role', '') == 'customer'
+          || application.status == 'approved'
+            && nextApplication.status == 'rejected'
+            && existsAfter(userPath)
+            && getAfter(userPath).data.get('role', '') == 'customer'
+            && existsAfter(farmerProfilePath(userId))
+            && getAfter(farmerProfilePath(userId)).data.get('status', '') == 'suspended'
+        );
+    }
+
+    function validFarmerProfileCreate(userId) {
+      let applicationDoc = applicationPath(userId);
+      let userPath = /databases/$(database)/documents/users/$(userId);
+      return isCcesAdmin()
+        && request.resource.data.keys().hasOnly([
+          'status', 'farmName', 'contactNumber', 'address', 'createdAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'status', 'farmName', 'contactNumber', 'address', 'createdAt'
+        ])
+        && request.resource.data.status == 'active'
+        && existsAfter(applicationDoc)
+        && getAfter(applicationDoc).data.get('status', '') == 'approved'
+        && existsAfter(userPath)
+        && getAfter(userPath).data.get('role', '') == 'farmer'
+        && request.resource.data.farmName == getAfter(applicationDoc).data.farmName
+        && request.resource.data.contactNumber == getAfter(applicationDoc).data.contactNumber
+        && request.resource.data.address == getAfter(applicationDoc).data.address
+        && request.resource.data.createdAt == request.time;
+    }
+
+    function validApplicationCreate(userId) {
+      let userPath = /databases/$(database)/documents/users/$(userId);
+      return isOwner(userId)
+        && existsAfter(userPath)
+        && getAfter(userPath).data.get('role', '') == 'customer'
+        && !exists(applicationPath(userId))
+        && request.resource.data.keys().hasOnly([
+          'status', 'farmName', 'contactNumber', 'address',
+          'createdAt', 'reviewedBy', 'reviewedAt', 'rejectionReason'
+        ])
+        && request.resource.data.keys().hasAll([
+          'status', 'farmName', 'contactNumber', 'address',
+          'createdAt', 'reviewedBy', 'reviewedAt', 'rejectionReason'
+        ])
+        && request.resource.data.status == 'pending'
+        && request.resource.data.farmName is string
+        && request.resource.data.farmName.size() > 0
+        && request.resource.data.farmName.size() <= 200
+        && request.resource.data.contactNumber is string
+        && request.resource.data.contactNumber.size() > 0
+        && request.resource.data.contactNumber.size() <= 40
+        && request.resource.data.address is string
+        && request.resource.data.address.size() > 0
+        && request.resource.data.address.size() <= 1000
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.reviewedBy == null
+        && request.resource.data.reviewedAt == null
+        && request.resource.data.rejectionReason == '';
     }
 
     function orderContainsItem(order, productId, quantity) {
@@ -228,7 +354,7 @@ service cloud.firestore {
     function validOrderRejection(orderId) {
       let order = resource.data;
       let nextOrder = request.resource.data;
-      return isAdmin()
+      return isFarmer()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'status', 'paymentStatus', 'paymentRejectedAt', 'paymentRejectedBy'
         ])
@@ -257,7 +383,7 @@ service cloud.firestore {
     function validOrderCancellation(orderId) {
       let order = resource.data;
       let nextOrder = request.resource.data;
-      return isAdmin()
+      return isFarmer()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
         && request.resource.data.diff(resource.data).affectedKeys().hasAll(['status'])
         && order.status in ['pending', 'confirmed', 'packed']
@@ -275,8 +401,8 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin();
+      allow get: if isOwner(userId) || isFarmer();
+      allow list: if isFarmer();
 
       allow create: if isOwner(userId)
         && request.resource.data.keys().hasOnly([
@@ -298,20 +424,43 @@ service cloud.firestore {
         && request.resource.data.farmNotes is string
         && request.resource.data.createdAt == request.time;
 
-      allow update: if isAdmin()
+      allow update: if isFarmer()
           && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])
+        || validFarmerRoleChange(userId)
         || isOwner(userId)
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'firstName', 'lastName', 'email', 'contactNumber', 'address'
           ]);
 
-      allow delete: if isAdmin();
+      allow delete: if isFarmer();
+    }
+
+    match /farmerApplications/{userId} {
+      allow get: if isOwner(userId) || isCcesAdmin();
+      allow list: if isCcesAdmin();
+      allow create: if validApplicationCreate(userId);
+      allow update: if validApplicationReview(userId);
+      allow delete: if false;
+    }
+
+    match /farmerProfiles/{userId} {
+      allow get: if isOwner(userId) || isCcesAdmin();
+      allow list: if isCcesAdmin();
+      allow create: if validFarmerProfileCreate(userId);
+      allow update: if isCcesAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasAll(['status'])
+        && resource.data.get('status', '') in ['active', 'suspended']
+        && request.resource.data.status in ['active', 'suspended']
+        && get(/databases/$(database)/documents/users/$(userId)).data.get('role', '') == 'farmer';
+      allow delete: if false;
     }
 
     match /products/{productId} {
       allow read: if true;
-      allow create, delete: if isAdmin();
-      allow update: if isAdmin()
+      allow create, delete: if isActiveFarmer();
+      allow update: if isActiveFarmer()
           && (
             !request.resource.data.diff(resource.data).affectedKeys().hasAny(['checkoutAction'])
             || validAdminInventoryRestore(productId)
@@ -353,14 +502,14 @@ service cloud.firestore {
     }
 
     match /orders/{orderId} {
-      allow get: if isAdmin() || isCcesAdmin()
+      allow get: if isFarmer() || isCcesAdmin()
         || isAuthenticated() && resource.data.userId == request.auth.uid;
-      allow list: if isAdmin() || isCcesAdmin()
+      allow list: if isFarmer() || isCcesAdmin()
         || isAuthenticated() && resource.data.userId == request.auth.uid;
 
       allow create: if validOrderCreate(orderId);
 
-      allow update: if isAdmin()
+      allow update: if isFarmer()
           && resource.data.status in ['pending', 'confirmed', 'packed', 'delivered']
           && resource.data.get('paymentStatus', '') != 'rejected'
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
@@ -369,7 +518,7 @@ service cloud.firestore {
             resource.data.get('paymentMethod', 'COD') in ['COD', 'CASH']
             || resource.data.get('paymentStatus', '') == 'paid'
           )
-        || isAdmin()
+        || isFarmer()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'paymentStatus', 'paymentVerifiedAt', 'paymentVerifiedBy'
           ])
@@ -384,7 +533,7 @@ service cloud.firestore {
           && request.resource.data.paymentStatus == 'paid'
           && request.resource.data.paymentVerifiedAt == request.time
           && request.resource.data.paymentVerifiedBy == request.auth.uid
-        || isAdmin()
+        || isFarmer()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'paymentStatus', 'paymentVerifiedAt', 'paymentVerifiedBy'
           ])
@@ -409,14 +558,14 @@ service cloud.firestore {
           && request.resource.data.deliveryConfirmed == true
           && request.resource.data.deliveryConfirmedAt == request.time;
 
-      allow delete: if isAdmin();
+      allow delete: if isFarmer();
     }
 
     match /conversations/{customerId} {
-      allow get, list: if isAdmin() || isOwner(customerId);
+      allow get, list: if isFarmer() || isOwner(customerId);
 
       allow create, update: if (
-          isAdmin() || isCustomer() && isOwner(customerId)
+          isFarmer() || isCustomer() && isOwner(customerId)
         )
         && request.resource.data.keys().hasOnly(['customerId', 'lastMessage', 'updatedAt'])
         && request.resource.data.keys().hasAll(['customerId', 'lastMessage', 'updatedAt'])
@@ -425,10 +574,10 @@ service cloud.firestore {
         && request.resource.data.lastMessage.size() > 0
         && request.resource.data.updatedAt == request.time;
 
-      allow delete: if isAdmin();
+      allow delete: if isFarmer();
 
       match /messages/{messageId} {
-        allow get, list: if isAdmin() || isOwner(customerId);
+        allow get, list: if isFarmer() || isOwner(customerId);
 
         allow create: if isAuthenticated()
           && request.resource.data.keys().hasOnly([
@@ -442,26 +591,26 @@ service cloud.firestore {
           && request.resource.data.text.size() > 0
           && request.resource.data.createdAt == request.time
           && (
-            isAdmin() && request.resource.data.senderRole == 'admin'
+            isFarmer() && request.resource.data.senderRole == 'admin'
             || isCustomer() && isOwner(customerId)
               && request.resource.data.senderRole == 'customer'
           );
 
         allow update: if false;
-        allow delete: if isAdmin();
+        allow delete: if isFarmer();
       }
     }
 
     match /settings/storefront {
-      allow get: if isAdmin() || isCustomer();
+      allow get: if isFarmer() || isCustomer();
       allow list: if false;
-      allow create, update, delete: if isAdmin();
+      allow create, update, delete: if isFarmer();
     }
 
     match /storeSettings/checkout {
-      allow get: if isAdmin();
+      allow get: if isFarmer();
       allow list: if false;
-      allow create, update: if isAdmin();
+      allow create, update: if isFarmer();
       allow delete: if false;
     }
   }

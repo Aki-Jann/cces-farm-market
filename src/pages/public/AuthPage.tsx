@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import { createUserWithEmailAndPassword, deleteUser, sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth'
 import type { User } from 'firebase/auth'
-import { Timestamp, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firestore'
+import { Timestamp, doc, getDoc, serverTimestamp, writeBatch } from 'firebase/firestore'
 import { BrandLogo } from '../../components/common/BrandLogo'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
@@ -32,6 +32,7 @@ type RegistrationFields = {
   contactNumber: string
   confirmPassword: string
   address: string
+  farmName: string
 }
 
 type RegistrationErrors = Partial<Record<keyof RegistrationFields, string>>
@@ -52,7 +53,7 @@ function parseDateInput(value: string) {
   return `${year}-${month}-${day}`
 }
 
-function validateRegistrationFields(fields: RegistrationFields): RegistrationErrors {
+function validateRegistrationFields(fields: RegistrationFields, applyAsFarmer: boolean): RegistrationErrors {
   const errors: RegistrationErrors = {}
   const normalizedPhone = fields.contactNumber.replace(/[\s()-]/g, '')
   const birthdayDate = fields.birthday ? new Date(`${fields.birthday}T00:00:00`) : null
@@ -62,6 +63,7 @@ function validateRegistrationFields(fields: RegistrationFields): RegistrationErr
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email)) errors.email = 'Enter a valid email address.'
   if (!/^(09\d{9}|\+639\d{9})$/.test(normalizedPhone)) errors.contactNumber = 'Enter a valid Philippine phone number.'
   if (!fields.address.trim()) errors.address = 'Enter your address.'
+  if (applyAsFarmer && !fields.farmName.trim()) errors.farmName = 'Enter your farm name.'
   if (!birthdayDate || Number.isNaN(birthdayDate.getTime()) || birthdayDate > new Date()) {
     errors.birthday = 'Select a valid birthday.'
   }
@@ -183,6 +185,7 @@ export function AuthPage({ type }: { type: AuthType }) {
   const [resetSuccess, setResetSuccess] = useState('')
   const [isSendingReset, setIsSendingReset] = useState(false)
   const [showRegistrationErrors, setShowRegistrationErrors] = useState(false)
+  const [applyAsFarmer, setApplyAsFarmer] = useState(false)
   const [registrationFields, setRegistrationFields] = useState<RegistrationFields>({
     firstName: '',
     lastName: '',
@@ -192,8 +195,9 @@ export function AuthPage({ type }: { type: AuthType }) {
     contactNumber: '',
     confirmPassword: '',
     address: '',
+    farmName: '',
   })
-  const registrationErrors = validateRegistrationFields(registrationFields)
+  const registrationErrors = validateRegistrationFields(registrationFields, applyAsFarmer)
   const isRegistrationValid = Object.keys(registrationErrors).length === 0
 
   function updateRegistrationField(field: keyof typeof registrationFields) {
@@ -323,7 +327,8 @@ export function AuthPage({ type }: { type: AuthType }) {
       const credential = await createUserWithEmailAndPassword(auth, registrationFields.email, registrationFields.password)
       createdUser = credential.user
       profileRef = doc(db, 'users', credential.user.uid)
-      await setDoc(profileRef, {
+      const batch = writeBatch(db)
+      batch.set(profileRef, {
         firstName: registrationFields.firstName,
         lastName: registrationFields.lastName,
         email: registrationFields.email,
@@ -335,8 +340,21 @@ export function AuthPage({ type }: { type: AuthType }) {
         farmNotes: '',
         createdAt: serverTimestamp(),
       })
+      if (applyAsFarmer) {
+        batch.set(doc(db, 'farmerApplications', credential.user.uid), {
+          status: 'pending',
+          farmName: registrationFields.farmName.trim(),
+          contactNumber: registrationFields.contactNumber.trim(),
+          address: registrationFields.address.trim(),
+          createdAt: serverTimestamp(),
+          reviewedBy: null,
+          reviewedAt: null,
+          rejectionReason: '',
+        })
+      }
+      await batch.commit()
       profileSaved = true
-      window.location.hash = '/shop'
+      window.location.hash = applyAsFarmer ? '/account' : '/shop'
     } catch (error) {
       let cleanupFailed = false
       if (createdUser && profileRef && !profileSaved) {
@@ -376,11 +394,23 @@ export function AuthPage({ type }: { type: AuthType }) {
             <p>Create your account</p>
           </div>
           <div className={styles.registerFields}>
+            <label className={styles.farmerApplicationChoice}>
+              <input
+                type="checkbox"
+                checked={applyAsFarmer}
+                onChange={(event) => {
+                  setApplyAsFarmer(event.target.checked)
+                  setShowRegistrationErrors(false)
+                }}
+              />
+              <span>Apply as a farmer</span>
+            </label>
             <Field label="First Name" required autoComplete="given-name" placeholder="Juan" value={registrationFields.firstName} onChange={updateRegistrationField('firstName')} error={showRegistrationErrors ? registrationErrors.firstName : undefined} />
             <Field label="Last Name" required autoComplete="family-name" placeholder="Dela Cruz" value={registrationFields.lastName} onChange={updateRegistrationField('lastName')} error={showRegistrationErrors ? registrationErrors.lastName : undefined} />
             <Field label="Email Address" required autoComplete="email" placeholder="name@example.com" type="email" value={registrationFields.email} onChange={updateRegistrationField('email')} error={showRegistrationErrors ? registrationErrors.email : undefined} />
             <Field label="Contact Number" required autoComplete="tel" placeholder="09XXXXXXXXX" value={registrationFields.contactNumber} onChange={updateRegistrationField('contactNumber')} error={showRegistrationErrors ? registrationErrors.contactNumber : undefined} />
             <Field label="Address" required autoComplete="street-address" placeholder="Zone I, Zamboanga City, Philippines" value={registrationFields.address} onChange={updateRegistrationField('address')} error={showRegistrationErrors ? registrationErrors.address : undefined} />
+            {applyAsFarmer && <Field label="Farm Name" required placeholder="Enter your farm name" value={registrationFields.farmName} onChange={updateRegistrationField('farmName')} error={showRegistrationErrors ? registrationErrors.farmName : undefined} />}
             <DateField label="Birthday" required value={registrationFields.birthday} onChange={(birthday) => setRegistrationFields((current) => ({ ...current, birthday }))} error={showRegistrationErrors ? registrationErrors.birthday : undefined} />
             <Field label="Password" required autoComplete="new-password" placeholder="Enter Password" type="password" value={registrationFields.password} onChange={updateRegistrationField('password')} error={showRegistrationErrors ? registrationErrors.password : undefined} />
             <Field label="Confirm Password" required autoComplete="new-password" placeholder="Re-enter Password" type="password" value={registrationFields.confirmPassword} onChange={updateRegistrationField('confirmPassword')} error={showRegistrationErrors ? registrationErrors.confirmPassword : undefined} />

@@ -4,6 +4,7 @@ import { onAuthStateChanged, sendPasswordResetEmail, verifyBeforeUpdateEmail, re
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
 import { Header } from '../../components/layout/Header'
+import { FarmerApplicationStatus } from '../../components/common/FarmerApplicationStatus'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import { formatMonthDayYear } from '../../utils/dateFormat'
@@ -270,6 +271,7 @@ export function AccountPage() {
                 {isLoggingOut ? 'LOGGING OUT...' : 'LOG OUT'}
               </button>
           </div>
+          <FarmerApplicationStatus />
           <div className={styles.sectionHeading}>
             <div>
               <h3>Personal information</h3>

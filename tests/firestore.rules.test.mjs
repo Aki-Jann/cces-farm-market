@@ -8,13 +8,16 @@ import {
 } from '@firebase/rules-unit-testing'
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
   runTransaction,
   serverTimestamp,
   setDoc,
+  Timestamp,
   updateDoc,
+  writeBatch,
 } from 'firebase/firestore'
 import { deleteObject, getBytes, ref as storageRef, uploadBytes } from 'firebase/storage'
 
@@ -45,6 +48,16 @@ beforeEach(async () => {
       setDoc(doc(db, 'users/customer-b'), { role: 'customer' }),
       setDoc(doc(db, 'users/admin-a'), { role: 'admin' }),
       setDoc(doc(db, 'users/cces-admin-a'), { role: 'cces_admin' }),
+      setDoc(doc(db, 'farmerApplications/customer-a'), {
+        status: 'pending',
+        farmName: 'Casey Farm',
+        contactNumber: '09123456789',
+        address: 'Farm Road',
+        createdAt: new Date(),
+        reviewedBy: null,
+        reviewedAt: null,
+        rejectionReason: '',
+      }),
       setDoc(doc(db, 'products/product-a'), {
         name: 'CARROTS',
         price: 10,
@@ -112,6 +125,141 @@ test('customers can read only their own user profile', async () => {
   const db = environment.authenticatedContext('customer-a').firestore()
   await assertSucceeds(getDoc(doc(db, 'users/customer-a')))
   await assertFails(getDoc(doc(db, 'users/customer-b')))
+})
+
+test('customers cannot promote their own role or assign themselves the CCES admin role', async () => {
+  const db = environment.authenticatedContext('customer-a').firestore()
+  await assertFails(updateDoc(doc(db, 'users/customer-a'), { role: 'farmer' }))
+  await assertFails(updateDoc(doc(db, 'users/customer-a'), { role: 'cces_admin' }))
+})
+
+test('applicants can create and read only their own pending application', async () => {
+  const db = environment.authenticatedContext('customer-b').firestore()
+  const application = doc(db, 'farmerApplications/customer-b')
+  await assertFails(setDoc(application, {
+    status: 'approved',
+    farmName: 'Green Valley',
+    contactNumber: '09987654321',
+    address: 'Valley Road',
+    createdAt: serverTimestamp(),
+    reviewedBy: null,
+    reviewedAt: null,
+    rejectionReason: '',
+  }))
+  await assertSucceeds(setDoc(application, {
+    status: 'pending',
+    farmName: 'Green Valley',
+    contactNumber: '09987654321',
+    address: 'Valley Road',
+    createdAt: serverTimestamp(),
+    reviewedBy: null,
+    reviewedAt: null,
+    rejectionReason: '',
+  }))
+  await assertSucceeds(getDoc(application))
+  await assertFails(getDoc(doc(db, 'farmerApplications/customer-a')))
+  await assertFails(updateDoc(application, { status: 'approved' }))
+})
+
+test('signup can create a customer profile and pending farmer application atomically', async () => {
+  const db = environment.authenticatedContext('farmer-applicant').firestore()
+  const batch = writeBatch(db)
+  batch.set(doc(db, 'users/farmer-applicant'), {
+    firstName: 'Taylor',
+    lastName: 'Applicant',
+    email: 'taylor@example.com',
+    birthday: Timestamp.fromDate(new Date('2000-01-01T00:00:00Z')),
+    contactNumber: '09123456789',
+    address: 'Farm Road',
+    role: 'customer',
+    customerType: 'individual',
+    farmNotes: '',
+    createdAt: serverTimestamp(),
+  })
+  batch.set(doc(db, 'farmerApplications/farmer-applicant'), {
+    status: 'pending',
+    farmName: 'Taylor Farm',
+    contactNumber: '09123456789',
+    address: 'Farm Road',
+    createdAt: serverTimestamp(),
+    reviewedBy: null,
+    reviewedAt: null,
+    rejectionReason: '',
+  })
+  await assertSucceeds(batch.commit())
+})
+
+test('customers cannot approve their farmer applications', async () => {
+  const db = environment.authenticatedContext('customer-a').firestore()
+  const batch = writeBatch(db)
+  batch.update(doc(db, 'farmerApplications/customer-a'), {
+    status: 'approved',
+    reviewedBy: 'customer-a',
+    reviewedAt: serverTimestamp(),
+  })
+  batch.update(doc(db, 'users/customer-a'), { role: 'farmer' })
+  batch.set(doc(db, 'farmerProfiles/customer-a'), {
+    status: 'active',
+    farmName: 'Casey Farm',
+    contactNumber: '09123456789',
+    address: 'Farm Road',
+    createdAt: serverTimestamp(),
+  })
+  await assertFails(batch.commit())
+})
+
+test('CCES admins approve applications and farmer roles atomically', async () => {
+  const db = environment.authenticatedContext('cces-admin-a').firestore()
+  await assertSucceeds(getDocs(collection(db, 'farmerApplications')))
+  const batch = writeBatch(db)
+  batch.update(doc(db, 'farmerApplications/customer-a'), {
+    status: 'approved',
+    reviewedBy: 'cces-admin-a',
+    reviewedAt: serverTimestamp(),
+  })
+  batch.update(doc(db, 'users/customer-a'), { role: 'farmer' })
+  batch.set(doc(db, 'farmerProfiles/customer-a'), {
+    status: 'active',
+    farmName: 'Casey Farm',
+    contactNumber: '09123456789',
+    address: 'Farm Road',
+    createdAt: serverTimestamp(),
+  })
+  await assertSucceeds(batch.commit())
+  await environment.withSecurityRulesDisabled(async (context) => {
+    const adminDb = context.firestore()
+    assert.equal((await getDoc(doc(adminDb, 'users/customer-a'))).data().role, 'farmer')
+    assert.equal((await getDoc(doc(adminDb, 'farmerApplications/customer-a'))).data().status, 'approved')
+    assert.equal((await getDoc(doc(adminDb, 'farmerProfiles/customer-a'))).data().status, 'active')
+  })
+})
+
+test('suspended farmers cannot create, update, or delete products', async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore()
+    await Promise.all([
+      setDoc(doc(db, 'users/suspended-farmer'), { role: 'farmer' }),
+      setDoc(doc(db, 'farmerProfiles/suspended-farmer'), {
+        status: 'suspended',
+        farmName: 'Suspended Farm',
+        contactNumber: '09111111111',
+        address: 'Closed Road',
+        createdAt: new Date(),
+      }),
+    ])
+  })
+
+  const db = environment.authenticatedContext('suspended-farmer').firestore()
+  await assertFails(setDoc(doc(db, 'products/suspended-farmer-product'), {
+    name: 'NEW PRODUCT',
+    price: 10,
+    stock: 5,
+    sold: 0,
+    unit: 'KG',
+    isAvailable: true,
+  }))
+  await assertFails(updateDoc(doc(db, 'products/product-a'), { stock: 0 }))
+  await assertFails(deleteDoc(doc(db, 'products/product-a')))
 })
 
 test('receipt uploads are owner-only and existing receipts cannot be overwritten', async () => {

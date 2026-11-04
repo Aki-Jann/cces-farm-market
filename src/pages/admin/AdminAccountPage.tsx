@@ -4,6 +4,7 @@ import { onAuthStateChanged, sendPasswordResetEmail, verifyBeforeUpdateEmail, re
 import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
+import { FarmerApplicationStatus } from '../../components/common/FarmerApplicationStatus'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import { normalizeRole, ROLES } from '../../constants/roles'
@@ -529,6 +530,7 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
               </button>
             </div>
 
+            <FarmerApplicationStatus />
             <div className={styles.sectionHeading}>
               <div>
                 <h3>Personal information</h3>

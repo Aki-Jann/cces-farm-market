@@ -399,6 +399,23 @@
   min-width: 0;
 }
 
+.farmerApplicationChoice {
+  align-items: center;
+  color: #405747;
+  display: flex;
+  font-size: 12px;
+  font-weight: 700;
+  gap: 9px;
+  grid-column: 1 / -1;
+}
+
+.farmerApplicationChoice input {
+  accent-color: var(--color-brand);
+  height: 16px;
+  margin: 0;
+  width: 16px;
+}
+
 .registerFields .field {
   gap: 5px;
 }

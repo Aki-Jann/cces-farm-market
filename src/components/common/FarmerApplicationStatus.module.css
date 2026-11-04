@@ -1,0 +1,54 @@
+.applicationStatus {
+  align-items: flex-start;
+  background: #f5faf6;
+  border: 1px solid #dfece2;
+  border-radius: 9px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin: 20px 0 0;
+  padding: 16px;
+}
+
+.applicationStatus h3 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.applicationStatus p {
+  color: #64736a;
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 5px 0 0;
+}
+
+.status {
+  border-radius: 999px;
+  flex: 0 0 auto;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 6px 10px;
+  text-transform: uppercase;
+}
+
+.pending {
+  background: #fff3d8;
+  color: #885900;
+}
+
+.approved {
+  background: #e2f5e6;
+  color: #176b32;
+}
+
+.rejected {
+  background: #fde9e6;
+  color: #a33c31;
+}
+
+@media (max-width: 520px) {
+  .applicationStatus {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+}

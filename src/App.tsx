@@ -14,11 +14,12 @@ import { AdminProductsPage } from './pages/admin/AdminProductsPage'
 import { AdminCustomersPage } from './pages/admin/AdminCustomersPage'
 import { AdminAnalyticsPage } from './pages/admin/AdminAnalyticsPage'
 import { AdminAccountPage } from './pages/admin/AdminAccountPage'
+import { FarmerApplicationsPage } from './pages/admin/FarmerApplicationsPage'
 import { auth } from './firebase/auth'
 import { db } from './firebase/firestore'
 import { normalizeRole, ROLES } from './constants/roles'
 import type { UserRole } from './constants/roles'
-export type Route = 'landing' | 'shop' | 'orders' | 'messages' | 'account' | 'admin' | 'admin-orders' | 'admin-payment' | 'admin-products' | 'admin-customers' | 'admin-analytics' | 'admin-account' | 'login' | 'register' | 'forgot-password'
+export type Route = 'landing' | 'shop' | 'orders' | 'messages' | 'account' | 'admin' | 'admin-orders' | 'admin-payment' | 'admin-products' | 'admin-customers' | 'admin-analytics' | 'admin-account' | 'admin-farmer-applications' | 'login' | 'register' | 'forgot-password'
 
 const protectedRoutes: Route[] = [
   'shop',
@@ -32,6 +33,7 @@ const protectedRoutes: Route[] = [
   'admin-customers',
   'admin-analytics',
   'admin-account',
+  'admin-farmer-applications',
 ]
 
 function canAccessRoute(role: UserRole | null, route: Route) {
@@ -41,7 +43,7 @@ function canAccessRoute(role: UserRole | null, route: Route) {
   if (role === ROLES.FARMER) {
     return ['admin', 'admin-orders', 'admin-payment', 'admin-products', 'admin-customers', 'admin-analytics', 'admin-account'].includes(route)
   }
-  return role === ROLES.CCES_ADMIN && ['admin', 'admin-analytics', 'admin-account'].includes(route)
+  return role === ROLES.CCES_ADMIN && ['admin', 'admin-analytics', 'admin-account', 'admin-farmer-applications'].includes(route)
 }
 
 function homeForRole(role: UserRole | null) {
@@ -59,6 +61,7 @@ function getRoute(): Route {
   if (path === 'admin/products') return 'admin-products'
   if (path === 'admin/customers') return 'admin-customers'
   if (path === 'admin/analytics') return 'admin-analytics'
+  if (path === 'admin/farmer-applications') return 'admin-farmer-applications'
   if (path === 'shop') return 'shop'
   if (path === 'messages') return 'messages'
   if (path === 'account') return 'account'
@@ -171,6 +174,10 @@ function App() {
 
   if (route === 'admin-analytics') {
     return <AdminAnalyticsPage role={role === ROLES.CCES_ADMIN ? ROLES.CCES_ADMIN : ROLES.FARMER} />
+  }
+
+  if (route === 'admin-farmer-applications') {
+    return <FarmerApplicationsPage />
   }
 
   return <AuthPage type={route} />
