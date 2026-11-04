@@ -8,11 +8,21 @@
 }
 
 .content {
+  box-sizing: border-box;
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
   min-width: 0;
+  padding-top: 76px;
+}
+
+.content > :global(header) {
+  left: 218px;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 15;
 }
 
 .toolbar {
@@ -223,6 +233,49 @@
   justify-content: center;
   overflow: hidden;
   position: relative;
+}
+
+.deleteButton {
+  align-items: center;
+  background: rgb(255 255 255 / 92%);
+  border: 1px solid #f0d9ce;
+  border-radius: 7px;
+  color: #a63e36;
+  cursor: pointer;
+  display: flex;
+  height: 30px;
+  justify-content: center;
+  left: 8px;
+  padding: 6px;
+  position: absolute;
+  top: 8px;
+  transition: background-color 140ms ease, color 140ms ease;
+  width: 30px;
+}
+
+.deleteButton:hover:not(:disabled) {
+  background: #a63e36;
+  color: #fff;
+}
+
+.deleteButton:focus-visible {
+  outline: 3px solid rgb(166 62 54 / 25%);
+  outline-offset: 2px;
+}
+
+.deleteButton:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+.deleteButton svg {
+  fill: none;
+  height: 16px;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  width: 16px;
 }
 
 .productImage img {
@@ -646,7 +699,7 @@
 .formRow {
   display: grid;
   gap: 10px;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .availability {
@@ -696,6 +749,106 @@
   text-align: center;
 }
 
+.confirmOverlay {
+  align-items: center;
+  background: rgb(20 35 26 / 48%);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 20px;
+  position: fixed;
+  z-index: 50;
+}
+
+.confirmDialog {
+  background: #fff;
+  border: 1px solid #e3ebe5;
+  border-radius: 12px;
+  box-shadow: 0 18px 55px rgb(15 35 22 / 24%);
+  max-width: 430px;
+  padding: 24px;
+  width: 100%;
+}
+
+.confirmEyebrow {
+  color: #578064;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .1em;
+}
+
+.confirmDialog h2 {
+  color: #183b28;
+  font-size: 20px;
+  margin: 9px 0;
+}
+
+.confirmDialog p {
+  color: #66716b;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.confirmDialog .deleteError {
+  background: #fff1ed;
+  border-radius: 7px;
+  color: #a33;
+  margin-top: 12px;
+  padding: 9px 11px;
+}
+
+.confirmActions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 24px;
+}
+
+.confirmActions button {
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  min-height: 38px;
+  padding: 0 14px;
+}
+
+.confirmActions button:focus-visible {
+  outline: 3px solid rgb(1 118 50 / 25%);
+  outline-offset: 2px;
+}
+
+.cancelConfirm {
+  background: #edf4ef;
+  color: #27563a;
+}
+
+.confirmUnlist {
+  background: #a63e36;
+  color: #fff;
+}
+
+.confirmUnlist:hover:not(:disabled) {
+  background: #8d302a;
+}
+
+.confirmDelete {
+  background: #a63e36;
+  color: #fff;
+}
+
+.confirmDelete:hover:not(:disabled) {
+  background: #8d302a;
+}
+
+.confirmActions button:disabled {
+  cursor: wait;
+  opacity: .7;
+}
+
 @media (max-width: 1100px) {
   .workspaceWithForm {
     gap: 18px;
@@ -714,13 +867,16 @@
 @media (max-width: 800px) {
   .page {
     display: block;
-    height: auto;
-    min-height: 100vh;
-    overflow: visible;
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
   }
 
   .content {
+    box-sizing: border-box;
     display: block;
+    height: 100dvh;
+    overflow-y: auto;
   }
 
   .workspace,
@@ -751,6 +907,24 @@
     max-height: none;
     position: static;
     width: 100%;
+  }
+
+  .formRow {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .content > :global(header) {
+    left: 0;
+    position: fixed;
+    top: 54px;
+    z-index: 15;
+    width: 100%;
+  }
+
+  .content {
+    padding-top: 118px;
   }
 }
 

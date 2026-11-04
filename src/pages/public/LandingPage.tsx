@@ -170,8 +170,8 @@ export function LandingPage() {
   return (
     <main className={styles.landing} id="top">
       <header className={styles.header}>
-        <a href="#top" aria-label="GreenMarket home">
-          <BrandLogo compact />
+        <a href="#top" aria-label="Tiangge Verde home">
+          TIANGGE VERDE
         </a>
         <nav>
           <a href="#shops">Shop</a>
@@ -343,7 +343,7 @@ export function LandingPage() {
           <p className={styles.sectionEyebrow}>GROWN CLOSE TO HOME</p>
           <h2>Every order helps local farming grow</h2>
           <p>
-            GreenMarket brings growers and buyers together in one place. Find
+            Tiangge Verde brings growers and buyers together in one place. Find
             seasonal produce, connect directly with the farm, and make local
             shopping part of your routine.
           </p>
@@ -412,7 +412,7 @@ export function LandingPage() {
         <a
           className={styles.logo}
           href="#top"
-          aria-label="GreenMarket — back to top"
+          aria-label="Tiangge Verde — back to top"
         >
           <BrandLogo compact />
         </a>

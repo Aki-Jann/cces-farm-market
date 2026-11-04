@@ -12,10 +12,14 @@
   display: flex;
   flex: 0 0 190px;
   flex-direction: column;
+  height: 100vh;
   justify-content: space-between;
   min-height: 100vh;
   padding: 17px 10px 20px;
+  position: sticky;
+  top: 0;
   text-align: center;
+  z-index: 20;
 }
 
 .sidebar > div { width: 100%; }
@@ -23,7 +27,7 @@
 .sidebar a { border-radius: 5px; color: #017632; display: block; font-size: 16px; margin-bottom: 8px; padding: 9px 26px; text-decoration: none; }
 .sidebar .activeNav { background: #017632; color: #fff; font-weight: 700; }
 
-.ordersContent { flex: 1; min-width: 0; }
+.ordersContent { flex: 1; margin-left: 218px; min-width: 0; }
 .orderPanel { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-panel); box-shadow: var(--shadow-panel); margin: 20px var(--page-gutter); min-height: calc(100vh - 150px); padding: 31px 14px; }
 .statusFilters { align-items: center; border-bottom: 1px solid #e6ebe7; display: flex; gap: 7px; margin: -5px 2px 18px; overflow-x: auto; padding: 0 0 12px; scrollbar-width: thin; }
 .statusFilters button { align-items: center; background: #f5f8f5; border: 1px solid transparent; border-radius: 999px; color: #58645b; cursor: pointer; display: inline-flex; flex: 0 0 auto; font: inherit; font-size: 11px; font-weight: 600; gap: 8px; min-height: 36px; padding: 7px 12px; transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease; }
@@ -180,11 +184,12 @@
 
 @media (max-width: 700px) {
   .ordersPage { display: block; }
-  .sidebar { flex-direction: row; min-height: auto; padding: 8px; }
+  .sidebar { flex-direction: row; height: auto; min-height: auto; padding: 8px; }
   .sidebar > div { align-items: center; display: flex; }
   .sidebar .logo, .rule { display: none; }
   .sidebar a { font-size: 11px; margin: 0; padding: 8px; }
   .sidebar > a { margin-left: auto; }
+  .ordersContent { margin-left: 0; padding-top: 54px; }
   .orderPanel { margin: 20px var(--page-gutter); padding: 16px 8px; }
   .statusFilters { gap: 6px; margin: 0 2px 14px; padding-bottom: 10px; }
   .statusFilters button { font-size: 10px; min-height: 34px; padding: 6px 10px; }

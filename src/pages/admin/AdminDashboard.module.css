@@ -421,12 +421,25 @@ a.inventoryRow:focus-visible {
 @media (max-width: 700px) {
   .page {
     display: block;
-    height: auto;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .content {
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    height: 100dvh;
+    overflow: hidden;
   }
 
   .dashboard {
+    flex: 1 1 0;
     gap: 12px;
     margin: 0;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 20px var(--page-gutter);
   }
 

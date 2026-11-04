@@ -102,12 +102,19 @@ service cloud.firestore {
         && request.resource.data.sold == (soldBefore >= quantity ? soldBefore - quantity : 0)
         && request.resource.data.checkoutAction == 'refund'
         && orderBefore.userId is string
-        && orderBefore.status == 'pending'
-        && orderBefore.paymentStatus == 'awaiting_verification'
-        && orderAfter.status == 'cancelled'
-        && orderAfter.paymentStatus == 'rejected'
-        && orderAfter.paymentRejectedBy == request.auth.uid
-        && orderAfter.paymentRejectedAt == request.time
+        && (
+          orderBefore.status == 'pending'
+            && orderBefore.paymentStatus == 'awaiting_verification'
+            && orderAfter.status == 'cancelled'
+            && orderAfter.paymentStatus == 'rejected'
+            && orderAfter.paymentRejectedBy == request.auth.uid
+            && orderAfter.paymentRejectedAt == request.time
+          || orderBefore.status in ['pending', 'confirmed', 'packed']
+            && orderBefore.get('paymentStatus', '') != 'awaiting_verification'
+            && orderBefore.get('paymentStatus', '') != 'rejected'
+            && orderAfter.status == 'cancelled'
+            && orderAfter.get('paymentStatus', '') == orderBefore.get('paymentStatus', '')
+        )
         && orderContainsItem(orderAfter, productId, quantity);
     }
 
@@ -247,6 +254,26 @@ service cloud.firestore {
         && (order.items.size() < 5 || validRefundProductAfter(orderId, order, 4));
     }
 
+    function validOrderCancellation(orderId) {
+      let order = resource.data;
+      let nextOrder = request.resource.data;
+      return isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasAll(['status'])
+        && order.status in ['pending', 'confirmed', 'packed']
+        && order.get('paymentStatus', '') != 'awaiting_verification'
+        && order.get('paymentStatus', '') != 'rejected'
+        && nextOrder.status == 'cancelled'
+        && order.items is list
+        && order.items.size() >= 1
+        && order.items.size() <= 5
+        && validRefundProductAfter(orderId, order, 0)
+        && (order.items.size() < 2 || validRefundProductAfter(orderId, order, 1))
+        && (order.items.size() < 3 || validRefundProductAfter(orderId, order, 2))
+        && (order.items.size() < 4 || validRefundProductAfter(orderId, order, 3))
+        && (order.items.size() < 5 || validRefundProductAfter(orderId, order, 4));
+    }
+
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       allow list: if isAdmin();
@@ -371,6 +398,7 @@ service cloud.firestore {
           && request.resource.data.paymentVerifiedAt == request.time
           && request.resource.data.paymentVerifiedBy == request.auth.uid
         || validOrderRejection(orderId)
+        || validOrderCancellation(orderId)
         || isAuthenticated()
           && resource.data.userId == request.auth.uid
           && resource.data.status == 'delivered'

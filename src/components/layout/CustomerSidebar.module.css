@@ -2,6 +2,7 @@
  background: var(--color-surface);
     border-right: 1px solid var(--color-border);
     box-sizing: border-box;
+    left: 0;
     text-align: left;
     z-index: 20;
     flex-direction: column;
@@ -14,7 +15,7 @@
     min-height: 100vh;
     padding: 22px 13px 16px;
     display: flex;
-    position: sticky;
+    position: fixed;
     top: 0;
     box-shadow: 4px 0 18px #1838230a;
 }
@@ -45,6 +46,7 @@
   font-weight: 700;
   letter-spacing: .1em;
   margin: 0 10px 7px;
+  text-align: center;
 }
 
 .sidebar a {
@@ -115,10 +117,12 @@
     box-shadow: 0 3px 12px rgb(24 56 35 / 7%);
     flex-direction: row;
     height: 54px;
+    left: 0;
     min-height: 54px;
     overflow: hidden;
     padding: 6px 8px;
     width: 100%;
+    top: 0;
   }
 
   .top {

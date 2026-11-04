@@ -14,7 +14,7 @@ import styles from './AdminAnalyticsPage.module.css'
 
 type Product = { id: string; name: string; category: string; sold: number; image: string; stock: number; unit: string; isAvailable: boolean; listedAt: Date | null }
 type CategorySale = { label: string; value: number; percentage: number; color: string }
-type AnalyticsPanel = 'order-value' | 'units-sold' | 'products-listed' | 'out-of-stock' | 'category-sales' | 'inventory' | 'top-products' | 'underperforming'
+type AnalyticsPanel = 'order-value' | 'units-sold' | 'products-listed' | 'out-of-stock' | 'category-sales' | 'revenue-trend' | 'transactions-trend' | 'inventory' | 'top-products' | 'underperforming'
 type Period = 'daily' | 'monthly' | 'yearly'
 type ProductPerformance = { product: Product; units: number; revenue: number }
 type TrendPoint = { label: string; tooltip: string; value: number }
@@ -251,7 +251,7 @@ function CategoryChart({ categories, total, loading, error, onClick }: { categor
   )
 }
 
-function RevenueTrend({ points, period, onPeriodChange, loading, error }: { points: TrendPoint[]; period: Period; onPeriodChange: (period: Period) => void; loading: boolean; error: string }) {
+function RevenueTrend({ points, period, onPeriodChange, loading, error, onClick }: { points: TrendPoint[]; period: Period; onPeriodChange: (period: Period) => void; loading: boolean; error: string; onClick: () => void }) {
   const maxValue = Math.max(1, ...points.map((point) => point.value))
   const plotPoints = points.map((point, index) => ({
     ...point,
@@ -268,7 +268,19 @@ function RevenueTrend({ points, period, onPeriodChange, loading, error }: { poin
       {loading || error ? <PanelState error={error} loading={loading} empty="" /> : points.length === 0 ? (
         <PanelState error="" loading={false} empty="No dated orders available for this trend." />
       ) : (
-        <div className={styles.trendChart}>
+        <div
+          aria-label="View revenue trend data"
+          className={styles.trendChart}
+          onClick={onClick}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              onClick()
+            }
+          }}
+          role="button"
+          tabIndex={0}
+        >
           <svg aria-label={`Revenue grouped ${period}`} role="img" viewBox="0 0 360 190">
             {[32, 91, 150].map((y, index) => (
               <g key={y}>
@@ -293,7 +305,7 @@ function RevenueTrend({ points, period, onPeriodChange, loading, error }: { poin
   )
 }
 
-function TransactionsTrend({ points, period, onPeriodChange, loading, error }: { points: TrendPoint[]; period: Period; onPeriodChange: (period: Period) => void; loading: boolean; error: string }) {
+function TransactionsTrend({ points, period, onPeriodChange, loading, error, onClick }: { points: TrendPoint[]; period: Period; onPeriodChange: (period: Period) => void; loading: boolean; error: string; onClick: () => void }) {
   const maxValue = Math.max(1, ...points.map((point) => point.value))
   const plotPoints = points.map((point, index) => ({
     ...point,
@@ -310,7 +322,19 @@ function TransactionsTrend({ points, period, onPeriodChange, loading, error }: {
       {loading || error ? <PanelState error={error} loading={loading} empty="" /> : points.length === 0 ? (
         <PanelState error="" loading={false} empty="No dated orders available for this trend." />
       ) : (
-        <div className={styles.trendChart}>
+        <div
+          aria-label="View transactions trend data"
+          className={styles.trendChart}
+          onClick={onClick}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              onClick()
+            }
+          }}
+          role="button"
+          tabIndex={0}
+        >
           <svg aria-label={`Transactions grouped ${period}`} role="img" viewBox="0 0 360 190">
             {[32, 91, 150].map((y, index) => (
               <g key={y}>
@@ -713,12 +737,18 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
     setActivePanel(null)
   }
 
+  function printReport() {
+    window.print()
+  }
+
   const detailTitle: Record<AnalyticsPanel, string> = {
     'order-value': 'TOTAL ORDER VALUE',
     'units-sold': 'UNITS SOLD',
     'products-listed': 'PRODUCTS LISTED',
     'out-of-stock': 'OUT OF STOCK',
     'category-sales': 'SALES BY CATEGORY',
+    'revenue-trend': 'REVENUE TREND',
+    'transactions-trend': 'TRANSACTIONS TREND',
     inventory: 'INVENTORY DETAILS',
     'top-products': 'TOP SELLING PRODUCTS',
     underperforming: 'UNDERPERFORMING PRODUCTS',
@@ -744,7 +774,7 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
   [analytics.inventory, query],
   )
   return (
-    <main className={styles.page}>
+    <main className={`${styles.page} ${activePanel ? styles.printView : ''}`}>
       <AdminSidebar active="analytics" role={role} />
       <section className={styles.content}>
         <Header title="ANALYTICS" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
@@ -754,7 +784,16 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
               <div>
                 <button className={styles.backButton} type="button" onClick={returnToOverview}>← Back to analytics</button>
                 <h2>{detailTitle[activePanel]}</h2>
-                <p>Expanded information from your live farm market data.</p>
+                <p>
+                  {activePanel === 'revenue-trend' || activePanel === 'transactions-trend'
+                    ? `Expanded ${activePanel === 'revenue-trend' ? revenuePeriod : transactionsPeriod} trend data.`
+                    : 'Expanded information from your live farm market data.'}
+                </p>
+              </div>
+              <div className={styles.printActions}>
+                <button className={styles.printButton} type="button" onClick={printReport}>
+                  PRINT / SAVE AS PDF
+                </button>
               </div>
             </div>
             {activePanel === 'order-value' ? (
@@ -772,6 +811,27 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
                 <div className={styles.dataListHeading}><span>CATEGORY</span><span>SHARE OF SALES</span><span>SALES VALUE</span></div>
                 {analytics.categories.map((category) => <div className={styles.categoryDetailRow} key={category.label}><i style={{ background: category.color }} /><strong>{category.label}</strong><span className={styles.categoryShare}><i style={{ width: `${category.percentage}%`, background: category.color }} /></span><b>{category.percentage}%</b><strong>{currency(category.value)}</strong></div>)}
               </div>
+            ) : activePanel === 'revenue-trend' || activePanel === 'transactions-trend' ? (
+              <>
+                <div className={styles.detailSummary}>
+                  <span>{activePanel === 'revenue-trend' ? 'Total revenue in selected period' : 'Total transactions in selected period'}</span>
+                  <strong>{activePanel === 'revenue-trend'
+                    ? currency(revenueTrend.reduce((sum, point) => sum + point.value, 0))
+                    : transactionsTrend.reduce((sum, point) => sum + point.value, 0).toLocaleString()}</strong>
+                </div>
+                <div className={`${styles.dataList} ${styles.trendDataList}`}>
+                  <div className={styles.dataListHeading}>
+                    <span>PERIOD</span>
+                    <span>{activePanel === 'revenue-trend' ? 'REVENUE' : 'TRANSACTIONS'}</span>
+                  </div>
+                  {(activePanel === 'revenue-trend' ? revenueTrend : transactionsTrend).map((point) => (
+                    <div className={styles.dataRow} key={point.tooltip}>
+                      <span>{point.tooltip}</span>
+                      <b>{activePanel === 'revenue-trend' ? currency(point.value) : point.value.toLocaleString()}</b>
+                    </div>
+                  ))}
+                </div>
+              </>
             ) : (
               <>
                 <div className={styles.detailSummary}>
@@ -803,8 +863,8 @@ export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cce
           )}
           <div className={styles.chartGrid}>
             <CategoryChart categories={analytics.categories} total={analytics.financialOrders.length} loading={!ordersLoaded} error={ordersError} onClick={() => openPanel('category-sales')} />
-            <RevenueTrend points={revenueTrend} period={revenuePeriod} onPeriodChange={setRevenuePeriod} loading={!ordersLoaded} error={ordersError} />
-            <TransactionsTrend points={transactionsTrend} period={transactionsPeriod} onPeriodChange={setTransactionsPeriod} loading={!ordersLoaded} error={ordersError} />
+            <RevenueTrend points={revenueTrend} period={revenuePeriod} onPeriodChange={setRevenuePeriod} loading={!ordersLoaded} error={ordersError} onClick={() => openPanel('revenue-trend')} />
+            <TransactionsTrend points={transactionsTrend} period={transactionsPeriod} onPeriodChange={setTransactionsPeriod} loading={!ordersLoaded} error={ordersError} onClick={() => openPanel('transactions-trend')} />
           </div>
           
           <div className={styles.lowerGrid}>

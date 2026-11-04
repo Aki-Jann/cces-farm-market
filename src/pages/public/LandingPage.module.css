@@ -27,12 +27,21 @@
 }
 
 .header > a {
-  flex: 0 0 160px;
-  width: 160px;
+  color: #017632;
+  display: inline-block;
+  flex: 0 0 auto;
+  font-size: clamp(20px, 2.5vw, 32px);
+  text-align: center;
+  text-transform: uppercase;
+  text-decoration: none;
+  transform-origin: center;
+  transition: transform 160ms ease;
+  white-space: nowrap;
+  font-family: 'SF Compact';
 }
 
-.header > a :global(div) {
-  width: 160px;
+.header > a:hover {
+  transform: scale(1.04);
 }
 
 .header nav {
@@ -603,11 +612,11 @@ footer {
 }
 
 footer .logo {
-  flex: 0 0 200px;
+  flex: 0 1 clamp(100px, 13vw, 150px);
   margin-right: auto;
   max-width: 100%;
   text-decoration: none;
-  width: 200px;
+  width: clamp(100px, 13vw, 150px);
 }
 
 footer .logo :global(div) {
@@ -659,10 +668,8 @@ footer .details {
     display: none;
   }
 
-  .header > a,
-  .header > a :global(div) {
-    flex-basis: 145px;
-    width: 145px;
+  .header > a {
+    font-size: clamp(14px, 3.2vw, 24px);
   }
 
     .header nav a {
@@ -837,9 +844,9 @@ footer .details {
   }
 
   footer .logo {
-    flex-basis: 190px;
+    flex-basis: clamp(110px, 40vw, 160px);
     margin: 0 auto;
-    width: 190px;
+    width: clamp(110px, 40vw, 160px);
   }
 }
 
@@ -848,10 +855,9 @@ footer .details {
     padding-inline: 10px;
   }
 
-  .header > a,
-  .header > a :global(div) {
-    flex-basis: 132px;
-    width: 132px;
+  .header > a {
+    font-size: clamp(12px, 4vw, 16px);
+    padding-inline: 5px;
   }
 
   .header nav a {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { collection, onSnapshot, updateDoc, doc } from 'firebase/firestore'
+import { collection, doc, onSnapshot, updateDoc } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { db } from '../../firebase/firestore'
@@ -8,7 +8,7 @@ import { isOrderEligibleForFinancialTotals } from '../../utils/orderFinancials'
 import styles from './AdminOrdersPage.module.css'
 
 type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PACKED' | 'DELIVERED' | 'CANCELLED'
-type OrderItem = { name: string; quantity: number; price: number }
+type OrderItem = { productId?: string; name: string; quantity: number; price: number; unit: string }
 type Order = {
   firestoreId: string
   id: string
@@ -75,7 +75,13 @@ function StatusTimeline({ status }: { status: OrderStatus }) {
   )
 }
 
-function OrderDetails({ order, onAdvance, onBack, isUpdating, isArchived }: { order: Order; onAdvance: () => void; onBack: () => void; isUpdating: boolean; isArchived: boolean }) {
+function OrderDetails({ order, onAdvance, onBack, isUpdating, isArchived }: {
+  order: Order
+  onAdvance: () => void
+  onBack: () => void
+  isUpdating: boolean
+  isArchived: boolean
+}) {
   const { delivery, tax, total } = totals(order)
   const statusIndex = statusOrder.indexOf(order.status)
   const previousStatus = statusOrder[statusIndex - 1]
@@ -100,7 +106,7 @@ function OrderDetails({ order, onAdvance, onBack, isUpdating, isArchived }: { or
         {order.paymentReceiptUrl && <a href={order.paymentReceiptUrl} target="_blank" rel="noreferrer">View payment receipt</a>}
       </div>
       <div className={styles.items}>
-        {order.items.map((item) => <div className={styles.itemRow} key={item.name}><span>{item.name}</span><span>{item.quantity}kg</span><span>{currency(item.price)}</span><strong>{currency(item.quantity * item.price)}</strong></div>)}
+        {order.items.map((item) => <div className={styles.itemRow} key={item.name}><span>{item.name}</span><span>{item.quantity} {item.unit}</span><span>{currency(item.price)}</span><strong>{currency(item.quantity * item.price)}</strong></div>)}
         <div className={styles.itemRow}><span>DELIVERY FEE</span><span>-</span><span>{currency(delivery)}</span><strong>{currency(delivery)}</strong></div>
         <div className={styles.itemRow}><span>TAX 5%</span><span>-</span><span>{currency(tax)}</span><strong>{currency(tax)}</strong></div>
         <div className={styles.totalRow}><strong>TOTAL</strong><strong>{currency(total)}</strong></div>
@@ -191,9 +197,11 @@ export function AdminOrdersPage() {
               if (!item || typeof item !== 'object') return []
               const itemData = item as Record<string, unknown>
               return [{
+                productId: typeof itemData.productId === 'string' ? itemData.productId : undefined,
                 name: typeof itemData.name === 'string' ? itemData.name : 'Product',
                 quantity: typeof itemData.quantity === 'number' ? itemData.quantity : 0,
                 price: typeof itemData.price === 'number' ? itemData.price : 0,
+                unit: typeof itemData.unit === 'string' && itemData.unit.trim() ? itemData.unit.trim() : 'KG',
               }]
             }),
           }
@@ -351,7 +359,13 @@ export function AdminOrdersPage() {
                       </button>
                     ))}
                   </aside>
-                  {selected && <OrderDetails order={selected} onAdvance={advanceSelected} onBack={reverseSelected} isUpdating={isUpdating} isArchived={archive} />}
+                  {selected && <OrderDetails
+                    order={selected}
+                    onAdvance={advanceSelected}
+                    onBack={reverseSelected}
+                    isUpdating={isUpdating}
+                    isArchived={archive}
+                  />}
                 </>
               )}
             </div>

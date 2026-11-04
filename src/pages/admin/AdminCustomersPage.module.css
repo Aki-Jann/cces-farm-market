@@ -8,11 +8,21 @@
 }
 
 .content {
+  box-sizing: border-box;
   display: flex;
   flex: 1;
   flex-direction: column;
   min-height: 0;
   min-width: 0;
+  padding-top: 76px;
+}
+
+.content > :global(header) {
+  left: 218px;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 15;
 }
 
 .pageIntro {
@@ -92,6 +102,15 @@
   display: block;
   font-size: 12px;
   margin-top: 3px;
+}
+
+.conversationError {
+  background: #fff1ed;
+  color: #a33;
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 10px;
+  padding: 9px;
 }
 
 .customerList button {
@@ -639,14 +658,16 @@
 @media (max-width: 700px) {
   .page {
     display: block;
-    height: auto;
+    height: 100dvh;
     min-height: 100vh;
-    overflow: visible;
+    overflow: hidden;
   }
 
   .content {
+    box-sizing: border-box;
     display: block;
-    height: auto;
+    height: 100dvh;
+    overflow-y: auto;
   }
 
   .pageIntro {
@@ -666,6 +687,16 @@
     gap: 6px;
     grid-template-columns: 30px minmax(0, 1fr);
     padding: 10px 8px;
+  }
+
+  .content > :global(header) {
+    left: 0;
+    top: 54px;
+    width: 100%;
+  }
+
+  .page > .content {
+    padding-top: 118px;
   }
 
   .avatar {

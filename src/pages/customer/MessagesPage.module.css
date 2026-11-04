@@ -5,16 +5,20 @@
   color: var(--color-text);
   display: flex;
   height: 100vh;
+  inset: 0;
   min-height: 0;
   overflow: hidden;
+  position: fixed;
 }
 
 .content {
   display: flex;
   flex: 1;
   flex-direction: column;
+  margin-left: 218px;
   min-height: 0;
   min-width: 0;
+  overflow: hidden;
 }
 
 .messaging {
@@ -148,11 +152,6 @@
   border: 1px solid #e4ece5;
   border-radius: 999px;
   padding: 5px 10px;
-}
-
-.message:hover {
-  box-shadow: 0 5px 16px rgb(35 58 40 / 8%);
-  transform: translateY(-1px);
 }
 
 .senderLabel {
@@ -319,7 +318,10 @@
   }
 
   .content {
-    height: calc(100dvh - 54px);
+    box-sizing: border-box;
+    height: 100dvh;
+    margin-left: 0;
+    padding-top: 54px;
   }
 
   .messaging {

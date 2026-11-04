@@ -12,10 +12,14 @@
   display: flex;
   flex: 0 0 190px;
   flex-direction: column;
+  height: 100vh;
   justify-content: space-between;
   min-height: 100vh;
   padding: 17px 10px 20px;
+  position: sticky;
+  top: 0;
   text-align: center;
+  z-index: 20;
 }
 
 .sidebar > div {
@@ -45,6 +49,8 @@
 
 .catalog {
   flex: 1;
+  margin-left: 218px;
+  margin-right: clamp(260px, 24vw, 320px);
   min-width: 0;
 }
 
@@ -330,17 +336,19 @@
 }
 
 .cart {
-  align-self: flex-start;
   background: #fff;
   border-left: 1px solid #d9d9d9;
   box-shadow: -2px 0 5px rgb(0 0 0 / 8%);
   display: flex;
   flex: 0 0 clamp(260px, 24vw, 320px);
   flex-direction: column;
-  height: 100vh;
+  height: 100dvh;
   min-height: 0;
+  position: fixed;
+  right: 0;
   top: 0;
-  position: sticky;
+  width: clamp(260px, 24vw, 320px);
+  z-index: 20;
 }
 
 .cartHeading {
@@ -1062,6 +1070,86 @@
   z-index: 20;
 }
 
+.confirmOverlay {
+  align-items: center;
+  background: rgb(25 25 25 / 60%);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 16px;
+  position: fixed;
+  z-index: 110;
+}
+
+.confirmModal {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 12px 36px rgb(0 0 0 / 28%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: calc(100vh - 32px);
+  max-width: 460px;
+  overflow-y: auto;
+  padding: 24px;
+  width: 100%;
+}
+
+.confirmModal h2 {
+  color: #017632;
+  font-size: 21px;
+  margin: 0;
+}
+
+.confirmLead {
+  color: #191919;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.confirmLead strong {
+  color: #ff0000;
+}
+
+.confirmSummary {
+  align-items: center;
+  background: #eaf5ed;
+  border-radius: 6px;
+  color: #183b28;
+  display: flex;
+  font-size: 13px;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 10px 12px;
+}
+
+.confirmSummary strong {
+  font-size: 16px;
+  white-space: nowrap;
+}
+
+.confirmList {
+  color: #191919;
+  display: grid;
+  font-size: 13px;
+  gap: 8px;
+  line-height: 1.45;
+  margin: 0;
+  padding-left: 20px;
+}
+
+@media (max-width: 480px) {
+  .confirmModal {
+    gap: 12px;
+    padding: 18px;
+  }
+
+  .confirmModal h2 {
+    font-size: 19px;
+  }
+}
+
 @media (max-width: 1200px) {
   .cart {
     flex-basis: 280px;
@@ -1206,7 +1294,8 @@
     min-height: 54px;
     overflow: hidden;
     padding: 6px 8px;
-    position: sticky;
+    position: fixed;
+    left: 0;
     top: 0;
     width: 100%;
     z-index: 20;
@@ -1252,6 +1341,9 @@
   }
 
   .catalog {
+    margin-left: 0;
+    margin-right: 0;
+    padding-top: 54px;
     width: 100%;
   }
 
@@ -1266,7 +1358,11 @@
     height: clamp(420px, 72vh, 620px);
     min-height: 0;
     align-self: auto;
+    position: sticky;
+    right: auto;
+    top: 54px;
     width: 100%;
+    z-index: 1;
   }
 
   .cartHeading {
