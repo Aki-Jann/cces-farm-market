@@ -16,6 +16,14 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') in ['farmer', 'admin'];
     }
 
+    function isLegacyFarmerAccount(userId) {
+      let storefrontPath = /databases/$(database)/documents/settings/storefront;
+      return exists(/databases/$(database)/documents/users/$(userId))
+        && get(/databases/$(database)/documents/users/$(userId)).data.get('role', '') in ['farmer', 'admin']
+        && exists(storefrontPath)
+        && get(storefrontPath).data.get('legacyFarmerId', '') == userId;
+    }
+
     function isActiveFarmer() {
       return isAuthenticated()
         && isFarmer()
@@ -23,7 +31,7 @@ service cloud.firestore {
           exists(/databases/$(database)/documents/farmerProfiles/$(request.auth.uid))
             && get(/databases/$(database)/documents/farmerProfiles/$(request.auth.uid)).data.get('status', '') == 'active'
           || !exists(/databases/$(database)/documents/farmerProfiles/$(request.auth.uid))
-            && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin'
+            && isLegacyFarmerAccount(request.auth.uid)
         );
     }
 
@@ -149,6 +157,50 @@ service cloud.firestore {
         && request.resource.data.contactNumber == getAfter(applicationDoc).data.contactNumber
         && request.resource.data.address == getAfter(applicationDoc).data.address
         && request.resource.data.createdAt == request.time;
+    }
+
+    function validFarmerProfileOwnerCreate(userId) {
+      let userPath = /databases/$(database)/documents/users/$(userId);
+      let applicationDoc = applicationPath(userId);
+      return isOwner(userId)
+        && exists(userPath)
+        && get(userPath).data.get('role', '') == 'farmer'
+        && exists(applicationDoc)
+        && get(applicationDoc).data.get('status', '') == 'approved'
+        && request.resource.data.keys().hasOnly([
+          'status', 'farmName', 'contactNumber', 'address', 'createdAt', 'storeReady',
+          'deliveryFee', 'pickupLocation', 'pickupDays', 'pickupHours',
+          'gcashAccountName', 'gcashAccountNumber', 'gcashQrUrl',
+          'mayaAccountName', 'mayaAccountNumber', 'mayaQrUrl'
+        ])
+        && request.resource.data.keys().hasAll([
+          'status', 'farmName', 'contactNumber', 'address', 'createdAt', 'storeReady',
+          'deliveryFee', 'pickupLocation', 'pickupDays', 'pickupHours',
+          'gcashAccountName', 'gcashAccountNumber', 'gcashQrUrl',
+          'mayaAccountName', 'mayaAccountNumber', 'mayaQrUrl'
+        ])
+        && request.resource.data.status == 'active'
+        && request.resource.data.storeReady is bool
+        && request.resource.data.storeReady == (
+          hasStorePickup(request.resource.data)
+          && hasConfiguredPayment(request.resource.data)
+        )
+        && request.resource.data.farmName == get(applicationDoc).data.farmName
+        && request.resource.data.contactNumber == get(applicationDoc).data.contactNumber
+        && request.resource.data.address == get(applicationDoc).data.address
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.deliveryFee is int
+        && request.resource.data.deliveryFee >= 0
+        && request.resource.data.deliveryFee <= 10000
+        && request.resource.data.pickupLocation is string
+        && request.resource.data.pickupDays is string
+        && request.resource.data.pickupHours is string
+        && request.resource.data.gcashAccountName is string
+        && request.resource.data.gcashAccountNumber is string
+        && request.resource.data.gcashQrUrl is string
+        && request.resource.data.mayaAccountName is string
+        && request.resource.data.mayaAccountNumber is string
+        && request.resource.data.mayaQrUrl is string;
     }
 
     function validApplicationCreate(userId) {
@@ -326,14 +378,56 @@ service cloud.firestore {
       let subtotal = orderSubtotal(order.items);
       let profilePath = farmerProfilePath(order.farmerId);
       let legacySettingsPath = /databases/$(database)/documents/settings/storefront;
-      let legacyFee = exists(legacySettingsPath) ? get(legacySettingsPath).data.get('deliveryFee', 100) : 100;
-      let configuredFee = exists(profilePath) ? get(profilePath).data.get('deliveryFee', legacyFee) : legacyFee;
+      let hasFarmerProfile = exists(profilePath);
+      let configuredFee = hasFarmerProfile
+        ? get(profilePath).data.get('deliveryFee', 100)
+        : get(legacySettingsPath).data.get('deliveryFee', 100);
       let deliveryFee = order.fulfillmentType == 'delivery' && subtotal > 0 ? configuredFee : 0;
       return order.subtotal == subtotal
-        && (order.fulfillmentType != 'delivery' || configuredFee is int && configuredFee >= 0 && configuredFee <= 10000)
+        && (order.fulfillmentType != 'delivery'
+          || configuredFee is int && configuredFee >= 0 && configuredFee <= 10000
+            && (hasFarmerProfile
+              || get(legacySettingsPath).data.get('legacyFarmerId', '') == order.farmerId))
         && order.deliveryFee == deliveryFee
         && order.tax == subtotal * 0.05
         && order.total == subtotal + deliveryFee + order.tax;
+    }
+
+    function hasConfiguredPayment(settings) {
+      let gcashName = settings.get('gcashAccountName', '');
+      let gcashNumber = settings.get('gcashAccountNumber', '');
+      let gcashQr = settings.get('gcashQrUrl', '');
+      let mayaName = settings.get('mayaAccountName', '');
+      let mayaNumber = settings.get('mayaAccountNumber', '');
+      let mayaQr = settings.get('mayaQrUrl', '');
+      return gcashName is string && gcashName.matches('.*\\S.*')
+          && gcashNumber is string && gcashNumber.matches('.*\\S.*')
+          && gcashQr is string && gcashQr.matches('.*\\S.*')
+        || mayaName is string && mayaName.matches('.*\\S.*')
+          && mayaNumber is string && mayaNumber.matches('.*\\S.*')
+          && mayaQr is string && mayaQr.matches('.*\\S.*');
+    }
+
+    function hasStorePickup(settings) {
+      let pickupLocation = settings.get('pickupLocation', '');
+      return pickupLocation is string && pickupLocation.matches('.*\\S.*');
+    }
+
+    function storeSettingsReady(settings) {
+      return settings.get('storeReady', false) == true;
+    }
+
+    function validFarmerStoreSettings(farmerId) {
+      let settings = get(farmerProfilePath(farmerId)).data;
+      return settings.get('status', '') == 'active'
+        && storeSettingsReady(settings);
+    }
+
+    function validLegacyStorefront(farmerId) {
+      let storefrontPath = /databases/$(database)/documents/settings/storefront;
+      let settings = get(storefrontPath).data;
+      return settings.get('legacyFarmerId', '') == farmerId
+        && storeSettingsReady(settings);
     }
 
     function validOrderFulfillment() {
@@ -351,8 +445,7 @@ service cloud.firestore {
               && order.pickupHours == get(farmerProfilePath(order.farmerId)).data.get('pickupHours', '')
               && order.pickupDays == get(farmerProfilePath(order.farmerId)).data.get('pickupDays', '')
             || !exists(farmerProfilePath(order.farmerId))
-              && get(/databases/$(database)/documents/users/$(order.farmerId)).data.get('role', '') == 'admin'
-              && exists(/databases/$(database)/documents/settings/storefront)
+              && get(/databases/$(database)/documents/settings/storefront).data.get('legacyFarmerId', '') == order.farmerId
               && order.deliveryAddress == get(/databases/$(database)/documents/settings/storefront).data.pickupLocation
               && order.pickupHours == get(/databases/$(database)/documents/settings/storefront).data.pickupHours
               && order.pickupDays == get(/databases/$(database)/documents/settings/storefront).data.pickupDays
@@ -362,6 +455,8 @@ service cloud.firestore {
     function validOrderCreate(orderId) {
       let order = request.resource.data;
       let profile = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      let profilePath = farmerProfilePath(order.farmerId);
+      let hasFarmerProfile = exists(profilePath);
       return isCustomer()
         && orderId.matches('^[A-Za-z0-9_-]{1,128}$')
         && order.keys().hasOnly([
@@ -382,12 +477,9 @@ service cloud.firestore {
         && order.farmerId is string
         && exists(/databases/$(database)/documents/users/$(order.farmerId))
         && get(/databases/$(database)/documents/users/$(order.farmerId)).data.get('role', '') in ['farmer', 'admin']
-        && (
-          exists(farmerProfilePath(order.farmerId))
-            && get(farmerProfilePath(order.farmerId)).data.get('status', '') == 'active'
-          || !exists(farmerProfilePath(order.farmerId))
-            && get(/databases/$(database)/documents/users/$(order.farmerId)).data.get('role', '') == 'admin'
-        )
+        && (hasFarmerProfile
+          ? validFarmerStoreSettings(order.farmerId)
+          : validLegacyStorefront(order.farmerId))
         && order.customerName is string
         && order.customerEmail == profile.get('email', '')
         && order.items is list
@@ -528,7 +620,7 @@ service cloud.firestore {
             || resource.data.get('status', '') == 'active'
           );
       allow list: if isCcesAdmin();
-      allow create: if validFarmerProfileCreate(userId);
+      allow create: if validFarmerProfileCreate(userId) || validFarmerProfileOwnerCreate(userId);
       allow update: if isCcesAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
         && request.resource.data.diff(resource.data).affectedKeys().hasAll(['status'])
@@ -538,10 +630,15 @@ service cloud.firestore {
         || isOwner(userId)
           && isActiveFarmer()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'deliveryFee', 'pickupLocation', 'pickupDays', 'pickupHours',
+            'storeReady', 'deliveryFee', 'pickupLocation', 'pickupDays', 'pickupHours',
             'gcashAccountName', 'gcashAccountNumber', 'gcashQrUrl',
             'mayaAccountName', 'mayaAccountNumber', 'mayaQrUrl'
           ])
+          && request.resource.data.storeReady is bool
+          && request.resource.data.storeReady == (
+            hasStorePickup(request.resource.data)
+            && hasConfiguredPayment(request.resource.data)
+          )
           && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['deliveryFee'])
             || request.resource.data.deliveryFee is int
               && request.resource.data.deliveryFee >= 0
@@ -578,15 +675,15 @@ service cloud.firestore {
         && request.resource.data.sold is int
         && request.resource.data.createdAt == request.time;
       allow delete: if isActiveFarmer() && resource.data.farmerId == request.auth.uid;
-      allow update: if isActiveFarmer()
+      allow update: if isCustomer() && validCustomerInventoryUpdate(productId)
+        || isActiveFarmer()
           && resource.data.farmerId == request.auth.uid
           && request.resource.data.farmerId == resource.data.farmerId
           && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['farmerId'])
           && (
             !request.resource.data.diff(resource.data).affectedKeys().hasAny(['checkoutAction'])
             || validAdminInventoryRestore(productId)
-          )
-        || isCustomer() && validCustomerInventoryUpdate(productId);
+          );
 
       match /reviews/{orderId} {
         allow read: if true;
@@ -815,7 +912,26 @@ service cloud.firestore {
     match /settings/storefront {
       allow get: if isFarmer() || isCustomer();
       allow list: if false;
-      allow create, update, delete: if isFarmer();
+      allow create: if isAuthenticated()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin'
+        && request.resource.data.get('legacyFarmerId', '') == request.auth.uid
+        && request.resource.data.storeReady is bool
+        && request.resource.data.storeReady == (
+          hasStorePickup(request.resource.data)
+          && hasConfiguredPayment(request.resource.data)
+        );
+      allow update: if isAuthenticated()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'admin'
+        && request.resource.data.get('legacyFarmerId', '') == request.auth.uid
+        && resource.data.get('legacyFarmerId', '') in ['', request.auth.uid]
+        && request.resource.data.storeReady is bool
+        && request.resource.data.storeReady == (
+          hasStorePickup(request.resource.data)
+          && hasConfiguredPayment(request.resource.data)
+        );
+      allow delete: if false;
     }
 
     match /storeSettings/checkout {

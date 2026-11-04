@@ -60,6 +60,15 @@ function usableFarmName(value) {
   return name.toLocaleLowerCase() === 'tiangge verde' ? '' : name
 }
 
+function storeSettingsReady(settings) {
+  const pickupConfigured = typeof settings.pickupLocation === 'string' && settings.pickupLocation.trim()
+  const gcashConfigured = ['gcashAccountName', 'gcashAccountNumber', 'gcashQrUrl']
+    .every((field) => typeof settings[field] === 'string' && settings[field].trim())
+  const mayaConfigured = ['mayaAccountName', 'mayaAccountNumber', 'mayaQrUrl']
+    .every((field) => typeof settings[field] === 'string' && settings[field].trim())
+  return Boolean(pickupConfigured && (gcashConfigured || mayaConfigured))
+}
+
 async function findUserByEmail(db, email, label) {
   const users = await db.collection('users').get()
   const matches = users.docs.filter((document) => normalizeEmail(document.data().email) === normalizeEmail(email))
@@ -188,6 +197,21 @@ try {
   const storefront = storefrontSnapshot.data() ?? {}
   if (storefrontSnapshot.exists) recordFound('settings/storefront')
   else recordSkipped('settings/storefront')
+  if (storefrontSnapshot.exists) {
+    const legacyFarmerId = storefront.legacyFarmerId
+    if (typeof legacyFarmerId === 'string' && legacyFarmerId && legacyFarmerId !== farmer.id) {
+      throw new Error('The storefront is already tagged to a different legacy farmer.')
+    }
+    const storefrontUpdates = {}
+    if (!legacyFarmerId) storefrontUpdates.legacyFarmerId = farmer.id
+    const legacyStoreReady = storeSettingsReady(storefront)
+    if (storefront.storeReady !== legacyStoreReady) storefrontUpdates.storeReady = legacyStoreReady
+    if (Object.keys(storefrontUpdates).length > 0) {
+      planWrite('settings/storefront', (batch) => batch.update(storefrontRef, storefrontUpdates))
+    } else {
+      recordSkipped('settings/storefront')
+    }
+  }
   const applicationData = applicationSnapshot.data() ?? {}
   const profileData = profileSnapshot.data() ?? {}
   const displayName = typeof farmerData.displayName === 'string' && farmerData.displayName.trim()
@@ -243,6 +267,7 @@ try {
       {
         ...storefront,
         status: 'active',
+        storeReady: storeSettingsReady(storefront),
         farmName,
         ...(displayName ? { displayName } : {}),
         contactNumber,
@@ -254,6 +279,8 @@ try {
     const profileUpdates = {}
     if (!sameValue(profileData.farmName, farmName)) profileUpdates.farmName = farmName
     if (displayName && !sameValue(profileData.displayName, displayName)) profileUpdates.displayName = displayName
+    const farmerStoreReady = storeSettingsReady(profileData)
+    if (profileData.storeReady !== farmerStoreReady) profileUpdates.storeReady = farmerStoreReady
     if (Object.keys(profileUpdates).length > 0) {
       planWrite('farmerProfiles', (batch) => batch.update(
         db.doc(`farmerProfiles/${farmer.id}`),
@@ -263,8 +290,6 @@ try {
       recordSkipped('farmerProfiles')
     }
   }
-  if (profileSnapshot.exists || !storefrontSnapshot.exists) recordSkipped('settings/storefront')
-
   const [products, orders] = await Promise.all([
     db.collection('products').get(),
     db.collection('orders').get(),

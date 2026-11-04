@@ -51,10 +51,20 @@ beforeEach(async () => {
       setDoc(doc(db, 'users/cces-admin-a'), { role: 'cces_admin' }),
       setDoc(doc(db, 'farmerProfiles/farmer-b'), {
         status: 'active',
+        storeReady: true,
         farmName: 'Valley Farm',
         contactNumber: '09999999999',
         address: 'Valley Road',
         deliveryFee: 25,
+        pickupLocation: 'Valley Road',
+        pickupDays: 'Monday to Friday',
+        pickupHours: '8 AM to 4 PM',
+        gcashAccountName: 'Valley Farm',
+        gcashAccountNumber: '09999999999',
+        gcashQrUrl: 'https://example.com/gcash.png',
+        mayaAccountName: '',
+        mayaAccountNumber: '',
+        mayaQrUrl: '',
         createdAt: new Date(),
       }),
       setDoc(doc(db, 'farmerApplications/customer-a'), {
@@ -116,9 +126,19 @@ beforeEach(async () => {
         })
       ),
       setDoc(doc(db, 'settings/storefront'), {
+        legacyFarmerId: 'admin-a',
+        storeReady: true,
+        farmName: 'Original Farm',
+        deliveryFee: 100,
         pickupLocation: 'Farm gate',
         pickupDays: 'Monday to Friday',
         pickupHours: '8 AM to 4 PM',
+        gcashAccountName: 'Original Farm',
+        gcashAccountNumber: '09999999999',
+        gcashQrUrl: 'https://example.com/original-gcash.png',
+        mayaAccountName: '',
+        mayaAccountNumber: '',
+        mayaQrUrl: '',
       }),
       setDoc(doc(db, 'orders/order-a'), {
         farmerId: 'admin-a',
@@ -229,10 +249,27 @@ test('customers can read active farmer storefront profiles but farmers cannot ed
   await assertFails(updateDoc(doc(farmerDb, 'orders/order-other-farmer'), { status: 'confirmed' }))
 })
 
+test('only the legacy farmer can claim an unmarked storefront fallback', async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await updateDoc(doc(context.firestore(), 'settings/storefront'), { legacyFarmerId: '' })
+  })
+
+  const newFarmerDb = environment.authenticatedContext('farmer-b').firestore()
+  await assertFails(updateDoc(doc(newFarmerDb, 'settings/storefront'), {
+    legacyFarmerId: 'farmer-b',
+  }))
+
+  const legacyFarmerDb = environment.authenticatedContext('admin-a').firestore()
+  await assertSucceeds(updateDoc(doc(legacyFarmerDb, 'settings/storefront'), {
+    legacyFarmerId: 'admin-a',
+  }))
+})
+
 test('farmers can update only their own storefront settings', async () => {
   await environment.withSecurityRulesDisabled(async (context) => {
     await setDoc(doc(context.firestore(), 'farmerProfiles/admin-a'), {
       status: 'active',
+      storeReady: false,
       farmName: 'Legacy Farm',
       contactNumber: '09123456789',
       address: 'Farm Road',
@@ -242,6 +279,7 @@ test('farmers can update only their own storefront settings', async () => {
 
   const farmerDb = environment.authenticatedContext('admin-a').firestore()
   await assertSucceeds(updateDoc(doc(farmerDb, 'farmerProfiles/admin-a'), {
+    storeReady: false,
     pickupLocation: 'Gate 2',
     pickupDays: 'Monday to Friday',
     pickupHours: '8 AM to 4 PM',
@@ -260,6 +298,7 @@ test('farmers can set only a valid delivery fee in their own profile', async () 
   const farmerDb = environment.authenticatedContext('farmer-b').firestore()
   const profileRef = doc(farmerDb, 'farmerProfiles/farmer-b')
   const settings = {
+    storeReady: false,
     deliveryFee: 50,
     pickupLocation: 'Gate 2',
     pickupDays: 'Monday to Friday',
@@ -537,6 +576,70 @@ test('customers can create a valid order and decrement inventory in one transact
   assert.equal(orderSnapshot.data().total, 121)
   assert.equal(productSnapshot.data().stock, 8)
   assert.equal(productSnapshot.data().sold, 2)
+})
+
+test('a farmer without a profile cannot sell until their profile has pickup and payment settings', async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    const db = context.firestore()
+    await deleteDoc(doc(db, 'farmerProfiles/farmer-b'))
+    await setDoc(doc(db, 'farmerApplications/farmer-b'), {
+      status: 'approved',
+      farmName: 'Valley Farm',
+      contactNumber: '09999999999',
+      address: 'Valley Road',
+    })
+  })
+
+  const customerDb = environment.authenticatedContext('customer-a').firestore()
+  const orderId = 'new-farmer-unconfigured'
+  const order = customerOrder(orderId, {
+    farmerId: 'farmer-b',
+    items: [{ productId: 'product-other-farmer', name: 'TOMATOES', price: 20, quantity: 1, unit: 'KG' }],
+    subtotal: 20,
+    deliveryFee: 25,
+    tax: 1,
+    total: 46,
+  })
+  await assertFails(submitCustomerOrder(customerDb, orderId, order))
+
+  const farmerDb = environment.authenticatedContext('farmer-b').firestore()
+  const profile = {
+    status: 'active',
+    storeReady: false,
+    farmName: 'Valley Farm',
+    contactNumber: '09999999999',
+    address: 'Valley Road',
+    createdAt: serverTimestamp(),
+    deliveryFee: 25,
+    pickupLocation: '',
+    pickupDays: '',
+    pickupHours: '',
+    gcashAccountName: '',
+    gcashAccountNumber: '',
+    gcashQrUrl: '',
+    mayaAccountName: '',
+    mayaAccountNumber: '',
+    mayaQrUrl: '',
+  }
+  await assertSucceeds(setDoc(doc(farmerDb, 'farmerProfiles/farmer-b'), profile))
+  await assertFails(submitCustomerOrder(customerDb, orderId, order))
+  await assertFails(updateDoc(doc(farmerDb, 'farmerProfiles/farmer-b'), {
+    storeReady: true,
+    pickupLocation: ' ',
+    gcashAccountName: ' ',
+    gcashAccountNumber: ' ',
+    gcashQrUrl: ' ',
+  }))
+  await assertSucceeds(updateDoc(doc(farmerDb, 'farmerProfiles/farmer-b'), {
+    storeReady: true,
+    pickupLocation: 'Valley Road',
+    pickupDays: 'Monday to Friday',
+    pickupHours: '8 AM to 4 PM',
+    gcashAccountName: 'Valley Farm',
+    gcashAccountNumber: '09999999999',
+    gcashQrUrl: 'https://example.com/gcash.png',
+  }))
+  await assertSucceeds(submitCustomerOrder(customerDb, orderId, order))
 })
 
 test('one checkout order for multiple products from one farmer uses that farmer delivery fee and validates stock and tax', async () => {

@@ -29,23 +29,11 @@ node scripts/migrate-multi-farmer.mjs ../private/cces-service-account.json \
   --cces-email=cces-admin@example.com
 ```
 
-The dry run reads Firestore but writes nothing. Review the `found | would change | changed | skipped` counts for users, applications, profiles, products, orders, conversations, and messages. Confirm the matched accounts and expected records before proceeding. If the result is unexpected, stop; do not use `--apply`.
+The dry run reads Firestore but writes nothing. Review the `found | would change | changed | skipped` counts for users, applications, profiles, products, orders, conversations, and messages. Confirm the matched accounts and expected records before proceeding. The storefront and original farmer profile will also be marked `storeReady` only when pickup and at least one complete GCash/Maya account and QR code are configured. If the result is unexpected, stop; do not use `--apply`.
 
-## 4. Deploy in order
+## 4. Apply the migration
 
-1. Deploy Firestore rules first:
-
-   ```sh
-   firebase deploy --only firestore:rules
-   ```
-
-2. Deploy the reviewed frontend and `api/notify-order.ts` together through the configured Vercel deployment process. Confirm the deployment is ready before migrating data.
-3. Do not deploy indexes for this phase; no new compound query was added.
-4. Do not change Vercel environment variables for this phase.
-
-## 5. Apply the migration
-
-After confirming the backup, dry-run summary, rules deployment, and frontend/API deployment, run the same migration with `--apply`:
+After confirming the backup and dry-run summary, run the same migration with `--apply`. This updates the readiness markers before the new rules begin requiring them:
 
 ```sh
 node scripts/migrate-multi-farmer.mjs ../private/cces-service-account.json \
@@ -54,14 +42,26 @@ node scripts/migrate-multi-farmer.mjs ../private/cces-service-account.json \
   --apply
 ```
 
-If the migration was already applied before the farmer-name display fix, rerun the same `--apply` command after deploying the updated frontend. It is idempotent and now synchronizes the original farmer profile name from the approved application and display name from the user profile.
+If the migration was already applied before this update, rerun the same `--apply` command before deploying the updated rules and frontend. It is idempotent, tags the retained storefront to the original farmer, and synchronizes the `storeReady` value on the storefront and farmer profile from their pickup/payment settings. A new farmer with incomplete settings remains unable to accept orders until the store is configured.
 
 Read the summary and verify that the expected roles, `farmerId` fields, farmer profile, approved application, and farmer-scoped conversations were changed. A subsequent dry run should report no changes for already migrated records. The migration is idempotent and commits Firestore writes in batches of no more than 500 operations.
+
+## 5. Deploy in order
+
+1. Deploy Firestore rules:
+
+   ```sh
+   firebase deploy --only firestore:rules
+   ```
+
+2. Deploy the reviewed frontend and `api/notify-order.ts` together through the configured Vercel deployment process.
+3. Do not deploy indexes for this phase; no new compound query was added.
+4. Do not change Vercel environment variables for this phase.
 
 ## 6. Manual role checklist
 
 - **Customer:** sign in; browse products from active farms; place a cart with one farmer and a cart with multiple farmers; verify each created order and farmer email notification; check each farmer conversation; attempt to access another customer's orders or conversations and confirm access is denied; review a delivered item from an order owned by the correct customer.
-- **Farmer:** sign in as the migrated farmer and as another approved farmer; verify analytics, products, orders, and conversations only show that farmer's data; reply to a customer conversation; confirm order status and payment verification behavior remains limited to owned orders.
+- **Farmer:** sign in as the migrated farmer and as another approved farmer; verify analytics, products, orders, and conversations only show that farmer's data; reply to a customer conversation; confirm order status and payment verification behavior remains limited to owned orders. For a new farmer, verify missing settings show empty defaults and a setup prompt, and that products cannot be ordered until pickup and payment details are complete.
 - **CCES admin:** sign in; open analytics, select each farmer and all farmers, and print/save reports to PDF; verify the Farmer column and filter scope; open farmer applications and verify application status and suspension controls.
 - **Legacy migration checks:** verify products/orders that lacked `farmerId` now have the migrated farmer's UID; verify untagged conversation messages appear under that farmer's conversation; verify newer, already farmer-scoped conversations remain intact.
 

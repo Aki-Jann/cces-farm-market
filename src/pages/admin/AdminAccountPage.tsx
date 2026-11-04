@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import { onAuthStateChanged, sendPasswordResetEmail, verifyBeforeUpdateEmail, reauthenticateWithCredential, EmailAuthProvider, signOut } from 'firebase/auth'
-import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore'
+import { doc, getDoc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { FarmerApplicationStatus } from '../../components/common/FarmerApplicationStatus'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
-import { normalizeRole, ROLES } from '../../constants/roles'
+import { LEGACY_FARMER_ROLE, normalizeRole, ROLES } from '../../constants/roles'
 import type { ManagementRole } from '../../constants/roles'
 import { uploadImageToCloudinary } from '../../utils/cloudinary'
 import { formatMonthDayYear } from '../../utils/dateFormat'
@@ -40,7 +40,7 @@ type StoreSettings = {
 type PaymentProvider = 'gcash' | 'maya'
 
 const emptyStoreSettings: StoreSettings = {
-  deliveryFee: 100,
+  deliveryFee: 0,
   pickupLocation: '',
   pickupDays: '',
   pickupHours: '',
@@ -73,6 +73,15 @@ function readStoreSettings(data: Record<string, unknown>): StoreSettings {
   }
 }
 
+function storeSettingsReady(settings: StoreSettings) {
+  const pickupConfigured = Boolean(settings.pickupLocation.trim())
+  const paymentConfigured = Boolean(
+    settings.gcashAccountName.trim() && settings.gcashAccountNumber.trim() && settings.gcashQrUrl.trim()
+    || settings.mayaAccountName.trim() && settings.mayaAccountNumber.trim() && settings.mayaQrUrl.trim()
+  )
+  return pickupConfigured && paymentConfigured
+}
+
 function validQrFile(file: File) {
   return ['image/jpeg', 'image/png', 'image/webp'].includes(file.type) && file.size <= 5 * 1024 * 1024
 }
@@ -95,6 +104,7 @@ function displayBirthday(value: unknown) {
 export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRole }) {
   const [profile, setProfile] = useState<AdminProfile | null>(null)
   const [isCcesAdmin, setIsCcesAdmin] = useState(role === ROLES.CCES_ADMIN)
+  const [isLegacyFarmer, setIsLegacyFarmer] = useState(false)
   const [draft, setDraft] = useState<AdminProfile | null>(null)
   const [storeSettings, setStoreSettings] = useState<StoreSettings>(emptyStoreSettings)
   const [storeSettingsDraft, setStoreSettingsDraft] = useState<StoreSettings>(emptyStoreSettings)
@@ -159,6 +169,8 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
 
           const data = snapshot.data()
           const profileRole = normalizeRole(data.role)
+          const isLegacyFarmerAccount = data.role === LEGACY_FARMER_ROLE
+          setIsLegacyFarmer(isLegacyFarmerAccount)
           if (profileRole !== ROLES.FARMER && profileRole !== ROLES.CCES_ADMIN) {
             setProfile(null)
             setIsCcesAdmin(false)
@@ -204,9 +216,13 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
             let farmerSettingsData: Record<string, unknown> | null = null
             let legacySettingsData: Record<string, unknown> = {}
             function applyStoreSettings() {
+              const isOriginalFarmer = isLegacyFarmerAccount
+                || legacySettingsData.legacyFarmerId === user?.uid
               const loadedSettings = farmerSettingsData
-                ? readStoreSettings({ ...legacySettingsData, ...farmerSettingsData })
-                : readStoreSettings(legacySettingsData)
+                ? readStoreSettings(farmerSettingsData)
+                : isOriginalFarmer
+                  ? readStoreSettings(legacySettingsData)
+                  : emptyStoreSettings
               setHasFarmerProfile(farmerSettingsData !== null)
               setStoreSettings(loadedSettings)
               if (!storeSettingsDirty.current) setStoreSettingsDraft(loadedSettings)
@@ -467,6 +483,7 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
         await setDoc(
           doc(db, 'farmerProfiles', user.uid),
           {
+            storeReady: storeSettingsReady(nextSettings),
             pickupLocation: nextSettings.pickupLocation,
             deliveryFee: nextSettings.deliveryFee,
             pickupDays: nextSettings.pickupDays,
@@ -480,10 +497,12 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
           },
           { merge: true }
         )
-      } else {
+      } else if (isLegacyFarmer) {
         await setDoc(
           doc(db, 'settings', 'storefront'),
           {
+            legacyFarmerId: user.uid,
+            storeReady: storeSettingsReady(nextSettings),
             farmName: profile ? displayName(profile, 'Original farm') : 'Original farm',
             pickupLocation: nextSettings.pickupLocation,
             deliveryFee: nextSettings.deliveryFee,
@@ -498,6 +517,31 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
           },
           { merge: true }
         )
+      } else {
+        const applicationSnapshot = await getDoc(doc(db, 'farmerApplications', user.uid))
+        if (!applicationSnapshot.exists() || applicationSnapshot.data().status !== 'approved') {
+          throw new Error('APPROVED_APPLICATION_REQUIRED')
+        }
+        const application = applicationSnapshot.data()
+        await setDoc(doc(db, 'farmerProfiles', user.uid), {
+          status: 'active',
+          storeReady: storeSettingsReady(nextSettings),
+          farmName: application.farmName,
+          contactNumber: application.contactNumber,
+          address: application.address,
+          createdAt: serverTimestamp(),
+          pickupLocation: nextSettings.pickupLocation,
+          deliveryFee: nextSettings.deliveryFee,
+          pickupDays: nextSettings.pickupDays,
+          pickupHours: nextSettings.pickupHours,
+          gcashAccountName: nextSettings.gcashAccountName,
+          gcashAccountNumber: nextSettings.gcashAccountNumber,
+          gcashQrUrl: nextSettings.gcashQrUrl,
+          mayaAccountName: nextSettings.mayaAccountName,
+          mayaAccountNumber: nextSettings.mayaAccountNumber,
+          mayaQrUrl: nextSettings.mayaQrUrl,
+        })
+        setHasFarmerProfile(true)
       }
       storeSettingsDirty.current = false
       setStoreSettings(nextSettings)
@@ -508,7 +552,9 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
       setSettingsNotice('Pickup and payment settings have been saved.')
     } catch (saveError) {
       console.error('Saving store settings failed:', saveError)
-      setSettingsError('Unable to save pickup and payment settings. Please try again.')
+      setSettingsError(saveError instanceof Error && saveError.message === 'APPROVED_APPLICATION_REQUIRED'
+        ? 'An approved farmer application is required before store settings can be created.'
+        : 'Unable to save pickup and payment settings. Please try again.')
     } finally {
       setIsSavingSettings(false)
     }
@@ -672,6 +718,11 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
                 <p className={styles.error} role="alert">{settingsError || 'Unable to load store settings. Refresh the page to try again.'}</p>
               ) : (
                 <form onSubmit={(event) => void saveStoreSettings(event)}>
+                  {!hasFarmerProfile && !isLegacyFarmer && (
+                    <p className={styles.notice} role="status">
+                      Your farmer profile is not set up yet. Complete these pickup and payment details to activate your storefront.
+                    </p>
+                  )}
                   <div className={styles.form}>
                     <label className={styles.fullWidth}>Pickup Location<input disabled={isSavingSettings} value={storeSettingsDraft.pickupLocation} onChange={(event) => updateStoreField('pickupLocation', event.target.value)} placeholder="Enter the pickup address" /></label>
                     <label>Delivery Fee<input type="number" min={0} max={10000} step={1} disabled={isSavingSettings} value={storeSettingsDraft.deliveryFee} onChange={(event) => updateStoreField('deliveryFee', Number(event.target.value))} /></label>
