@@ -6,10 +6,11 @@ import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
+import { ROLES } from '../../constants/roles'
 import { formatMonthDayYear, formatTime } from '../../utils/dateFormat'
 import styles from './MessagesPage.module.css'
 
-type Message = { id: string; text: string; timestamp: string; sender: 'customer' | 'market'; dayDivider?: string }
+type Message = { id: string; text: string; timestamp: string; sender: typeof ROLES.CUSTOMER | 'market'; dayDivider?: string }
 type LoadedMessage = Omit<Message, 'dayDivider'> & { createdAt: Date | null }
 
 function parseMessageDate(value: unknown): Date | null {
@@ -58,7 +59,7 @@ export function MessagesPage() {
             const createdAt = parseMessageDate(data.createdAt)
             return {
               id: messageDocument.id,
-              sender: data.senderRole === 'customer' ? 'customer' : 'market',
+              sender: data.senderRole === ROLES.CUSTOMER ? ROLES.CUSTOMER : 'market',
               text: typeof data.text === 'string' ? data.text : '',
               timestamp: createdAt ? formatTime(createdAt) : 'Pending',
               createdAt,
@@ -109,7 +110,7 @@ export function MessagesPage() {
       const conversationRef = doc(db, 'conversations', user.uid)
       await addDoc(collection(conversationRef, 'messages'), {
         senderId: user.uid,
-        senderRole: 'customer',
+        senderRole: ROLES.CUSTOMER,
         text,
         createdAt: serverTimestamp(),
       })
@@ -166,8 +167,8 @@ export function MessagesPage() {
                       <span>{message.dayDivider}</span>
                     </div>
                   )}
-                  <article className={`${styles.message} ${message.sender === 'customer' ? styles.outgoing : styles.incoming}`}>
-                    <span className={styles.senderLabel}>{message.sender === 'customer' ? 'You' : 'Tiangge Verde'}</span>
+                  <article className={`${styles.message} ${message.sender === ROLES.CUSTOMER ? styles.outgoing : styles.incoming}`}>
+                    <span className={styles.senderLabel}>{message.sender === ROLES.CUSTOMER ? 'You' : 'Tiangge Verde'}</span>
                     <p>{message.text}</p>
                     <time>{message.timestamp}</time>
                   </article>

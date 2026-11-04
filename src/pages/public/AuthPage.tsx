@@ -6,6 +6,7 @@ import { Timestamp, doc, getDoc, serverTimestamp, setDoc } from 'firebase/firest
 import { BrandLogo } from '../../components/common/BrandLogo'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
+import { normalizeRole, ROLES } from '../../constants/roles'
 import styles from './AuthPage.module.css'
 
 export type AuthType = 'login' | 'register' | 'forgot-password'
@@ -237,18 +238,18 @@ export function AuthPage({ type }: { type: AuthType }) {
         return
       }
 
-      const role = profileSnapshot.data().role
-      if (role === 'customer') {
+      const role = normalizeRole(profileSnapshot.data().role)
+      if (role === ROLES.CUSTOMER) {
         window.location.hash = '/shop'
         return
       }
 
-      if (role === 'admin') {
+      if (role === ROLES.FARMER) {
         window.location.hash = '/admin'
         return
       }
 
-      if (role === 'cces_admin') {
+      if (role === ROLES.CCES_ADMIN) {
         window.location.hash = '/admin/analytics'
         return
       }
@@ -329,7 +330,7 @@ export function AuthPage({ type }: { type: AuthType }) {
         birthday: Timestamp.fromDate(birthdayDate),
         contactNumber: registrationFields.contactNumber,
         address: registrationFields.address,
-        role: 'customer',
+        role: ROLES.CUSTOMER,
         customerType: 'individual',
         farmNotes: '',
         createdAt: serverTimestamp(),

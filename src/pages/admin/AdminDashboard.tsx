@@ -5,6 +5,8 @@ import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
+import { normalizeRole, ROLES } from '../../constants/roles'
+import type { ManagementRole } from '../../constants/roles'
 import { formatMonthDayYear } from '../../utils/dateFormat'
 import { isOrderEligibleForFinancialTotals } from '../../utils/orderFinancials'
 import styles from './AdminDashboard.module.css'
@@ -140,8 +142,8 @@ function ProductInventory({ items, readOnly = false }: { items: InventoryItem[];
   )
 }
 
-export function AdminDashboard({ role = 'farmer' }: { role?: 'farmer' | 'cces_admin' }) {
-  const readOnly = role === 'cces_admin'
+export function AdminDashboard({ role = ROLES.FARMER }: { role?: ManagementRole }) {
+  const readOnly = role === ROLES.CCES_ADMIN
   const [search, setSearch] = useState('')
   const [adminName, setAdminName] = useState('')
   const [orders, setOrders] = useState<FirestoreOrder[]>([])
@@ -161,12 +163,14 @@ export function AdminDashboard({ role = 'farmer' }: { role?: 'farmer' | 'cces_ad
         return
       }
 
-      setAdminName(user.displayName?.trim() || user.email?.split('@')[0] || 'Admin')
+      setAdminName(user.displayName?.trim() || user.email?.split('@')[0] || (role === ROLES.CCES_ADMIN ? 'CCES Admin' : 'Farmer'))
       unsubscribeProfile = onSnapshot(
         doc(db, 'users', user.uid),
         (snapshot) => {
-          if (!snapshot.exists() || !['admin', 'cces_admin'].includes(snapshot.data().role)) return
+          if (!snapshot.exists()) return
           const data = snapshot.data()
+          const profileRole = normalizeRole(data.role)
+          if (profileRole !== ROLES.FARMER && profileRole !== ROLES.CCES_ADMIN) return
           const profileName = [data.firstName, data.lastName]
             .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
             .map((part) => part.trim())
@@ -401,7 +405,7 @@ export function AdminDashboard({ role = 'farmer' }: { role?: 'farmer' | 'cces_ad
           <section className={styles.welcome}>
             <div className={styles.welcomeCopy}>
               <span className={styles.welcomeEyebrow}>FARM MARKET OVERVIEW</span>
-              <h1>{greeting}{adminName ? `, ${adminName}` : ', Admin'}!</h1>
+              <h1>{greeting}{adminName ? `, ${adminName}` : ', Farmer'}!</h1>
               <p>Here’s what’s happening with your farm market today.</p>
             </div>
             <div className={styles.welcomeMeta}>

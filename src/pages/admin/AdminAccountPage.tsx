@@ -6,6 +6,8 @@ import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
+import { normalizeRole, ROLES } from '../../constants/roles'
+import type { ManagementRole } from '../../constants/roles'
 import { uploadImageToCloudinary } from '../../utils/cloudinary'
 import { formatMonthDayYear } from '../../utils/dateFormat'
 import styles from './AdminAccountPage.module.css'
@@ -69,8 +71,8 @@ function validQrFile(file: File) {
   return ['image/jpeg', 'image/png', 'image/webp'].includes(file.type) && file.size <= 5 * 1024 * 1024
 }
 
-function displayName(profile: AdminProfile) {
-  return `${profile.firstName} ${profile.lastName}`.trim() || 'Admin'
+function displayName(profile: AdminProfile, fallback: string) {
+  return `${profile.firstName} ${profile.lastName}`.trim() || fallback
 }
 
 function displayBirthday(value: unknown) {
@@ -84,9 +86,9 @@ function displayBirthday(value: unknown) {
     : 'Not provided'
 }
 
-export function AdminAccountPage({ role = 'farmer' }: { role?: 'farmer' | 'cces_admin' }) {
+export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRole }) {
   const [profile, setProfile] = useState<AdminProfile | null>(null)
-  const [isCcesAdmin, setIsCcesAdmin] = useState(role === 'cces_admin')
+  const [isCcesAdmin, setIsCcesAdmin] = useState(role === ROLES.CCES_ADMIN)
   const [draft, setDraft] = useState<AdminProfile | null>(null)
   const [storeSettings, setStoreSettings] = useState<StoreSettings>(emptyStoreSettings)
   const [storeSettingsDraft, setStoreSettingsDraft] = useState<StoreSettings>(emptyStoreSettings)
@@ -127,7 +129,7 @@ export function AdminAccountPage({ role = 'farmer' }: { role?: 'farmer' | 'cces_
       if (!user) {
         if (isMounted) {
           setIsCcesAdmin(false)
-          setError('Please log in to manage your admin account.')
+          setError('Please log in to manage your account.')
           setIsLoading(false)
           setIsSettingsLoading(false)
           setHasLoadedSettings(false)
@@ -139,17 +141,27 @@ export function AdminAccountPage({ role = 'farmer' }: { role?: 'farmer' | 'cces_
         doc(db, 'users', user.uid),
         (snapshot) => {
           if (!isMounted) return
-          if (!snapshot.exists() || (snapshot.data().role !== 'admin' && snapshot.data().role !== 'cces_admin')) {
+          if (!snapshot.exists()) {
             setProfile(null)
             setIsCcesAdmin(false)
-            setError('An admin account profile could not be found.')
+            setError('A farmer or CCES admin profile could not be found.')
             setIsLoading(false)
             setIsSettingsLoading(false)
             return
           }
 
           const data = snapshot.data()
-          const ccesAdmin = data.role === 'cces_admin'
+          const profileRole = normalizeRole(data.role)
+          if (profileRole !== ROLES.FARMER && profileRole !== ROLES.CCES_ADMIN) {
+            setProfile(null)
+            setIsCcesAdmin(false)
+            setError('A farmer or CCES admin profile could not be found.')
+            setIsLoading(false)
+            setIsSettingsLoading(false)
+            return
+          }
+
+          const ccesAdmin = profileRole === ROLES.CCES_ADMIN
           setIsCcesAdmin(ccesAdmin)
           const loadedProfile: AdminProfile = {
             firstName: typeof data.firstName === 'string' ? data.firstName : '',
@@ -504,10 +516,10 @@ export function AdminAccountPage({ role = 'farmer' }: { role?: 'farmer' | 'cces_
         ) : (
           <section className={styles.card}>
             <div className={styles.profileHeader}>
-              <div className={styles.avatar} aria-hidden="true">{displayName(profile).charAt(0).toUpperCase()}</div>
+              <div className={styles.avatar} aria-hidden="true">{displayName(profile, isCcesAdmin ? 'CCES Admin' : 'Farmer').charAt(0).toUpperCase()}</div>
               <div className={styles.identity}>
                 <div className={styles.identityTitle}>
-                  <h2>{displayName(profile)}</h2>
+                  <h2>{displayName(profile, isCcesAdmin ? 'CCES Admin' : 'Farmer')}</h2>
                   <span className={styles.role}>{isCcesAdmin ? 'CCES ADMIN' : 'FARMER'}</span>
                 </div>
                 <p>{profile.email}</p>

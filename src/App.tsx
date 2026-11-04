@@ -16,8 +16,9 @@ import { AdminAnalyticsPage } from './pages/admin/AdminAnalyticsPage'
 import { AdminAccountPage } from './pages/admin/AdminAccountPage'
 import { auth } from './firebase/auth'
 import { db } from './firebase/firestore'
+import { normalizeRole, ROLES } from './constants/roles'
+import type { UserRole } from './constants/roles'
 export type Route = 'landing' | 'shop' | 'orders' | 'messages' | 'account' | 'admin' | 'admin-orders' | 'admin-payment' | 'admin-products' | 'admin-customers' | 'admin-analytics' | 'admin-account' | 'login' | 'register' | 'forgot-password'
-type UserRole = 'customer' | 'admin' | 'cces_admin'
 
 const protectedRoutes: Route[] = [
   'shop',
@@ -34,19 +35,19 @@ const protectedRoutes: Route[] = [
 ]
 
 function canAccessRoute(role: UserRole | null, route: Route) {
-  if (role === 'customer') {
+  if (role === ROLES.CUSTOMER) {
     return ['shop', 'orders', 'messages', 'account'].includes(route)
   }
-  if (role === 'admin') {
+  if (role === ROLES.FARMER) {
     return ['admin', 'admin-orders', 'admin-payment', 'admin-products', 'admin-customers', 'admin-analytics', 'admin-account'].includes(route)
   }
-  return role === 'cces_admin' && ['admin', 'admin-analytics', 'admin-account'].includes(route)
+  return role === ROLES.CCES_ADMIN && ['admin', 'admin-analytics', 'admin-account'].includes(route)
 }
 
 function homeForRole(role: UserRole | null) {
-  if (role === 'customer') return '/shop'
-  if (role === 'cces_admin') return '/admin/analytics'
-  return role === 'admin' ? '/admin' : '/login'
+  if (role === ROLES.CUSTOMER) return '/shop'
+  if (role === ROLES.CCES_ADMIN) return '/admin/analytics'
+  return role === ROLES.FARMER ? '/admin' : '/login'
 }
 
 function getRoute(): Route {
@@ -98,7 +99,7 @@ function App() {
         const profile = await getDoc(doc(db, 'users', user.uid))
         if (!isMounted || currentRequest !== requestId) return
         const storedRole = profile.exists() ? profile.data().role : null
-        setRole(storedRole === 'customer' || storedRole === 'admin' || storedRole === 'cces_admin' ? storedRole : null)
+        setRole(normalizeRole(storedRole))
       } catch (error) {
         console.error('Loading authenticated user role failed:', error)
         if (isMounted && currentRequest === requestId) setRole(null)
@@ -145,11 +146,11 @@ function App() {
   }
 
   if (route === 'admin-account') {
-    return <AdminAccountPage role={role === 'cces_admin' ? 'cces_admin' : 'farmer'} />
+    return <AdminAccountPage role={role === ROLES.CCES_ADMIN ? ROLES.CCES_ADMIN : ROLES.FARMER} />
   }
 
   if (route === 'admin') {
-    return <AdminDashboard role={role === 'cces_admin' ? 'cces_admin' : 'farmer'} />
+    return <AdminDashboard role={role === ROLES.CCES_ADMIN ? ROLES.CCES_ADMIN : ROLES.FARMER} />
   }
 
   if (route === 'admin-orders') {
@@ -169,7 +170,7 @@ function App() {
   }
 
   if (route === 'admin-analytics') {
-    return <AdminAnalyticsPage role={role === 'cces_admin' ? 'cces_admin' : 'farmer'} />
+    return <AdminAnalyticsPage role={role === ROLES.CCES_ADMIN ? ROLES.CCES_ADMIN : ROLES.FARMER} />
   }
 
   return <AuthPage type={route} />

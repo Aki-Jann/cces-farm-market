@@ -3,6 +3,8 @@ import { collection, onSnapshot } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { db } from '../../firebase/firestore'
+import { ROLES } from '../../constants/roles'
+import type { ManagementRole } from '../../constants/roles'
 import { isOrderEligibleForFinancialTotals } from '../../utils/orderFinancials'
 import { resolveProductImage } from '../../utils/productImages'
 import apple from '../../assets/shop-apple.png'
@@ -447,7 +449,7 @@ function getProductFallbackImage(name: string): string {
   return apple
 }
 
-export function AdminAnalyticsPage({ role = 'farmer' }: { role?: 'farmer' | 'cces_admin' }) {
+export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementRole }) {
   const [search, setSearch] = useState('')
   const [activePanel, setActivePanel] = useState<AnalyticsPanel | null>(null)
   const [orders, setOrders] = useState<FirestoreOrder[]>([])

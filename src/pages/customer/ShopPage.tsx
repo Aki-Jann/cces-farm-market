@@ -6,6 +6,7 @@ import { Header } from '../../components/layout/Header'
 import { ProductRating } from '../../components/common/ProductRating'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
+import { normalizeRole, ROLES } from '../../constants/roles'
 import { uploadImageToCloudinary } from '../../utils/cloudinary'
 import { productImages, resolveProductImage } from '../../utils/productImages'
 import styles from './ShopPage.module.css'
@@ -833,7 +834,7 @@ export function ShopPage() {
             transaction.get(profileRef),
             ...productRefs.map(({ ref }) => transaction.get(ref)),
           ])
-          if (!profileSnapshot.exists() || profileSnapshot.data().role !== 'customer') {
+          if (!profileSnapshot.exists() || normalizeRole(profileSnapshot.data().role) !== ROLES.CUSTOMER) {
             throw new Error('CUSTOMER_PROFILE_REQUIRED')
           }
           productSnapshots.forEach((productSnapshot, index) => {

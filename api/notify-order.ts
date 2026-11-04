@@ -3,6 +3,7 @@ import { cert, getApps, initializeApp } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 import { FieldValue, getFirestore } from 'firebase-admin/firestore'
 import nodemailer from 'nodemailer'
+import { LEGACY_FARMER_ROLE } from '../src/constants/roles'
 
 const MAX_ORDER_AGE_MS = 10 * 60 * 1000 // only notify for orders created in the last 10 minutes
 
@@ -67,7 +68,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 4. Recipients: all farmer admins + optional settings/storefront.notificationEmail
     const recipients = new Set<string>()
-    const admins = await db.collection('users').where('role', '==', 'admin').get()
+    const admins = await db.collection('users').where('role', '==', LEGACY_FARMER_ROLE).get()
     admins.forEach((d) => {
       const email = d.data().email
       if (typeof email === 'string' && email) recipients.add(email)

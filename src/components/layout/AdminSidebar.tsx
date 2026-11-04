@@ -1,4 +1,6 @@
 import { BrandLogo } from '../common/BrandLogo'
+import { ROLES } from '../../constants/roles'
+import type { ManagementRole } from '../../constants/roles'
 import styles from './AdminSidebar.module.css'
 
 type AdminNavItem = 'dashboard' | 'orders' | 'payments' | 'products' | 'customers' | 'analytics' | 'account'
@@ -12,13 +14,13 @@ const links: { key: AdminNavItem; label: string; href: string }[] = [
   { key: 'analytics', label: 'ANALYTICS', href: '#/admin/analytics' },
 ]
 
-export function AdminSidebar({ active, role = 'farmer' }: { active: AdminNavItem; role?: 'farmer' | 'cces_admin' }) {
-  const visibleLinks = role === 'cces_admin'
+export function AdminSidebar({ active, role = ROLES.FARMER }: { active: AdminNavItem; role?: ManagementRole }) {
+  const visibleLinks = role === ROLES.CCES_ADMIN
     ? links.filter((link) => link.key === 'dashboard' || link.key === 'analytics')
     : links
 
   return (
-    <nav className={styles.sidebar} aria-label="Admin navigation">
+    <nav className={styles.sidebar} aria-label="Management navigation">
       <div className={styles.top}>
         <div className={styles.logo}><BrandLogo compact /></div>
         <div className={styles.rule} />

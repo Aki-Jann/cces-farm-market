@@ -5,10 +5,11 @@ import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
+import { LEGACY_FARMER_ROLE, ROLES } from '../../constants/roles'
 import styles from './AdminCustomersPage.module.css'
 import { formatMonthDayYear, formatTime } from '../../utils/dateFormat'
 
-type Message = { id: string; text: string; timestamp: string; sender: 'customer' | 'admin'; dayDivider?: string }
+type Message = { id: string; text: string; timestamp: string; sender: typeof ROLES.CUSTOMER | typeof LEGACY_FARMER_ROLE; dayDivider?: string }
 type LoadedMessage = Omit<Message, 'dayDivider'> & { createdAt: Date | null }
 type Order = { id: string; date: string; status: 'DELIVERED' | 'PENDING' | 'CONFIRMED' | 'PACKED'; total: number }
 type Customer = {
@@ -146,7 +147,7 @@ function Messages({ customer }: { customer: Customer }) {
           const createdAt = parseMessageDate(data.createdAt)
           return {
             id: messageDocument.id,
-            sender: data.senderRole === 'admin' ? 'admin' : 'customer',
+            sender: data.senderRole === LEGACY_FARMER_ROLE ? LEGACY_FARMER_ROLE : ROLES.CUSTOMER,
             text: typeof data.text === 'string' ? data.text : '',
             timestamp: createdAt ? formatTime(createdAt) : 'Pending',
             createdAt,
@@ -200,7 +201,7 @@ function Messages({ customer }: { customer: Customer }) {
       const conversationRef = doc(db, 'conversations', customer.id)
       await addDoc(collection(conversationRef, 'messages'), {
         senderId: admin.uid,
-        senderRole: 'admin',
+        senderRole: LEGACY_FARMER_ROLE,
         text,
         createdAt: serverTimestamp(),
       })
@@ -224,7 +225,7 @@ function Messages({ customer }: { customer: Customer }) {
         <span>{message.dayDivider}</span>
       </div>
     )}
-    <article className={`${styles.message} ${message.sender === 'admin' ? styles.outgoing : styles.incoming}`}>
+    <article className={`${styles.message} ${message.sender === LEGACY_FARMER_ROLE ? styles.outgoing : styles.incoming}`}>
       <p>{message.text}</p>
       <time>{message.timestamp}</time>
     </article>
@@ -252,7 +253,7 @@ export function AdminCustomersPage() {
 
   const customers = useMemo<Customer[]>(() => {
     return rawUsers.flatMap(({ id, data }) => {
-      if (data.role !== 'customer') return []
+      if (data.role !== ROLES.CUSTOMER) return []
 
       const firstName = typeof data.firstName === 'string' ? data.firstName.trim() : ''
       const lastName = typeof data.lastName === 'string' ? data.lastName.trim() : ''
