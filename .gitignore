@@ -16,6 +16,11 @@ dist/
 .firebase/
 firestore-debug.log
 *-debug.log
+backups/
+*service-account*.json
+*serviceAccount*.json
+*service_account*.json
+*firebase-adminsdk*.json
 
 # Environment variables
 .env
