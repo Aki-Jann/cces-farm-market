@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { FormEvent } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
@@ -57,6 +57,22 @@ function parseOrderDate(createdAt: unknown): Date | null {
     if (!isNaN(d.getTime())) return d
   }
   return null
+}
+
+// Asks the server to email the farmer admins about a new order.
+// The server checks the token and sends at most one email per order; failures never affect the order.
+async function notifyFarmers(orderId: string) {
+  try {
+    const token = await auth.currentUser?.getIdToken()
+    if (!token) return
+    await fetch('/api/notify-order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ orderId }),
+    })
+  } catch (notifyError) {
+    console.error('Email notification failed:', notifyError)
+  }
 }
 
 function currency(value: number) {
@@ -331,6 +347,7 @@ export function OrdersPage() {
     return null;
   }
 });
+  const notifiedRef = useRef(false)
   const emptyState = window.location.hash.includes('empty')
   const visibleOrders = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -451,6 +468,15 @@ export function OrdersPage() {
       if (unsubscribeOrders) unsubscribeOrders()
     }
   }, [])
+
+  // Right after checkout, find the new order in the loaded list and email the farmers (once).
+  useEffect(() => {
+    if (!placedOrder || notifiedRef.current || isLoading) return
+    const newOrder = orders.find((order) => order.id === placedOrder.orderNumber)
+    if (!newOrder) return
+    notifiedRef.current = true
+    void notifyFarmers(newOrder.firestoreId)
+  }, [orders, isLoading, placedOrder])
 
   async function confirmDelivery(order: Order) {
     if (!auth.currentUser || order.deliveryConfirmed || order.status !== 'DELIVERED') return
