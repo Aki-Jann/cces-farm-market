@@ -3,8 +3,8 @@ import { cert, getApps, initializeApp } from 'firebase-admin/app'
 import { getAuth } from 'firebase-admin/auth'
 import { FieldValue, getFirestore } from 'firebase-admin/firestore'
 import nodemailer from 'nodemailer'
-import { LEGACY_FARMER_ROLE } from '../src/constants/roles'
 
+const LEGACY_FARMER_ROLE = 'admin'
 const MAX_ORDER_AGE_MS = 10 * 60 * 1000 // only notify for orders created in the last 10 minutes
 
 type Claim =
