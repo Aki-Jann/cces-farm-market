@@ -1,0 +1,121 @@
+.printButton {
+  background: #017632;
+  border: 0;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 10px 13px;
+}
+
+.printButton:hover,
+.printButton:focus-visible {
+  background: #066431;
+  outline: 2px solid rgb(1 118 50 / 22%);
+  outline-offset: 2px;
+}
+
+.reportRoot {
+  display: none;
+}
+
+.reportHeader {
+  border-bottom: 1px solid #999;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+}
+
+.reportHeader h1 {
+  font-size: 20px;
+  margin: 0 0 8px;
+}
+
+.reportHeader p {
+  font-size: 11px;
+  margin: 3px 0;
+}
+
+.reportSection {
+  break-inside: avoid;
+  margin: 0 0 18px;
+  page-break-inside: avoid;
+}
+
+.reportSection h2 {
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+
+.reportTable {
+  border-collapse: collapse;
+  font-size: 10px;
+  width: 100%;
+}
+
+.reportTable th,
+.reportTable td {
+  border: 1px solid #aaa;
+  padding: 5px 7px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.reportTable th {
+  background: #edf2ee;
+}
+
+.reportTable tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.reportCharts {
+  display: grid;
+  gap: 12px;
+}
+
+.reportChart {
+  break-inside: avoid;
+  min-width: 0;
+  page-break-inside: avoid;
+}
+
+@media print {
+  :global(body[data-printing-report]) > :not([data-print-report]) {
+    display: none !important;
+  }
+
+  :global(body[data-printing-report]) > [data-print-report] {
+    background: #fff;
+    color: #000;
+    display: block;
+    font-family: Arial, sans-serif;
+    font-size: 11px;
+    padding: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  :global(body[data-printing-report]) > [data-print-report] *,
+  :global(body[data-printing-report]) > [data-print-report] *::before,
+  :global(body[data-printing-report]) > [data-print-report] *::after {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .reportSection {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .reportCharts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reportTable tr,
+  .reportChart {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

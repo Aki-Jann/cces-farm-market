@@ -48,6 +48,31 @@
   padding: 8px 10px;
 }
 
+.reportToolbar {
+  align-items: center;
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px var(--page-gutter) 0;
+}
+
+.toolbarPrintButton {
+  background: #017632;
+  border: 0;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 10px 13px;
+}
+
+.toolbarPrintButton:hover,
+.toolbarPrintButton:focus-visible {
+  background: #066431;
+  outline: 2px solid rgb(1 118 50 / 22%);
+  outline-offset: 2px;
+}
+
 .panelLink {
   align-items: center;
   align-self: flex-end;
@@ -1130,5 +1155,22 @@ button.panel {
   .printView .dataRow > b,
   .printView .detailSummary strong {
     color: #000;
+  }
+
+  :global(body[data-printing-report]) .periodFilters,
+  :global(body[data-printing-report]) .panelClickHint,
+  :global(body[data-printing-report]) .panelLink {
+    display: none !important;
+  }
+
+  :global(body[data-printing-report]) .panel {
+    box-shadow: none;
+    cursor: default;
+    transform: none;
+  }
+
+  :global(body[data-printing-report]) .trendChart {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }

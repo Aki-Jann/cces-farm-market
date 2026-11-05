@@ -3,6 +3,8 @@ import { collection, doc, onSnapshot, query as firestoreQuery, where } from 'fir
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { FarmerFilter } from '../../components/admin/FarmerFilter'
+import { PrintReport } from '../../components/reports/PrintReport'
+import reportStyles from '../../components/reports/PrintReport.module.css'
 import { getFarmerOptions } from '../../utils/farmerFilter'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
@@ -810,10 +812,6 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
     setActivePanel(null)
   }
 
-  function printReport() {
-    window.print()
-  }
-
   const detailTitle: Record<AnalyticsPanel, string> = {
     'order-value': 'TOTAL ORDER VALUE',
     'units-sold': 'UNITS SOLD',
@@ -846,6 +844,131 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
   () => analytics.inventory.filter((product) => matchesProduct(product, query)),
   [analytics.inventory, query],
   )
+  const printTitle = `Analytics - ${reportFarmerName}`
+  const printContent = (
+    <>
+      <section className={reportStyles.reportSection}>
+        <h2>SUMMARY</h2>
+        <table className={reportStyles.reportTable}>
+          <thead><tr><th>Measure</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td>Total order value (paid orders)</td><td>{currency(analytics.totalRevenue)}</td></tr>
+            <tr><td>Paid transactions</td><td>{analytics.financialOrders.length.toLocaleString()}</td></tr>
+            <tr><td>Units sold</td><td>{analytics.unitsSold.toLocaleString()}</td></tr>
+            <tr><td>Products listed</td><td>{analytics.listedProducts.toLocaleString()}</td></tr>
+            <tr><td>Out of stock</td><td>{analytics.outOfStockProducts.toLocaleString()}</td></tr>
+          </tbody>
+        </table>
+      </section>
+      <section className={reportStyles.reportSection}>
+        <h2>CHARTS AND GRAPHS</h2>
+        <div className={`${styles.chartGrid} ${reportStyles.reportCharts}`}>
+          <div className={reportStyles.reportChart}>
+            <CategoryChart categories={analytics.categories} total={analytics.financialOrders.length} loading={!ordersLoaded} error={ordersError} onClick={() => {}} />
+          </div>
+          <div className={reportStyles.reportChart}>
+            <RevenueTrend points={revenueTrend} period={revenuePeriod} onPeriodChange={setRevenuePeriod} loading={!ordersLoaded} error={ordersError} onClick={() => {}} />
+          </div>
+          <div className={reportStyles.reportChart}>
+            <TransactionsTrend points={transactionsTrend} period={transactionsPeriod} onPeriodChange={setTransactionsPeriod} loading={!ordersLoaded} error={ordersError} onClick={() => {}} />
+          </div>
+        </div>
+        <div className={`${styles.lowerGrid} ${reportStyles.reportCharts}`}>
+          <div className={reportStyles.reportChart}>
+            <ProductRanking title="TOP SELLING PRODUCTS" products={topProducts} period={topProductsPeriod} onPeriodChange={setTopProductsPeriod} loading={!ordersLoaded} error={ordersError} empty="No products sold during this period." description="Ranked by units sold, then revenue." onClick={() => {}} />
+          </div>
+          <div className={reportStyles.reportChart}>
+            <ProductRanking title="UNDERPERFORMING PRODUCTS" products={underperformingProducts} period={underperformingPeriod} onPeriodChange={setUnderperformingPeriod} loading={!ordersLoaded || !productsLoaded} error={ordersError || productsError} empty="Not enough comparable sales history for this period." underperforming description="Available products below the cohort's average revenue." onClick={() => {}} />
+          </div>
+          <div className={reportStyles.reportChart}>
+            <InventoryChart products={filteredInventory} loading={!productsLoaded} error={productsError} onClick={() => {}} />
+          </div>
+        </div>
+      </section>
+      <section className={reportStyles.reportSection}>
+        <h2>REVENUE TREND · {revenuePeriod.toUpperCase()}</h2>
+        <table className={reportStyles.reportTable}>
+          <thead><tr><th>Period</th><th>Farmer</th><th>Paid revenue</th></tr></thead>
+          <tbody>{revenueTrend.filter((point) => point.value > 0).map((point) => (
+            <tr key={point.tooltip}><td>{point.tooltip}</td><td>{reportFarmerName}</td><td>{currency(point.value)}</td></tr>
+          ))}</tbody>
+        </table>
+      </section>
+      <section className={reportStyles.reportSection}>
+        <h2>TRANSACTION TREND · {transactionsPeriod.toUpperCase()}</h2>
+        <table className={reportStyles.reportTable}>
+          <thead><tr><th>Period</th><th>Farmer</th><th>Paid transactions</th></tr></thead>
+          <tbody>{transactionsTrend.filter((point) => point.value > 0).map((point) => (
+            <tr key={point.tooltip}><td>{point.tooltip}</td><td>{reportFarmerName}</td><td>{point.value.toLocaleString()}</td></tr>
+          ))}</tbody>
+        </table>
+      </section>
+      <section className={reportStyles.reportSection}>
+        <h2>SALES BY CATEGORY</h2>
+        <table className={reportStyles.reportTable}>
+          <thead><tr><th>Category</th><th>Farmer</th><th>Sales</th><th>Share</th></tr></thead>
+          <tbody>{analytics.categories.map((category) => (
+            <tr key={category.label}><td>{category.label}</td><td>{reportFarmerName}</td><td>{currency(category.value)}</td><td>{category.percentage}%</td></tr>
+          ))}</tbody>
+        </table>
+      </section>
+      <section className={reportStyles.reportSection}>
+        <h2>TOP SELLING PRODUCTS · {topProductsPeriod.toUpperCase()}</h2>
+        <table className={reportStyles.reportTable}>
+          <thead><tr><th>Product</th><th>Farmer</th><th>Units</th><th>Revenue</th></tr></thead>
+          <tbody>{topProducts.map(({ product, units, revenue }) => (
+            <tr key={product.id}><td>{product.name}</td><td>{farmerName(product.farmerId)}</td><td>{units.toLocaleString()}</td><td>{currency(revenue)}</td></tr>
+          ))}</tbody>
+        </table>
+      </section>
+      <section className={reportStyles.reportSection}>
+        <h2>UNDERPERFORMING PRODUCTS · {underperformingPeriod.toUpperCase()}</h2>
+        <table className={reportStyles.reportTable}>
+          <thead><tr><th>Product</th><th>Farmer</th><th>Units</th><th>Revenue</th></tr></thead>
+          <tbody>{underperformingProducts.map(({ product, units, revenue }) => (
+            <tr key={product.id}><td>{product.name}</td><td>{farmerName(product.farmerId)}</td><td>{units.toLocaleString()}</td><td>{currency(revenue)}</td></tr>
+          ))}</tbody>
+        </table>
+      </section>
+      <section className={reportStyles.reportSection}>
+        <h2>INVENTORY</h2>
+        <table className={reportStyles.reportTable}>
+          <thead><tr><th>Product</th><th>Farmer</th><th>Category</th><th>Stock</th><th>Status</th></tr></thead>
+          <tbody>{filteredInventory.map((product) => (
+            <tr key={product.id}><td>{product.name}</td><td>{farmerName(product.farmerId)}</td><td>{product.category}</td><td>{product.stock} {product.unit}</td><td>{product.isAvailable ? 'Available' : 'Not listed'}</td></tr>
+          ))}</tbody>
+        </table>
+      </section>
+      <section className={reportStyles.reportSection}>
+        <h2>PAID ORDERS</h2>
+        <table className={reportStyles.reportTable}>
+          <thead><tr><th>Order</th><th>Date</th><th>Farmer</th><th>Customer</th><th>Items</th><th>Total</th></tr></thead>
+          <tbody>{analytics.financialOrders.map((order) => {
+            const date = parseDate(order.createdAt)
+            return (
+              <tr key={order.id}>
+                <td>{order.orderNumber}</td>
+                <td>{date?.toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) ?? '—'}</td>
+                <td>{farmerName(order.farmerId)}</td>
+                <td>{order.customerName}</td>
+                <td>{order.items.reduce((sum, item) => sum + (item.quantity ?? 0), 0)}</td>
+                <td>{currency(order.total)}</td>
+              </tr>
+            )
+          })}</tbody>
+        </table>
+      </section>
+      <section className={reportStyles.reportSection}>
+        <h2>PRODUCTS</h2>
+        <table className={reportStyles.reportTable}>
+          <thead><tr><th>Product</th><th>Farmer</th><th>Category</th><th>Units sold</th><th>Stock</th><th>Status</th></tr></thead>
+          <tbody>{analytics.allProducts.map((product) => (
+            <tr key={product.id}><td>{product.name}</td><td>{farmerName(product.farmerId)}</td><td>{product.category}</td><td>{product.sold.toLocaleString()}</td><td>{product.stock} {product.unit}</td><td>{product.isAvailable ? 'Available' : 'Not listed'}</td></tr>
+          ))}</tbody>
+        </table>
+      </section>
+    </>
+  )
   return (
     <main className={`${styles.page} ${activePanel ? styles.printView : ''}`}>
       <AdminSidebar active="analytics" role={role} />
@@ -859,6 +982,11 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
             onChange={setSelectedFarmerId}
           />
         )}
+        <div className={styles.reportToolbar}>
+          <PrintReport title={printTitle} scope={reportFarmerName} buttonClassName={styles.toolbarPrintButton}>
+            {printContent}
+          </PrintReport>
+        </div>
         {activePanel ? (
           <div className={styles.dashboard}>
             <div className={styles.detailHeader}>
@@ -871,11 +999,6 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
                     : 'Expanded information from your live farm market data.'}
                   {role === ROLES.CCES_ADMIN && ` Report scope: ${selectedFarmerId === 'all' ? 'All farmers' : farmerName(selectedFarmerId)}.`}
                 </p>
-              </div>
-              <div className={styles.printActions}>
-                <button className={styles.printButton} type="button" onClick={printReport}>
-                  PRINT / SAVE AS PDF
-                </button>
               </div>
             </div>
             <div className={styles.detailContent}>
@@ -908,13 +1031,15 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
                     <span>FARMER</span>
                     <span>{activePanel === 'revenue-trend' ? 'REVENUE' : 'TRANSACTIONS'}</span>
                   </div>
-                  {(activePanel === 'revenue-trend' ? revenueTrend : transactionsTrend).map((point) => (
+                  {(activePanel === 'revenue-trend' ? revenueTrend : transactionsTrend)
+                    .filter((point) => point.value > 0)
+                    .map((point) => (
                     <div className={styles.dataRow} key={point.tooltip}>
                       <span>{point.tooltip}</span>
                       <span>{reportFarmerName}</span>
                       <b>{activePanel === 'revenue-trend' ? currency(point.value) : point.value.toLocaleString()}</b>
                     </div>
-                  ))}
+                    ))}
                 </div>
               </>
             ) : (
