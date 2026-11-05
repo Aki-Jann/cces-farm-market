@@ -57,13 +57,9 @@ service cloud.firestore {
       let userPath = /databases/$(database)/documents/users/$(farmerId);
       let profilePath = /databases/$(database)/documents/farmerProfiles/$(farmerId);
       return exists(userPath)
-        && (
-          get(userPath).data.get('role', '') == 'admin'
-            && !exists(profilePath)
-          || get(userPath).data.get('role', '') == 'farmer'
-            && exists(profilePath)
-            && get(profilePath).data.get('status', '') == 'active'
-        );
+        && get(userPath).data.get('role', '') in ['farmer', 'admin']
+        && exists(profilePath)
+        && get(profilePath).data.get('status', '') == 'active';
     }
 
     function orderPath(orderId) {
@@ -575,11 +571,11 @@ service cloud.firestore {
       allow create: if isOwner(userId)
         && request.resource.data.keys().hasOnly([
           'firstName', 'lastName', 'email', 'birthday', 'contactNumber',
-          'address', 'role', 'customerType', 'farmNotes', 'createdAt'
+          'address', 'role', 'customerType', 'createdAt'
         ])
         && request.resource.data.keys().hasAll([
           'firstName', 'lastName', 'email', 'birthday', 'contactNumber',
-          'address', 'role', 'customerType', 'farmNotes', 'createdAt'
+          'address', 'role', 'customerType', 'createdAt'
         ])
         && request.resource.data.role == 'customer'
         && request.resource.data.firstName is string
@@ -589,12 +585,16 @@ service cloud.firestore {
         && request.resource.data.contactNumber is string
         && request.resource.data.address is string
         && request.resource.data.customerType == 'individual'
-        && request.resource.data.farmNotes is string
         && request.resource.data.createdAt == request.time;
 
       allow update: if isFarmer()
+            && resource.data.get('role', '') == 'customer'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customerType'])
+            && request.resource.data.customerType in [
+              'individual', 'retail', 'wholesale', 'Individual', 'Retail', 'Wholesale'
+            ]
           && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])
-        || validFarmerRoleChange(userId)
+          || validFarmerRoleChange(userId)
         || isOwner(userId)
           && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
@@ -619,7 +619,9 @@ service cloud.firestore {
             !exists(farmerProfilePath(userId))
             || resource.data.get('status', '') == 'active'
           );
-      allow list: if isCcesAdmin();
+      allow list: if isCcesAdmin()
+        || isCustomer()
+          && resource.data.get('status', '') == 'active';
       allow create: if validFarmerProfileCreate(userId) || validFarmerProfileOwnerCreate(userId);
       allow update: if isCcesAdmin()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
@@ -653,6 +655,25 @@ service cloud.firestore {
           && request.resource.data.mayaAccountNumber is string
           && request.resource.data.mayaQrUrl is string;
       allow delete: if false;
+
+      match /customerNotes/{customerId} {
+        function validCustomerNote(data) {
+          return data.keys().hasOnly(['notes', 'updatedBy', 'updatedAt'])
+            && data.keys().hasAll(['notes', 'updatedBy', 'updatedAt'])
+            && data.notes is string
+            && data.notes.size() <= 4000
+            && data.updatedBy == request.auth.uid
+            && data.updatedAt == request.time
+            && exists(/databases/$(database)/documents/users/$(customerId))
+            && get(/databases/$(database)/documents/users/$(customerId)).data.get('role', '') == 'customer';
+        }
+
+        allow get, list: if isOwner(userId) && isActiveFarmer();
+        allow create, update: if isOwner(userId)
+          && isActiveFarmer()
+          && validCustomerNote(request.resource.data);
+        allow delete: if isOwner(userId) && isActiveFarmer();
+      }
     }
 
     match /products/{productId} {
@@ -900,7 +921,7 @@ service cloud.firestore {
               || isActiveFarmer()
                 && request.auth.uid == farmerId
                 && afterFarmerConversation().farmerId == request.auth.uid
-                && request.resource.data.senderRole == 'farmer'
+                && request.resource.data.senderRole in ['farmer', 'admin']
             );
 
           allow update: if false;

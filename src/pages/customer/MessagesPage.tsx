@@ -4,6 +4,7 @@ import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, where, wri
 import { onAuthStateChanged } from 'firebase/auth'
 import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
 import { Header } from '../../components/layout/Header'
+import farmerStyles from '../admin/AdminCustomersPage.module.css'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import { ROLES } from '../../constants/roles'
@@ -13,7 +14,7 @@ import styles from './MessagesPage.module.css'
 
 type Message = { id: string; text: string; timestamp: string; sender: typeof ROLES.CUSTOMER | 'market'; dayDivider?: string }
 type LoadedMessage = Omit<Message, 'dayDivider'> & { createdAt: Date | null }
-type ConversationTarget = { id: string; farmerId: string; farmName: string; active: boolean }
+type ConversationTarget = { id: string; farmerId: string; farmName: string; hasConversation: boolean; lastMessage: string }
 
 function parseMessageDate(value: unknown): Date | null {
   if (value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function') {
@@ -24,10 +25,8 @@ function parseMessageDate(value: unknown): Date | null {
 }
 
 export function MessagesPage() {
-  const [targets, setTargets] = useState<ConversationTarget[]>([
-    { id: 'legacy', farmerId: '', farmName: 'Farmer', active: true },
-  ])
-  const [selectedTargetId, setSelectedTargetId] = useState('legacy')
+  const [targets, setTargets] = useState<ConversationTarget[]>([])
+  const [selectedTargetId, setSelectedTargetId] = useState('')
   const [messages, setMessages] = useState<Message[]>([])
   const [draft, setDraft] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -40,15 +39,15 @@ export function MessagesPage() {
   const selectedTarget = targets.find((target) => target.id === selectedTargetId)
 
   useEffect(() => {
-    let unsubscribeOrders: (() => void) | undefined
+    let unsubscribeFarmers: (() => void) | undefined
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      unsubscribeOrders?.()
-      unsubscribeOrders = undefined
+      unsubscribeFarmers?.()
+      unsubscribeFarmers = undefined
       if (!user) {
-        setTargets([{ id: 'legacy', farmerId: '', farmName: 'Farmer', active: true }])
-        selectedTargetIdRef.current = 'legacy'
+        setTargets([])
+        selectedTargetIdRef.current = ''
         hasSelectedTargetRef.current = false
-        setSelectedTargetId('legacy')
+        setSelectedTargetId('')
         setMessages([])
         setError('Please log in to view your messages.')
         setIsLoading(false)
@@ -57,46 +56,45 @@ export function MessagesPage() {
 
       setIsLoading(true)
       setError('')
-      unsubscribeOrders = onSnapshot(
-        query(collection(db, 'orders'), where('userId', '==', user.uid)),
+      unsubscribeFarmers = onSnapshot(
+        query(collection(db, 'farmerProfiles'), where('status', '==', 'active')),
         (snapshot) => {
-          const farmerOrders = new Map<string, string>()
-          snapshot.docs.forEach((order) => {
-            const data = order.data()
-            const farmerId = data.farmerId
-            if (typeof farmerId === 'string' && farmerId) {
-              farmerOrders.set(
-                farmerId,
-                getFarmerDisplayName({ farmName: data.farmName, displayName: data.farmerName })
-              )
-            }
-          })
-          void Promise.all([...farmerOrders].map(async ([farmerId, orderName]): Promise<ConversationTarget> => {
+          void Promise.all(snapshot.docs.map(async (profile): Promise<ConversationTarget> => {
             try {
-              const profile = await getDoc(doc(db, 'farmerProfiles', farmerId))
-              const profileData = profile.exists() ? profile.data() : undefined
+              const conversation = await getDoc(doc(db, 'conversations', user.uid, 'farmers', profile.id))
+              const profileData = profile.data()
+              const lastMessage = conversation.exists() && typeof conversation.data().lastMessage === 'string'
+                ? conversation.data().lastMessage
+                : ''
               return {
-                id: farmerId,
-                farmerId,
-                farmName: getFarmerDisplayName(profileData, orderName),
-                active: !profile.exists() || profileData?.status === 'active',
+                id: profile.id,
+                farmerId: profile.id,
+                farmName: getFarmerDisplayName(profileData, 'Farmer'),
+                hasConversation: conversation.exists(),
+                lastMessage,
               }
             } catch (profileError) {
-              console.error(`Loading farmer ${farmerId} for messaging failed:`, profileError)
-              return { id: farmerId, farmerId, farmName: orderName, active: false }
+              console.error(`Loading conversation with farmer ${profile.id} failed:`, profileError)
+              const profileData = profile.data()
+              return {
+                id: profile.id,
+                farmerId: profile.id,
+                farmName: getFarmerDisplayName(profileData, 'Farmer'),
+                hasConversation: false,
+                lastMessage: '',
+              }
             }
           })).then((loadedTargets) => {
             if (auth.currentUser?.uid !== user.uid) return
-            const distinctFarmerTargets = new Map(loadedTargets.map((target) => [target.id, target]))
-            const nextTargets = [
-              { id: 'legacy', farmerId: '', farmName: 'Farmer', active: true },
-              ...distinctFarmerTargets.values(),
-            ]
+            const nextTargets = loadedTargets.sort((first, second) =>
+              Number(second.hasConversation) - Number(first.hasConversation)
+              || first.farmName.localeCompare(second.farmName)
+            )
             setTargets(nextTargets)
             const currentTarget = selectedTargetIdRef.current
             const nextId = hasSelectedTargetRef.current && nextTargets.some((target) => target.id === currentTarget)
               ? currentTarget
-              : nextTargets[1]?.id ?? 'legacy'
+              : nextTargets[0]?.id ?? ''
             if (nextId !== currentTarget) {
               setMessages([])
               setIsLoading(true)
@@ -107,13 +105,14 @@ export function MessagesPage() {
         },
         (snapshotError) => {
           console.error('Loading message recipients failed:', snapshotError)
-          setError('Unable to load your order-related conversations. Please try again.')
+          setError('Unable to load active farmers. Please try again.')
+          setIsLoading(false)
         }
       )
     })
 
     return () => {
-      unsubscribeOrders?.()
+      unsubscribeFarmers?.()
       unsubscribeAuth()
     }
   }, [])
@@ -129,9 +128,7 @@ export function MessagesPage() {
   useEffect(() => {
     const user = auth.currentUser
     if (!user || !selectedTarget) return
-    const messagesQuery = selectedTarget.farmerId
-      ? query(collection(db, 'conversations', user.uid, 'farmers', selectedTarget.farmerId, 'messages'))
-      : query(collection(db, 'conversations', user.uid, 'messages'))
+    const messagesQuery = query(collection(db, 'conversations', user.uid, 'farmers', selectedTarget.farmerId, 'messages'))
     return onSnapshot(messagesQuery, (snapshot) => {
         const sortedMessages = snapshot.docs
           .map((messageDocument): LoadedMessage => {
@@ -176,22 +173,16 @@ export function MessagesPage() {
     event.preventDefault()
     const text = draft.trim()
     const user = auth.currentUser
-    if (!text || !user || !selectedTarget || !selectedTarget.active || isSending) return
+    if (!text || !user || !selectedTarget || isSending) return
 
     setIsSending(true)
     setError('')
     try {
-      const conversationRef = selectedTarget.farmerId
-        ? doc(db, 'conversations', user.uid, 'farmers', selectedTarget.farmerId)
-        : doc(db, 'conversations', user.uid)
+      const conversationRef = doc(db, 'conversations', user.uid, 'farmers', selectedTarget.farmerId)
       const batch = writeBatch(db)
-      batch.set(conversationRef, selectedTarget.farmerId ? {
+      batch.set(conversationRef, {
         customerId: user.uid,
         farmerId: selectedTarget.farmerId,
-        lastMessage: text,
-        updatedAt: serverTimestamp(),
-      } : {
-        customerId: user.uid,
         lastMessage: text,
         updatedAt: serverTimestamp(),
       }, { merge: true })
@@ -217,29 +208,42 @@ export function MessagesPage() {
       <section className={styles.content}>
         <Header title="MESSAGE" />
         <div className={styles.messaging}>
+          <aside className={`${farmerStyles.customerList} ${styles.farmerList}`} aria-label="Farmers you can message">
+            <div className={farmerStyles.customerListHeader}>
+              <div><h2>Farmers</h2><span>{targets.length} active</span></div>
+            </div>
+            {targets.map((target) => (
+              <button
+                className={selectedTargetId === target.id ? farmerStyles.selectedCustomer : ''}
+                key={target.id}
+                type="button"
+                onClick={() => {
+                  selectedTargetIdRef.current = target.id
+                  hasSelectedTargetRef.current = true
+                  setMessages([])
+                  setIsLoading(true)
+                  setSelectedTargetId(target.id)
+                }}
+              >
+                <span className={farmerStyles.avatar} aria-hidden="true">{target.farmName.charAt(0).toUpperCase()}</span>
+                <span className={farmerStyles.customerSummary}>
+                  <strong>{target.farmName}</strong>
+                  <small>{target.hasConversation ? target.lastMessage || 'Conversation started' : 'Start a conversation'}</small>
+                </span>
+                <span className={farmerStyles.segment}>{target.hasConversation ? 'CHAT' : 'MESSAGE'}</span>
+              </button>
+            ))}
+            {!isLoading && targets.length === 0 && <p className={styles.noFarmers}>No active farmers are available.</p>}
+          </aside>
           <section className={styles.chat} aria-label={`Conversation with ${selectedTarget?.farmName ?? 'farmer'}`}>
             <div className={styles.conversationHeader}>
-              <div className={styles.conversationAvatar} aria-hidden="true">T</div>
+              <div className={styles.conversationAvatar} aria-hidden="true">{selectedTarget?.farmName.charAt(0).toUpperCase() ?? 'F'}</div>
               <div className={styles.conversationIdentity}>
                 <strong>{selectedTarget?.farmName ?? 'Farmer'}</strong>
                 <span>Tiangge Verde marketplace</span>
               </div>
               <span className={styles.sellerBadge}>SELLER</span>
             </div>
-            {targets.length > 1 && (
-              <label className={styles.farmerSelectLabel}>
-                Conversation
-                <select value={selectedTargetId} onChange={(event) => {
-                  selectedTargetIdRef.current = event.target.value
-                  hasSelectedTargetRef.current = true
-                  setMessages([])
-                  setIsLoading(true)
-                  setSelectedTargetId(event.target.value)
-                }}>
-                  {targets.map((target) => <option key={target.id} value={target.id}>{target.farmName}</option>)}
-                </select>
-              </label>
-            )}
             <div
               className={styles.messageList}
               onScroll={(event) => {
@@ -250,6 +254,8 @@ export function MessagesPage() {
             >
               {isLoading ? (
                 <p className={styles.listNotice}>Loading messages...</p>
+              ) : !selectedTarget ? (
+                <p className={styles.listNotice}>Select an active farmer to start messaging.</p>
               ) : error && messages.length === 0 ? (
                 <p className={styles.listNotice} role="alert">{error}</p>
               ) : messages.length === 0 ? (
@@ -274,8 +280,8 @@ export function MessagesPage() {
             </div>
             {error && messages.length > 0 && <p className={styles.sendError} role="alert">{error}</p>}
             <form className={styles.composer} onSubmit={sendMessage}>
-              <input value={draft} onChange={(event) => setDraft(event.target.value)} spellCheck autoCapitalize="sentences" autoCorrect="on" placeholder="Write a message..." aria-label="Message" />
-              <button disabled={isSending || !draft.trim() || !selectedTarget?.active} type="submit">
+              <input disabled={!selectedTarget} value={draft} onChange={(event) => setDraft(event.target.value)} spellCheck autoCapitalize="sentences" autoCorrect="on" placeholder="Write a message..." aria-label="Message" />
+              <button disabled={isSending || !draft.trim() || !selectedTarget} type="submit">
                 <span>{isSending ? 'SENDING' : 'SEND'}</span>
                 <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
               </button>

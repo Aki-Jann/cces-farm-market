@@ -3,6 +3,7 @@ import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/f
 import { onAuthStateChanged } from 'firebase/auth'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
+import { ReceiptViewer } from '../../components/common/ReceiptViewer'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import { formatMonthDayYearTime } from '../../utils/dateFormat'
@@ -105,7 +106,7 @@ function OrderDetails({ order, onAdvance, onBack, isUpdating, isArchived }: {
           {order.fulfillmentType === 'pickup' && order.pickupDays && <p><strong>Pickup days</strong><span>{order.pickupDays}</span></p>}
           {order.fulfillmentType === 'pickup' && order.pickupHours && <p><strong>Pickup hours</strong><span>{order.pickupHours}</span></p>}
         {order.sellerNotes && <p><strong>Note to seller</strong><span>{order.sellerNotes}</span></p>}
-        {order.paymentReceiptUrl && <a href={order.paymentReceiptUrl} target="_blank" rel="noreferrer">View payment receipt</a>}
+        {order.paymentReceiptUrl && <ReceiptViewer url={order.paymentReceiptUrl} label="View payment receipt" ariaLabel={`View payment receipt for order ${order.id}`} />}
       </div>
       <div className={styles.items}>
         {order.items.map((item) => <div className={styles.itemRow} key={item.name}><span>{item.name}</span><span>{item.quantity} {item.unit}</span><span>{currency(item.price)}</span><strong>{currency(item.quantity * item.price)}</strong></div>)}

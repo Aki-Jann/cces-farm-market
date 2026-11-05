@@ -936,7 +936,10 @@ export function ShopPage() {
     const query = search.trim().toLowerCase()
     return products.filter((product) => {
       const matchesCategory = product.isAvailable && isFarmerActive(product, farmerStores) && (category === 'All' || product.category === category)
-      const matchesSearch = !query || product.name.toLowerCase().includes(query)
+      const matchesSearch = !query ||
+        product.name.toLowerCase().includes(query) ||
+        product.category.toLowerCase().includes(query) ||
+        product.farmName.toLowerCase().includes(query)
       return matchesCategory && matchesSearch
     })
   }, [category, farmerStores, products, search])

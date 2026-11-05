@@ -48,7 +48,25 @@ beforeEach(async () => {
       setDoc(doc(db, 'users/customer-rejected'), { role: 'customer' }),
       setDoc(doc(db, 'users/admin-a'), { role: 'admin' }),
       setDoc(doc(db, 'users/farmer-b'), { role: 'farmer' }),
+      setDoc(doc(db, 'users/farmer-no-profile'), { role: 'farmer' }),
       setDoc(doc(db, 'users/cces-admin-a'), { role: 'cces_admin' }),
+      setDoc(doc(db, 'farmerProfiles/admin-a'), {
+        status: 'active',
+        storeReady: true,
+        farmName: 'Original Farm',
+        contactNumber: '09999999999',
+        address: 'Farm gate',
+        deliveryFee: 100,
+        pickupLocation: 'Farm gate',
+        pickupDays: 'Monday to Friday',
+        pickupHours: '8 AM to 4 PM',
+        gcashAccountName: 'Original Farm',
+        gcashAccountNumber: '09999999999',
+        gcashQrUrl: 'https://example.com/original-gcash.png',
+        mayaAccountName: '',
+        mayaAccountNumber: '',
+        mayaQrUrl: '',
+      }),
       setDoc(doc(db, 'farmerProfiles/farmer-b'), {
         status: 'active',
         storeReady: true,
@@ -249,6 +267,34 @@ test('customers can read active farmer storefront profiles but farmers cannot ed
   await assertFails(updateDoc(doc(farmerDb, 'orders/order-other-farmer'), { status: 'confirmed' }))
 })
 
+test('customers can list only active farmer profiles', async () => {
+  const db = environment.authenticatedContext('customer-a').firestore()
+  const snapshot = await getDocs(query(collection(db, 'farmerProfiles'), where('status', '==', 'active')))
+  assert.deepEqual(snapshot.docs.map((profile) => profile.id).sort(), ['admin-a', 'farmer-b'])
+  await assertFails(getDocs(collection(db, 'farmerProfiles')))
+})
+
+test('farmer customer notes are private to the owning farmer and are never written to user profiles', async () => {
+  const farmerDb = environment.authenticatedContext('farmer-b').firestore()
+  const noteRef = doc(farmerDb, 'farmerProfiles/farmer-b/customerNotes/customer-a')
+  await assertSucceeds(setDoc(noteRef, {
+    notes: 'Prefers morning delivery.',
+    updatedBy: 'farmer-b',
+    updatedAt: serverTimestamp(),
+  }))
+  await assertSucceeds(getDoc(noteRef))
+  await assertFails(getDoc(doc(farmerDb, 'farmerProfiles/admin-a/customerNotes/customer-a')))
+  await assertFails(updateDoc(doc(farmerDb, 'users/customer-a'), { farmNotes: 'Shared note.' }))
+
+  const customerDb = environment.authenticatedContext('customer-a').firestore()
+  await assertFails(getDoc(doc(customerDb, 'farmerProfiles/farmer-b/customerNotes/customer-a')))
+  await assertFails(setDoc(doc(customerDb, 'farmerProfiles/farmer-b/customerNotes/customer-a'), {
+    notes: 'Customer cannot write this.',
+    updatedBy: 'customer-a',
+    updatedAt: serverTimestamp(),
+  }))
+})
+
 test('only the legacy farmer can claim an unmarked storefront fallback', async () => {
   await environment.withSecurityRulesDisabled(async (context) => {
     await updateDoc(doc(context.firestore(), 'settings/storefront'), { legacyFarmerId: '' })
@@ -387,7 +433,6 @@ test('signup can create a customer profile and pending farmer application atomic
     address: 'Farm Road',
     role: 'customer',
     customerType: 'individual',
-    farmNotes: '',
     createdAt: serverTimestamp(),
   })
   batch.set(doc(db, 'farmerApplications/farmer-applicant'), {
@@ -1213,6 +1258,22 @@ test('customers can create a farmer-scoped conversation and first message atomic
     createdAt: serverTimestamp(),
   })
   await assertSucceeds(batch.commit())
+})
+
+test('customers cannot message a farmer role account without an active farmer profile', async () => {
+  const db = environment.authenticatedContext('customer-b').firestore()
+  await assertFails(setDoc(doc(db, 'conversations/customer-b/farmers/farmer-no-profile'), {
+    customerId: 'customer-b',
+    farmerId: 'farmer-no-profile',
+    lastMessage: 'Should not be delivered.',
+    updatedAt: serverTimestamp(),
+  }))
+  await assertFails(setDoc(doc(db, 'conversations/customer-b/farmers/cces-admin-a'), {
+    customerId: 'customer-b',
+    farmerId: 'cces-admin-a',
+    lastMessage: 'CCES admin is not a farmer.',
+    updatedAt: serverTimestamp(),
+  }))
 })
 
 test('a farmer cannot create a conversation under another farmer id', async () => {

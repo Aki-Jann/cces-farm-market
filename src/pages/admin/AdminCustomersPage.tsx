@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, updateDoc, where, writeBatch } from 'firebase/firestore'
+import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
@@ -132,7 +132,6 @@ function Messages({ customer }: { customer: Customer }) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState('')
-  const [isLegacyFarmer, setIsLegacyFarmer] = useState(false)
   const messageListRef = useRef<HTMLDivElement | null>(null)
   const shouldScrollToBottom = useRef(true)
 
@@ -140,17 +139,10 @@ function Messages({ customer }: { customer: Customer }) {
     shouldScrollToBottom.current = true
     const farmer = auth.currentUser
     let unsubscribeMessages: (() => void) | undefined
-    let isMounted = true
     if (!farmer) return
 
-    void getDoc(doc(db, 'users', farmer.uid)).then((farmerDocument) => {
-      if (!isMounted) return
-      const legacy = farmerDocument.data()?.role === LEGACY_FARMER_ROLE
-      setIsLegacyFarmer(legacy)
-      const messagesQuery = legacy
-        ? query(collection(db, 'conversations', customer.id, 'messages'))
-        : query(collection(db, 'conversations', customer.id, 'farmers', farmer.uid, 'messages'))
-      unsubscribeMessages = onSnapshot(messagesQuery, (snapshot) => {
+    const messagesQuery = query(collection(db, 'conversations', customer.id, 'farmers', farmer.uid, 'messages'))
+    unsubscribeMessages = onSnapshot(messagesQuery, (snapshot) => {
         const sortedMessages = snapshot.docs
           .map((messageDocument): LoadedMessage => {
             const data = messageDocument.data()
@@ -186,16 +178,8 @@ function Messages({ customer }: { customer: Customer }) {
         console.error('Loading customer messages failed:', snapshotError)
         setError('Unable to load messages. Please try again.')
         setIsLoading(false)
-      })
-    }).catch((loadError) => {
-      console.error('Loading farmer account for messages failed:', loadError)
-      if (isMounted) {
-        setError('Unable to load messages. Please try again.')
-        setIsLoading(false)
-      }
     })
     return () => {
-      isMounted = false
       unsubscribeMessages?.()
     }
   }, [customer.id])
@@ -221,15 +205,9 @@ function Messages({ customer }: { customer: Customer }) {
     setIsSending(true)
     setError('')
     try {
-      const conversationRef = isLegacyFarmer
-        ? doc(db, 'conversations', customer.id)
-        : doc(db, 'conversations', customer.id, 'farmers', farmer.uid)
+      const conversationRef = doc(db, 'conversations', customer.id, 'farmers', farmer.uid)
       const batch = writeBatch(db)
-      batch.set(conversationRef, isLegacyFarmer ? {
-        customerId: customer.id,
-        lastMessage: text,
-        updatedAt: serverTimestamp(),
-      } : {
+      batch.set(conversationRef, {
         customerId: customer.id,
         farmerId: farmer.uid,
         lastMessage: text,
@@ -237,7 +215,7 @@ function Messages({ customer }: { customer: Customer }) {
       }, { merge: true })
       batch.set(doc(collection(conversationRef, 'messages')), {
         senderId: farmer.uid,
-        senderRole: isLegacyFarmer ? LEGACY_FARMER_ROLE : ROLES.FARMER,
+        senderRole: ROLES.FARMER,
         text,
         createdAt: serverTimestamp(),
       })
@@ -277,6 +255,8 @@ export function AdminCustomersPage() {
   const [tab, setTab] = useState<'profile' | 'messages'>('messages')
   const [search, setSearch] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [isOriginalFarmer, setIsOriginalFarmer] = useState(false)
+  const [notesByCustomer, setNotesByCustomer] = useState<Record<string, string>>({})
   const [error, setError] = useState('')
   const isLoading = !usersLoaded || !ordersLoaded
 
@@ -291,8 +271,8 @@ export function AdminCustomersPage() {
       const lastName = typeof data.lastName === 'string' ? data.lastName.trim() : ''
       const name = `${firstName} ${lastName}`.trim() || 'Unnamed customer'
       const customerType = normalizeCustomerType(data.customerType)
-      const farmNotes = typeof data.farmNotes === 'string' ? data.farmNotes.trim() : ''
-      const profileNotes = farmNotes
+      const legacyFarmNotes = typeof data.farmNotes === 'string' ? data.farmNotes.trim() : ''
+      const farmNotes = notesByCustomer[id] ?? (isOriginalFarmer ? legacyFarmNotes : '')
       const orders = rawOrders.flatMap(({ id: orderId, data: orderData }) => {
         if (orderData.userId !== id) return []
         return [{
@@ -314,12 +294,12 @@ export function AdminCustomersPage() {
         segment: customerType.toUpperCase(),
         joined: formatDate(data.createdAt),
         farmNotes,
-        notes: profileNotes || 'No farm notes.',
+        notes: farmNotes || 'No farm notes.',
         orders,
         messages: [],
       }]
     })
-  }, [rawUsers, rawOrders])
+  }, [isOriginalFarmer, notesByCustomer, rawUsers, rawOrders])
 
   const visibleCustomers = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -334,6 +314,41 @@ export function AdminCustomersPage() {
   }, [customers, search])
 
   const selected = visibleCustomers.find((customer) => customer.id === selectedId) ?? visibleCustomers[0]
+
+  useEffect(() => {
+    const farmer = auth.currentUser
+    if (!farmer) return
+    let isMounted = true
+    void getDoc(doc(db, 'settings', 'storefront')).then((storefrontSnapshot) => {
+      if (!isMounted) return
+      setIsOriginalFarmer(storefrontSnapshot.data()?.legacyFarmerId === farmer.uid)
+    }).catch((loadError) => {
+      console.error('Loading legacy farmer note fallback failed:', loadError)
+      if (isMounted) setError('Unable to load farmer account settings. Please try again.')
+    })
+    return () => { isMounted = false }
+  }, [])
+
+  useEffect(() => {
+    const farmer = auth.currentUser
+    if (!farmer || !selected?.id) return
+    return onSnapshot(
+      doc(db, 'farmerProfiles', farmer.uid, 'customerNotes', selected.id),
+      (snapshot) => {
+        setNotesByCustomer((current) => {
+          if (!snapshot.exists() || typeof snapshot.data().notes !== 'string') {
+            const { [selected.id]: _removed, ...remaining } = current
+            return remaining
+          }
+          return { ...current, [selected.id]: snapshot.data().notes }
+        })
+      },
+      (loadError) => {
+        console.error('Loading farmer-specific customer notes failed:', loadError)
+        setError('Unable to load farm notes. Please try again.')
+      }
+    )
+  }, [selected?.id])
 
   // Users and orders are independent collections, so each gets its own
   // real-time listener; the customer list above is derived from both.
@@ -376,13 +391,12 @@ export function AdminCustomersPage() {
     }
   }, [])
 
-  async function updateCustomerProfile(field: 'farmNotes' | 'customerType', value: string) {
+  async function updateCustomerProfile(field: 'customerType', value: string) {
     if (!selected) return
     setError('')
     setIsSaving(true)
     try {
       await updateDoc(doc(db, 'users', selected.id), { [field]: value })
-      // The users listener will refresh `customers` automatically once Firestore confirms the write.
     } catch (saveError) {
       console.error('Updating customer profile failed:', saveError)
       setError('Unable to save customer information. Please try again.')
@@ -391,6 +405,24 @@ export function AdminCustomersPage() {
     }
   }
 
+  async function saveFarmNotes(value: string) {
+    const farmer = auth.currentUser
+    if (!selected || !farmer) return
+    setError('')
+    setIsSaving(true)
+    try {
+      await setDoc(doc(db, 'farmerProfiles', farmer.uid, 'customerNotes', selected.id), {
+        notes: value,
+        updatedBy: farmer.uid,
+        updatedAt: serverTimestamp(),
+      })
+    } catch (saveError) {
+      console.error('Saving farmer-specific customer notes failed:', saveError)
+      setError('Unable to save farm notes. Please try again.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
   return <main className={styles.page}><AdminSidebar active="customers" />
   <section className={styles.content}>
     <Header title="MESSAGES" search={search} onSearchChange={(event) => setSearch(event.target.value)} />
@@ -407,5 +439,5 @@ export function AdminCustomersPage() {
                   <nav className={styles.tabs}>
                     <button className={tab === 'messages' ? styles.activeTab : ''} type="button" onClick={() => setTab('messages')}>MESSAGES</button>
                     <button className={tab === 'profile' ? styles.activeTab : ''} type="button" onClick={() => setTab('profile')}>PROFILE</button>
-                    </nav>{tab === 'profile' ? <Profile key={selected.id} customer={selected} isSaving={isSaving} onSaveNotes={(notes) => updateCustomerProfile('farmNotes', notes)} /> : <Messages key={selected.id} customer={selected} />}</section></div>}</section></main>
+                    </nav>{tab === 'profile' ? <Profile key={selected.id} customer={selected} isSaving={isSaving} onSaveNotes={saveFarmNotes} /> : <Messages key={selected.id} customer={selected} />}</section></div>}</section></main>
 }

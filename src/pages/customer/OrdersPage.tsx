@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
 import type { FormEvent } from 'react'
 import { onAuthStateChanged } from 'firebase/auth'
 import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore'
 import { CustomerSidebar } from '../../components/layout/CustomerSidebar'
 import { Header } from '../../components/layout/Header'
+import { ReceiptViewer } from '../../components/common/ReceiptViewer'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
 import { formatMonthDayYear } from '../../utils/dateFormat'
@@ -70,54 +70,6 @@ function currency(value: number) {
 function isOnlinePayment(payment: string) {
   const normalizedPayment = payment.trim().toUpperCase()
   return normalizedPayment === 'GCASH' || normalizedPayment === 'MAYA' || normalizedPayment === 'PAYMAYA'
-}
-
-function ReceiptViewer({
-  url,
-  label,
-  className,
-  ariaLabel,
-}: {
-  url: string
-  label: string
-  className?: string
-  ariaLabel?: string
-}) {
-  const [isOpen, setIsOpen] = useState(false)
-
-  useEffect(() => {
-    if (!isOpen) return
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setIsOpen(false)
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [isOpen])
-
-  return (
-    <>
-      <button type="button" className={className} aria-label={ariaLabel} onClick={() => setIsOpen(true)}>
-        {label}
-      </button>
-      {isOpen && createPortal(
-        <div
-          className={styles.receiptOverlay}
-          onClick={(event) => {
-            if (event.target === event.currentTarget) setIsOpen(false)
-          }}
-        >
-          <section className={styles.receiptModal} role="dialog" aria-modal="true" aria-label="Payment receipt">
-            <div className={styles.receiptModalHeader}>
-              <h2>Payment receipt</h2>
-              <button type="button" aria-label="Close receipt" onClick={() => setIsOpen(false)}>×</button>
-            </div>
-            <img src={url} alt="Payment receipt screenshot" />
-          </section>
-        </div>,
-        document.body
-      )}
-    </>
-  )
 }
 
 function ProductReview({ order, item }: { order: Order; item: Order['items'][number] }) {

@@ -18,7 +18,6 @@ type AccountData = {
   contact: string
   address: string
   customerType: string
-  farmNotes: string
 }
 
 function formatBirthday(value: unknown) {
@@ -90,7 +89,6 @@ export function AccountPage({ applicantOnly = false }: { applicantOnly?: boolean
             contact: typeof data.contactNumber === 'string' ? data.contactNumber : '',
             address: typeof data.address === 'string' ? data.address : '',
             customerType: typeof data.customerType === 'string' ? data.customerType : 'Not provided',
-            farmNotes: typeof data.farmNotes === 'string' ? data.farmNotes : '',
           }
           if (user.email && data.email !== user.email) {
             updateDoc(doc(db, 'users', user.uid), { email: user.email })

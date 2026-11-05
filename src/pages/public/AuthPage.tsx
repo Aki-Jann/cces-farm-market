@@ -337,7 +337,6 @@ export function AuthPage({ type }: { type: AuthType }) {
         address: registrationFields.address,
         role: ROLES.CUSTOMER,
         customerType: 'individual',
-        farmNotes: '',
         createdAt: serverTimestamp(),
       })
       if (applyAsFarmer) {

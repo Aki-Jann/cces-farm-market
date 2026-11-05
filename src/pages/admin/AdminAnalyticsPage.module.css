@@ -587,9 +587,20 @@ button.panel {
 
 .detailHeader {
   align-items: flex-end;
+  background: var(--color-background);
   display: flex;
   gap: 18px;
   justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.detailContent {
+  max-height: min(65vh, 680px);
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .detailHeader h2 {
@@ -994,6 +1005,10 @@ button.panel {
     align-items: flex-start;
   }
 
+  .detailContent {
+    max-height: calc(100dvh - 260px);
+  }
+
   .detailHeader h2 {
     font-size: 21px;
   }
@@ -1065,6 +1080,12 @@ button.panel {
     border-bottom: 2px solid #017632;
     margin-bottom: 16px;
     padding-bottom: 10px;
+    position: static;
+  }
+
+  .printView .detailContent {
+    max-height: none;
+    overflow: visible;
   }
 
   .printView .detailHeader h2 {

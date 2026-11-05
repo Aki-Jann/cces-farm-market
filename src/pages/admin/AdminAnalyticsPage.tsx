@@ -106,44 +106,59 @@ function getPeriodBounds(period: Period, now = new Date()) {
   return { start, end }
 }
 
+function manilaDateParts(date: Date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+  return {
+    year: Number(parts.find((part) => part.type === 'year')?.value),
+    month: Number(parts.find((part) => part.type === 'month')?.value),
+    day: Number(parts.find((part) => part.type === 'day')?.value),
+  }
+}
+
 function periodDateKey(date: Date, period: Period) {
-  if (period === 'yearly') return String(date.getFullYear())
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  if (period === 'monthly') return `${date.getFullYear()}-${month}`
-  return `${date.getFullYear()}-${month}-${String(date.getDate()).padStart(2, '0')}`
+  const { year, month, day } = manilaDateParts(date)
+  if (period === 'yearly') return String(year)
+  if (period === 'monthly') return `${year}-${String(month).padStart(2, '0')}`
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
 function getBucketLabel(date: Date, period: Period) {
-  if (period === 'yearly') return String(date.getFullYear())
-  if (period === 'monthly') return date.toLocaleDateString('en-PH', { month: 'short', year: '2-digit' })
-  return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
+  if (period === 'yearly') return String(manilaDateParts(date).year)
+  if (period === 'monthly') return date.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'short', year: '2-digit' })
+  return date.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'short', day: 'numeric' })
 }
 
 function getChartPeriods(period: Period, dates: Date[], now = new Date()) {
   const keys: { key: string; label: string; tooltip: string }[] = []
-  if (dates.length === 0) return keys
+  const current = manilaDateParts(now)
   if (period === 'yearly') {
-    const firstYear = Math.min(...dates.map((date) => date.getFullYear()))
-    for (let year = firstYear; year <= now.getFullYear(); year += 1) {
+    const firstYear = dates.length
+      ? Math.min(current.year, ...dates.map((date) => manilaDateParts(date).year))
+      : current.year
+    for (let year = firstYear; year <= current.year; year += 1) {
       keys.push({ key: String(year), label: String(year), tooltip: String(year) })
     }
     return keys
   }
 
   const periods = period === 'daily' ? 30 : 12
-  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  if (period === 'daily') start.setDate(start.getDate() - periods + 1)
-  else start.setMonth(start.getMonth() - periods + 1, 1)
-  if (period === 'monthly') start.setDate(1)
+  const start = new Date(Date.UTC(current.year, current.month - 1, period === 'daily' ? current.day : 1, 12))
+  if (period === 'daily') start.setUTCDate(start.getUTCDate() - periods + 1)
+  else start.setUTCMonth(start.getUTCMonth() - periods + 1)
 
   for (let index = 0; index < periods; index += 1) {
     const date = new Date(start)
-    if (period === 'daily') date.setDate(start.getDate() + index)
-    else date.setMonth(start.getMonth() + index)
+    if (period === 'daily') date.setUTCDate(start.getUTCDate() + index)
+    else date.setUTCMonth(start.getUTCMonth() + index)
     const key = periodDateKey(date, period)
     const tooltip = period === 'daily'
-      ? date.toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })
-      : date.toLocaleDateString('en-PH', { month: 'long', year: 'numeric' })
+      ? date.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'long', day: 'numeric', year: 'numeric' })
+      : date.toLocaleDateString('en-PH', { timeZone: 'Asia/Manila', month: 'long', year: 'numeric' })
     keys.push({ key, label: getBucketLabel(date, period), tooltip })
   }
   return keys
@@ -154,7 +169,7 @@ function makeTrendPoints(
   period: Period,
   valueForOrder: (order: FirestoreOrder) => number,
 ) {
-  const datedOrders = orders.flatMap((order) => {
+  const datedOrders = orders.filter(isOrderEligibleForFinancialTotals).flatMap((order) => {
     const date = parseDate(order.createdAt)
     return date ? [{ order, date }] : []
   })
@@ -728,10 +743,10 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
   ), [analytics.financialOrders, revenuePeriod])
 
   const transactionsTrend = useMemo(() => makeTrendPoints(
-    analytics.orders,
+    analytics.financialOrders,
     transactionsPeriod,
     () => 1,
-  ), [analytics.orders, transactionsPeriod])
+  ), [analytics.financialOrders, transactionsPeriod])
 
   function getProductPerformance(orders: FirestoreOrder[], products: Product[], period: Period) {
     const { start, end } = getPeriodBounds(period)
@@ -863,6 +878,7 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
                 </button>
               </div>
             </div>
+            <div className={styles.detailContent}>
             {activePanel === 'order-value' ? (
               <>
                 <div className={styles.detailSummary}><span>Total value across {analytics.financialOrders.length} paid orders</span><strong>{currency(analytics.totalRevenue)}</strong></div>
@@ -915,6 +931,7 @@ export function AdminAnalyticsPage({ role = ROLES.FARMER }: { role?: ManagementR
                 </div>
               </>
             )}
+            </div>
           </div>
         ) : <div className={styles.dashboard}>
           <div className={styles.metrics}>
