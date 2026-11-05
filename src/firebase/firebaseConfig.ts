@@ -1,13 +1,21 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp } from 'firebase/app'
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAp6g2bZ49Fdzi990yXy79D_f_CBRUrQb0",
-  authDomain: "cces-farm-market.firebaseapp.com",
-  projectId: "cces-farm-market",
-  storageBucket: "cces-farm-market.firebasestorage.app",
-  messagingSenderId: "450594062725",
-  appId: "1:450594062725:web:d7f3e68c61f18d6e2684ec",
-  measurementId: "G-7XTJGX677Z"
-};
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+}
 
-export const app = initializeApp(firebaseConfig);
+const missingConfig = Object.entries(firebaseConfig)
+  .filter(([name, value]) => name !== 'measurementId' && !value)
+  .map(([name]) => name)
+
+if (missingConfig.length > 0) {
+  throw new Error(`Missing Firebase configuration: ${missingConfig.join(', ')}`)
+}
+
+export const app = initializeApp(firebaseConfig)

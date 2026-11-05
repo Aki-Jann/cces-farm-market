@@ -1,5 +1,6 @@
 {
   "name": "cces-farm-market",
+  "description": "CCES Farm to Market marketplace for customers, farmers, and CCES administrators.",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -11,22 +12,20 @@
     "test:rules": "node scripts/run-rules-tests.mjs"
   },
   "dependencies": {
-    "@types/qrcode": "^1.5.6",
     "firebase": "^12.19.0",
     "firebase-admin": "^14.5.0",
     "nodemailer": "^10.3.1",
-    "qrcode": "^1.5.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@typescript-eslint/parser": "^8.70.0",
     "@firebase/rules-unit-testing": "^5.0.2",
     "@types/node": "^24.13.3",
     "@types/nodemailer": "^8.0.2",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
+    "@typescript-eslint/parser": "^8.70.0",
     "@vercel/node": "^29.0.1",
     "@vitejs/plugin-react": "^6.1.1",
     "eslint": "^10.10.0",
