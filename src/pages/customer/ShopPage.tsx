@@ -440,7 +440,7 @@ function Cart({
           </div>
         ) : groups.map((group) => (
           <section className={styles.cartFarmerGroup} key={group.farmerId || 'legacy'}>
-            <h2>{group.farmName}</h2>
+            <h2>Farm: {group.farmName}</h2>
             {group.items.map((item) => (
               <div
                 className={`${styles.cartItemShell} ${revealedItemId === item.id ? styles.cartItemShellRevealed : ''}`}
@@ -494,12 +494,6 @@ function Cart({
                 </div>
               </div>
             ))}
-            <div className={styles.cartFarmerTotals}>
-              <SummaryRow label="Subtotal" value={currency(group.subtotal)} />
-              <SummaryRow label="Delivery" value={currency(group.deliveryFee)} />
-              <SummaryRow label="Tax 5%" value={currency(group.tax)} />
-              <SummaryRow label="Farm total" value={currency(group.total)} strong />
-            </div>
           </section>
         ))}
       </div>
@@ -573,7 +567,9 @@ function Cart({
                       <p><strong>Delivery fee:</strong> {currency(group.deliveryFee)}</p>
                       <p><strong>Tax:</strong> {currency(group.tax)}</p>
                       <p><strong>Order total:</strong> {currency(group.total)}</p>
-                      {fulfillmentType === 'pickup' && (
+                    </div>
+                    <div className={styles.pickupDetails}>
+                        {fulfillmentType === 'pickup' && (
                         <>
                           <p><strong>Pickup location:</strong> {group.settings.pickupLocation || 'To be confirmed by the seller.'}</p>
                           {group.settings.pickupDays && <p><strong>Pickup days:</strong> {group.settings.pickupDays}</p>}

@@ -74,10 +74,18 @@
 .cancelled { background: #fff1ee; color: #9f342a; }
 
 .emptyState {
-  padding: 20px 0px;
-  color: #6c7175;
+  align-items: center;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   grid-column: 1 / -1;
+  margin: 32px auto;
+  max-width: 460px;
+  min-height: 280px;
+  padding: 28px 20px;
   text-align: center;
+  width: 100%;
 }
 .noMatches { background: transparent; border-radius: 0; box-shadow: none; gap: 14px; margin: 32px auto; max-width: 460px; min-height: 280px; padding: 28px 20px; text-align: center; width: 100%; }
 .noMatches strong { color: #191919; font-size: 20px; white-space: normal; }

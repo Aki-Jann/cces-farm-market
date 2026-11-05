@@ -855,6 +855,10 @@
   padding: 10px 12px;
 }
 
+.pickupDetails:empty{
+  display: none;
+}
+
 .pickupDetails {
   background: #f5f5f5;
   border-radius: 5px;
