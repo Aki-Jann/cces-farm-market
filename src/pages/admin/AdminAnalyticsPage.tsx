@@ -45,6 +45,18 @@ type FirestoreProduct = {
   unit: string
   isAvailable: boolean
   imageUrl?: string
+<<<<<<< Updated upstream
+=======
+  createdAt?: unknown
+}
+
+const categoryColors = ['#087b3b', '#79a94b', '#d3a32d', '#78a9a0', '#7492b8', '#a788b5']
+
+function matchesProduct(product: Product, query: string) {
+  return !query ||
+    product.name.toLowerCase().includes(query) ||
+    product.category.toLowerCase().includes(query)
+>>>>>>> Stashed changes
 }
 
 function currency(value: number) {

@@ -416,7 +416,20 @@ a.inventoryRow:focus-visible {
 @media (max-width: 700px) {
   .page {
     display: block;
+<<<<<<< Updated upstream
     height: auto;
+=======
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .page > .content {
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    height: 100dvh;
+    overflow: hidden;
+>>>>>>> Stashed changes
   }
 
   .dashboard {

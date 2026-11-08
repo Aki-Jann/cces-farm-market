@@ -119,7 +119,7 @@
 .tabs button:focus-visible,
 .sectionHeading button:focus-visible,
 .customerTypeButton:focus-visible {
-  outline: 3px solid rgb(1 118 50 / 28%);
+  outline: 3px solid rgb(8 123 59 / 28%);
   outline-offset: -3px;
 }
 
@@ -556,7 +556,7 @@
 
 .composer input:focus {
   border-color: #63a879;
-  outline: 3px solid rgb(1 118 50 / 10%);
+  outline: 3px solid rgb(8 123 59 / 10%);
 }
 
 .composer button {

@@ -33,10 +33,10 @@
   align-items: center;
   background: #eaf5ed;
   border-radius: 50%;
-  color: #017632;
+  color: #087b3b;
   display: flex;
   flex: 0 0 68px;
-  font-family: 'Playfair Display', Georgia, serif;
+  font-family: 'DM Sans', Arial, sans-serif;
   font-size: 32px;
   height: 68px;
   justify-content: center;
@@ -69,7 +69,7 @@
 .role {
   background: #eaf5ed;
   border-radius: 5px;
-  color: #017632;
+  color: #087b3b;
   font-size: 11px;
   font-weight: 700;
   padding: 7px 10px;
@@ -116,7 +116,7 @@
   background: #eaf5ed;
   border: 0;
   border-radius: 5px;
-  color: #017632;
+  color: #087b3b;
   cursor: pointer;
   flex: 0 0 auto;
   font-size: 12px;
@@ -197,8 +197,8 @@
 
 .form input:focus {
   background: #fff;
-  border-color: #017632;
-  outline: 2px solid rgb(1 118 50 / 14%);
+  border-color: #087b3b;
+  outline: 2px solid rgb(8 123 59 / 14%);
 }
 
 .actions {
@@ -210,7 +210,7 @@
 }
 
 .actions button {
-  background: #017632;
+  background: #087b3b;
   border: 0;
   border-radius: 5px;
   color: #fff;
@@ -235,6 +235,67 @@
   opacity: 0.6;
 }
 
+<<<<<<< Updated upstream
+=======
+.security {
+  align-items: center;
+  border-top: 1px solid #e2e7e3;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-top: 24px;
+  padding-top: 24px;
+}
+
+.security h3 {
+  font-size: 16px;
+  margin: 0;
+}
+
+.security p {
+  color: #6c7175;
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
+.security button {
+  background: #eaf5ed;
+  border: 0;
+  border-radius: 5px;
+  color: #087b3b;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 10px 14px;
+}
+
+.security button:hover:not(:disabled),
+.security button:focus-visible {
+  background: #d9eddf;
+  outline: 0;
+}
+
+.security button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.resetError,
+.resetNotice {
+  font-size: 13px;
+  margin: 16px 0 0;
+}
+
+.resetError {
+  color: #b42318;
+}
+
+.resetNotice {
+  color: #087b3b;
+}
+
+>>>>>>> Stashed changes
 @media (max-width: 700px) {
   .page {
     display: block;

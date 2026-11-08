@@ -19,9 +19,9 @@
 }
 
 .sidebar > div { width: 100%; }
-.rule { border-top: 1px solid #017632; margin: -7px -10px 20px; }
-.sidebar a { border-radius: 5px; color: #017632; display: block; font-size: 16px; margin-bottom: 8px; padding: 9px 26px; text-decoration: none; }
-.sidebar .activeNav { background: #017632; color: #fff; font-weight: 700; }
+.rule { border-top: 1px solid #087b3b; margin: -7px -10px 20px; }
+.sidebar a { border-radius: 5px; color: #087b3b; display: block; font-size: 16px; margin-bottom: 8px; padding: 9px 26px; text-decoration: none; }
+.sidebar .activeNav { background: #087b3b; color: #fff; font-weight: 700; }
 
 .ordersContent { flex: 1; min-width: 0; }
 .orderPanel { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-panel); box-shadow: var(--shadow-panel); margin: 20px 30px; min-height: calc(100vh - 150px); padding: 31px 14px; }
@@ -34,6 +34,10 @@
 .statusFilters button.activeFilter span { background: rgb(255 255 255 / 20%); color: #fff; }
 .tableHeader { align-items: center; display: grid; gap: 12px; grid-template-columns: 1.4fr 1fr 1fr 1fr 1.2fr 1fr; text-align: center; }
 .tableHeader { border-bottom: 1px solid #d9d9d9; color: #6c7175; font-size: 12px; font-weight: 700; padding: 0 16px 14px; text-transform: uppercase; }
+<<<<<<< Updated upstream
+=======
+.orderPlacedNotice { background: #eaf5ed; border: 1px solid #cfe0d3; border-radius: var(--radius-control); color: #087b3b; font-size: 13px; font-weight: 600; margin: 0 0 14px; padding: 12px 14px; }
+>>>>>>> Stashed changes
 .orderList { display: flex; flex-direction: column; gap: 10px; margin-top: 15px; }
 .orderGroup { border: 1px solid var(--color-border); border-radius: var(--radius-control); overflow: hidden; }
 .orderLine { align-items: stretch; background: #fff; display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr 1.2fr 1fr; }
@@ -44,7 +48,7 @@
 .receiptAction:hover { background: #e2f0e5; border-color: #b8d8bf; }
 .receiptAction:focus-visible { outline: 2px solid #087b3b; outline-offset: 2px; }
 .receiptPending, .receiptNotNeeded { color: #758178; font-size: 10px; }
-.green { color: #017632; }
+.green { color: #087b3b; }
 .status { border-radius: 999px; justify-self: center; padding: 5px 8px; font-size: 10px; font-weight: 700; }
 .delivered { background: var(--order-delivered-bg); color: var(--order-delivered-text); }
 .confirmed { background: var(--order-confirmed-bg); color: var(--order-confirmed-text); }
@@ -56,16 +60,22 @@
 .emptyState a { background: #017632; border-radius: 5px; color: #fff; font-size: 14px; font-weight: 700; padding: 9px 25px; text-decoration: none; }
 .noMatches { background: transparent; border-radius: 0; box-shadow: none; gap: 14px; margin: 32px auto; max-width: 460px; min-height: 280px; padding: 28px 20px; text-align: center; width: 100%; }
 .noMatches strong { color: #191919; font-size: 20px; white-space: normal; }
-.emptyIcon { align-items: center; background: #eaf5ed; border-radius: 50%; color: #017632; display: flex; flex: 0 0 56px; height: 56px; justify-content: center; width: 56px; }
+.emptyIcon { align-items: center; background: #eaf5ed; border-radius: 50%; color: #087b3b; display: flex; flex: 0 0 56px; height: 56px; justify-content: center; width: 56px; }
 .emptyIcon svg { fill: none; height: 25px; stroke: currentColor; stroke-linecap: round; stroke-width: 1.8; width: 25px; }
 .emptyCopy p { color: #6c7175; font-size: 14px; line-height: 1.5; margin: 0; overflow-wrap: anywhere; }
-.clearSearchButton { background: #017632; border: 0; border-radius: 5px; color: #fff; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; min-height: 40px; padding: 9px 16px; }
+.clearSearchButton { background: #087b3b; border: 0; border-radius: 5px; color: #fff; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; min-height: 40px; padding: 9px 16px; }
 .clearSearchButton:hover { background: #015c27; }
-.clearSearchButton:focus-visible { outline: 2px solid #017632; outline-offset: 3px; }
+.clearSearchButton:focus-visible { outline: 2px solid #087b3b; outline-offset: 3px; }
 
+<<<<<<< Updated upstream
 .details { background: var(--color-surface-muted); border-top: 1px solid var(--color-border); padding: 18px; }
 .detailsHeading { align-items: center; display: flex; justify-content: space-between; margin-bottom: 14px; }
 .detailsHeading h2 { color: #017632; font-size: 17px; margin: 0; }
+=======
+.details { background: #eef5f0; border-top: 3px solid #087b3b; padding: 18px; }
+.detailsHeading { align-items: center; border-bottom: 1px solid #cfe0d3; display: flex; justify-content: space-between; margin-bottom: 14px; padding-bottom: 12px; }
+.detailsHeading h2 { color: #087b3b; font-size: 17px; margin: 0; }
+>>>>>>> Stashed changes
 .detailsHeading p { color: #6c7175; font-size: 12px; margin: 3px 0 0; }
 .detailsStatus { border-radius: 999px; font-size: 10px; font-weight: 700; padding: 6px 9px; white-space: nowrap; }
 .detailMeta { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 12px; }
@@ -75,7 +85,7 @@
 .detailNote { display: flex; flex-wrap: wrap; gap: 6px 10px; margin: 8px 0; }
 .detailNote strong { flex: 0 0 110px; font-size: 12px; }
 .detailNote span { color: #555d58; flex: 1; font-size: 12px; min-width: 0; overflow-wrap: anywhere; }
-.receiptLink { color: #017632; display: inline-block; font-size: 12px; font-weight: 700; margin: 6px 0 12px; }
+.receiptLink { color: #087b3b; display: inline-block; font-size: 12px; font-weight: 700; margin: 6px 0 12px; }
 .detailTable { border-top: 1px solid #d8dfda; font-size: 13px; }
 .detailHeader, .detailRow { display: grid; gap: 10px; grid-template-columns: minmax(0, 2fr) minmax(52px, .9fr) minmax(75px, 1fr) minmax(85px, 1.1fr); padding: 10px 0; }
 .detailHeader { color: #6c7175; font-size: 10px; font-weight: 700; }
@@ -84,7 +94,7 @@
 .detailRow span:nth-child(n+2), .detailRow strong:last-child, .detailHeader span:nth-child(n+2) { text-align: right; }
 .detailTotal { align-items: center; border-top: 1px solid #d8dfda; display: flex; justify-content: space-between; padding-top: 13px; }
 .detailTotal span { color: #555d58; font-size: 13px; font-weight: 700; text-transform: uppercase; }
-.detailTotal strong { color: #017632; font-size: 19px; }
+.detailTotal strong { color: #087b3b; font-size: 19px; }
 .deliveryConfirmation, .reviews { border-top: 1px solid #d8dfda; margin-top: 16px; padding-top: 16px; }
 .deliveryConfirmation { align-items: center; display: flex; flex-wrap: wrap; gap: 10px; }
 .deliveryConfirmation p, .reviews > p { color: #555d58; font-size: 12px; margin: 0; }
@@ -104,6 +114,68 @@
 .submittedReview { align-items: center; color: #56645a; font-size: 12px; }
 .reviewStars { color: #d58b12; font-size: 15px; white-space: nowrap; }
 .reviewLoading { color: #758178; font-size: 11px; }
+<<<<<<< Updated upstream
+=======
+.receiptOverlay {
+  align-items: center;
+  background: rgb(25 25 25 / 55%);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 16px;
+  position: fixed;
+  z-index: 100;
+}
+
+.receiptModal {
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 12px 36px rgb(0 0 0 / 24%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100vh - 32px);
+  max-width: 420px;
+  padding: 16px;
+  width: 100%;
+}
+
+.receiptModalHeader {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.receiptModalHeader h2 {
+  color: #087b3b;
+  font-size: 18px;
+  margin: 0;
+}
+
+.receiptModalHeader button {
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  color: #6c7175;
+  cursor: pointer;
+  font-size: 26px;
+  line-height: 1;
+  padding: 4px 8px;
+}
+
+.receiptModalHeader button:hover {
+  background: #f4f4f4;
+}
+
+.receiptModal img {
+  background: #f5f5f5;
+  border-radius: 5px;
+  display: block;
+  max-height: calc(100vh - 140px);
+  object-fit: contain;
+  width: 100%;
+}
+>>>>>>> Stashed changes
 
 @media (max-width: 700px) {
   .ordersPage { display: block; }

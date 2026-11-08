@@ -192,6 +192,9 @@ export function LandingPage() {
             Ateneo de Zamboanga University, La Purisima St., Zamboanga City 7000, Philippines
           </a>
         </div>
+        <small className={styles.copyright}>
+          © 2026 Aaron Jann Enriquez &amp; Jasmien Pajiji. All rights reserved.
+        </small>
       </footer>
     </main> 
   )
