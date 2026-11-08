@@ -17,16 +17,13 @@ dist/
 firestore-debug.log
 *-debug.log
 backups/
-service-account/
-credentials/
 *service-account*.json
 *serviceAccount*.json
 *service_account*.json
 *firebase-adminsdk*.json
-*credential*.json
-*credentials*.json
-.vercel/
-*.tsbuildinfo
+
+# Environment variables
+.env
 
 # Editor directories and files
 .vscode/*

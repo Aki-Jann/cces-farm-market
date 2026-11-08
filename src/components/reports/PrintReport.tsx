@@ -17,6 +17,7 @@ export function PrintReport({
   const [printedAt, setPrintedAt] = useState<Date | null>(null)
   const previousTitle = useRef('')
   const titleRef = useRef(title)
+  titleRef.current = title
 
   useEffect(() => {
     if (!printedAt) return
@@ -41,10 +42,7 @@ export function PrintReport({
     <>
       <button
         className={buttonClassName ?? styles.printButton}
-        onClick={() => {
-          titleRef.current = title
-          setPrintedAt(new Date())
-        }}
+        onClick={() => setPrintedAt(new Date())}
         type="button"
       >
         PRINT / SAVE AS PDF
