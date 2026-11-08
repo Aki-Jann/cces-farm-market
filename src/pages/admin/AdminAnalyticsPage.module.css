@@ -10,7 +10,7 @@
   align-items: center;
   background: #edf5ef;
   border-radius: 50%;
-  color: #017632;
+  color: #087b3b;
   display: flex;
   font-size: 11px;
   font-weight: 700;
@@ -56,7 +56,7 @@
 }
 
 .toolbarPrintButton {
-  background: #017632;
+  background: #087b3b;
   border: 0;
   border-radius: 6px;
   color: #fff;
@@ -68,8 +68,8 @@
 
 .toolbarPrintButton:hover,
 .toolbarPrintButton:focus-visible {
-  background: #066431;
-  outline: 2px solid rgb(1 118 50 / 22%);
+  background: #087b3b;
+  outline: 2px solid rgb(8 123 59 / 22%);
   outline-offset: 2px;
 }
 
@@ -78,7 +78,7 @@
   align-self: flex-end;
   background: transparent;
   border: 0;
-  color: #017632;
+  color: #087b3b;
   cursor: pointer;
   display: inline-flex;
   font: inherit;
@@ -90,7 +90,7 @@
 }
 
 .panelLink:focus-visible {
-  outline: 2px solid rgb(1 118 50 / 35%);
+  outline: 2px solid rgb(8 123 59 / 35%);
   outline-offset: 3px;
 }
 
@@ -128,7 +128,7 @@
 .metric {
   appearance: none;
   border: 1px solid var(--color-border);
-  border-top: 3px solid #017632;
+  border-top: 3px solid #087b3b;
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
   display: flex;
@@ -152,12 +152,12 @@
 
 .metric:focus-visible,
 .panel:focus-visible {
-  outline: 3px solid rgb(1 118 50 / 28%);
+  outline: 3px solid rgb(8 123 59 / 28%);
   outline-offset: 2px;
 }
 
 .metricSales {
-  border-top-color: #017632;
+  border-top-color: #087b3b;
 }
 
 .metricUnits {
@@ -200,7 +200,7 @@
   align-items: center;
   background: #eaf5ed;
   border-radius: 9px;
-  color: #017632;
+  color: #087b3b;
   display: flex;
   flex: 0 0 34px;
   height: 34px;
@@ -245,7 +245,7 @@
 .metricAction,
 .panelClickHint {
   align-items: center;
-  color: #017632;
+  color: #087b3b;
   display: flex;
   font-size: 11px;
   font-weight: 700;
@@ -303,7 +303,7 @@ button.panel {
 }
 
 .panel h2 {
-  color: #017632;
+  color: #087b3b;
 }
 
 .panelDescription {
@@ -353,12 +353,12 @@ button.panel {
 }
 
 .periodFilters button:focus-visible {
-  outline: 2px solid rgb(1 118 50 / 35%);
+  outline: 2px solid rgb(8 123 59 / 35%);
   outline-offset: 1px;
 }
 
 .periodFilters .selectedPeriod {
-  background: #017632;
+  background: #087b3b;
   box-shadow: 0 1px 3px rgb(26 63 41 / 15%);
   color: #fff;
 }
@@ -371,7 +371,7 @@ button.panel {
 
 .trendChart[role='button']:focus-visible {
   border-radius: 6px;
-  outline: 3px solid rgb(1 118 50 / 28%);
+  outline: 3px solid rgb(8 123 59 / 28%);
   outline-offset: 3px;
 }
 
@@ -395,7 +395,7 @@ button.panel {
 
 .revenueLine {
   fill: none;
-  stroke: #017632;
+  stroke: #087b3b;
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 2.5;
@@ -403,7 +403,7 @@ button.panel {
 
 .revenuePoint {
   fill: #fff;
-  stroke: #017632;
+  stroke: #087b3b;
   stroke-width: 2;
 }
 
@@ -593,7 +593,7 @@ button.panel {
 
 .inventoryTrack i,
 .product > div > span > i {
-  background: #017632;
+  background: #087b3b;
   border-radius: inherit;
   display: block;
   height: 100%;
@@ -653,11 +653,11 @@ button.panel {
 
 .backButton {
   background: #eaf5ed;
-  color: #017632;
+  color: #087b3b;
 }
 
 .printButton {
-  background: #017632;
+  background: #087b3b;
   color: #fff;
 }
 
@@ -669,15 +669,15 @@ button.panel {
 
 .printButton:hover,
 .printButton:focus-visible {
-  background: #066431;
-  outline: 2px solid rgb(1 118 50 / 22%);
+  background: #087b3b;
+  outline: 2px solid rgb(8 123 59 / 22%);
   outline-offset: 2px;
 }
 
 .backButton:hover,
 .backButton:focus-visible {
   filter: brightness(0.96);
-  outline: 2px solid rgb(1 118 50 / 22%);
+  outline: 2px solid rgb(8 123 59 / 22%);
   outline-offset: 2px;
 }
 
@@ -703,7 +703,7 @@ button.panel {
 }
 
 .detailSummary strong {
-  color: #017632;
+  color: #087b3b;
   font-size: 22px;
   font-variant-numeric: tabular-nums;
   overflow-wrap: anywhere;
@@ -853,7 +853,7 @@ button.panel {
 }
 
 .statusAvailable {
-  color: #017632;
+  color: #087b3b;
 }
 
 .statusOut {
@@ -1102,7 +1102,7 @@ button.panel {
 
   .printView .detailHeader {
     align-items: flex-start;
-    border-bottom: 2px solid #017632;
+    border-bottom: 2px solid #087b3b;
     margin-bottom: 16px;
     padding-bottom: 10px;
     position: static;

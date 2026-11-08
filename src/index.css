@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
 
 :root {
   font-family: 'DM Sans', Arial, sans-serif;
@@ -12,7 +12,7 @@
   --color-border: #e3eae4;
   --color-border-strong: #d5e1d7;
   --color-brand: #087b3b;
-  --color-brand-strong: #066431;
+  --color-brand-strong: #087b3b;
   --color-brand-soft: #e9f5ec;
   --page-gutter: clamp(16px, 3.8vw, 30px);
   --color-focus: rgb(8 123 59 / 24%);
@@ -28,7 +28,7 @@
   --order-packed-bg: #f0eaff;
   --order-packed-text: #694fa0;
   --order-delivered-bg: #e7f4e9;
-  --order-delivered-text: #287747;
+  --order-delivered-text: #087b3b;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -70,4 +70,24 @@ a {
 ::selection {
   background: #d9eddf;
   color: #183b28;
+}
+
+@media (max-width: 700px) {
+  html,
+  body,
+  #root {
+    max-width: 100%;
+    overflow-x: clip;
+  }
+
+  body {
+    min-height: 100dvh;
+  }
+
+  input:not([type='checkbox']):not([type='radio']):not([type='hidden']),
+  select:not([multiple]):not([size]),
+  textarea:not([disabled]):not([readonly]) {
+    font-size: 16px;
+    min-height: 44px;
+  }
 }

@@ -44,7 +44,6 @@
 }
 
 .heading h1 {
-  font-family: 'Playfair Display', Georgia, serif;
   font-size: clamp(24px, 3vw, 34px);
   margin: 0;
 }
@@ -258,7 +257,7 @@
 }
 
 .notice {
-  color: #176b32;
+  color: #087b3b;
 }
 
 .emptyState {

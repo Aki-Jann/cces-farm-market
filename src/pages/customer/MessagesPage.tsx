@@ -29,6 +29,7 @@ export function MessagesPage() {
   const [selectedTargetId, setSelectedTargetId] = useState('')
   const [messages, setMessages] = useState<Message[]>([])
   const [draft, setDraft] = useState('')
+  const [mobileChatOpen, setMobileChatOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSending, setIsSending] = useState(false)
   const [error, setError] = useState('')
@@ -207,7 +208,7 @@ export function MessagesPage() {
       <CustomerSidebar active="messages" />
       <section className={styles.content}>
         <Header title="MESSAGE" />
-        <div className={styles.messaging}>
+        <div className={`${styles.messaging} ${mobileChatOpen ? styles.mobileChatOpen : ''}`}>
           <aside className={`${farmerStyles.customerList} ${styles.farmerList}`} aria-label="Farmers you can message">
             <div className={farmerStyles.customerListHeader}>
               <div><h2>Farmers</h2><span>{targets.length} active</span></div>
@@ -223,6 +224,7 @@ export function MessagesPage() {
                   setMessages([])
                   setIsLoading(true)
                   setSelectedTargetId(target.id)
+                  setMobileChatOpen(true)
                 }}
               >
                 <span className={farmerStyles.avatar} aria-hidden="true">{target.farmName.charAt(0).toUpperCase()}</span>
@@ -237,6 +239,13 @@ export function MessagesPage() {
           </aside>
           <section className={styles.chat} aria-label={`Conversation with ${selectedTarget?.farmName ?? 'farmer'}`}>
             <div className={styles.conversationHeader}>
+              <button
+                className={styles.mobileConversationBack}
+                type="button"
+                onClick={() => setMobileChatOpen(false)}
+              >
+                <span aria-hidden="true">‹</span> Conversations
+              </button>
               <div className={styles.conversationAvatar} aria-hidden="true">{selectedTarget?.farmName.charAt(0).toUpperCase() ?? 'F'}</div>
               <div className={styles.conversationIdentity}>
                 <strong>{selectedTarget?.farmName ?? 'Farmer'}</strong>

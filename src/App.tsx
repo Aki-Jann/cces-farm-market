@@ -53,7 +53,7 @@ function homeForRole(role: UserRole | null, applicationStatus: ApplicationStatus
   if (role === ROLES.CUSTOMER) {
     return applicationStatus === 'pending' || applicationStatus === 'rejected' ? '/account' : '/shop'
   }
-  if (role === ROLES.CCES_ADMIN) return '/admin/analytics'
+  if (role === ROLES.CCES_ADMIN) return '/admin'
   return role === ROLES.FARMER ? '/admin' : '/login'
 }
 

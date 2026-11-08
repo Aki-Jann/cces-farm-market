@@ -355,7 +355,6 @@ export function LandingPage() {
             Buying nearby makes it easier to know where our food comes from and
             who grew it.
           </blockquote>
-          <small>Sample community note — illustrative content</small>
         </div>
       </section>
 
@@ -427,6 +426,10 @@ export function LandingPage() {
             Ateneo de Zamboanga University, La Purisima St., Zamboanga City
             7000, Philippines
           </a>
+          <p className={styles.copyright}>
+            © 2026 Aaron Jann Enriquez, Jasmien Pajiji, &amp; Stephen Gabrielle
+            David. All rights reserved.
+          </p>
         </div>
       </footer>
     </main>

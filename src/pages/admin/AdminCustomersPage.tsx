@@ -252,6 +252,7 @@ export function AdminCustomersPage() {
   const [usersLoaded, setUsersLoaded] = useState(false)
   const [ordersLoaded, setOrdersLoaded] = useState(false)
   const [selectedId, setSelectedId] = useState('')
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false)
   const [tab, setTab] = useState<'profile' | 'messages'>('messages')
   const [search, setSearch] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -432,9 +433,12 @@ export function AdminCustomersPage() {
           <div className={styles.workspace}><p role="alert">{error}</p>
           </div> : !selected ? <div className={styles.workspace}>
             <p>{search.trim() ? 'No customer profiles match your search.' : 'No customer profiles found.'}</p>
-          </div> : <div className={styles.workspace}>
-            <CustomerList customers={visibleCustomers} selectedId={selected.id} onSelect={(id) => { setSelectedId(id); setTab('messages') }} />
+          </div> : <div className={`${styles.workspace} ${mobileDetailOpen ? styles.mobileDetailOpen : ''}`}>
+            <CustomerList customers={visibleCustomers} selectedId={selected.id} onSelect={(id) => { setSelectedId(id); setTab('messages'); setMobileDetailOpen(true) }} />
               <section className={styles.details}>
+                <button className={styles.mobileCustomerBack} type="button" onClick={() => setMobileDetailOpen(false)}>
+                  <span aria-hidden="true">‹</span> Customers
+                </button>
                 <CustomerHeader customer={selected} onChangeCustomerType={(customerType) => void updateCustomerProfile('customerType', customerType)} />
                   <nav className={styles.tabs}>
                     <button className={tab === 'messages' ? styles.activeTab : ''} type="button" onClick={() => setTab('messages')}>MESSAGES</button>

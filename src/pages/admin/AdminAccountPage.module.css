@@ -39,7 +39,7 @@
   align-items: center;
   background: #eaf5ed;
   border-radius: 50%;
-  color: #017632;
+  color: #087b3b;
   display: flex;
   flex: 0 0 68px;
   font-size: 30px;
@@ -74,7 +74,7 @@
 .role {
   background: #eaf5ed;
   border-radius: 5px;
-  color: #017632;
+  color: #087b3b;
   font-size: 11px;
   font-weight: 700;
   padding: 7px 10px;
@@ -131,7 +131,7 @@
   background: #eaf5ed;
   border: 0;
   border-radius: 5px;
-  color: #017632;
+  color: #087b3b;
   cursor: pointer;
   flex: 0 0 auto;
   font-size: 12px;
@@ -172,7 +172,7 @@
   background: #eaf5ed;
   border: 0;
   border-radius: 5px;
-  color: #017632;
+  color: #087b3b;
   cursor: pointer;
   flex: 0 0 auto;
   font-size: 12px;
@@ -256,8 +256,8 @@
 
 .form input:focus {
   background: #fff;
-  border-color: #017632;
-  outline: 2px solid rgb(1 118 50 / 14%);
+  border-color: #087b3b;
+  outline: 2px solid rgb(8 123 59 / 14%);
 }
 
 .form input:read-only {
@@ -277,7 +277,7 @@
 }
 
 .actions button {
-  background: #017632;
+  background: #087b3b;
   border: 0;
   border-radius: 5px;
   color: #fff;
@@ -320,7 +320,7 @@
 }
 
 .paymentSettings h4 {
-  color: #017632;
+  color: #087b3b;
   font-size: 14px;
   margin: 0;
 }
@@ -409,7 +409,7 @@
 }
 
 .notice {
-  color: #017632;
+  color: #087b3b;
 }
 
 @media (max-width: 700px) {

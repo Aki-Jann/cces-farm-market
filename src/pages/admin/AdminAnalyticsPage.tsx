@@ -59,7 +59,7 @@ type FirestoreProduct = {
   createdAt?: unknown
 }
 
-const categoryColors = ['#017632', '#79a94b', '#d3a32d', '#78a9a0', '#7492b8', '#a788b5']
+const categoryColors = ['#087b3b', '#087b3b', '#d3a32d', '#78a9a0', '#7492b8', '#a788b5']
 
 function matchesProduct(product: Product, query: string) {
   return !query ||

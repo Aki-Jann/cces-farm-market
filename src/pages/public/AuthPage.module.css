@@ -159,7 +159,7 @@
   background: transparent;
   border: 0;
   border-radius: 5px;
-  color: #017632;
+  color: #087b3b;
   cursor: pointer;
   display: inline-flex;
   height: 30px;
@@ -492,13 +492,19 @@
   }
 
   .field > span {
-    font-size: 10px;
+    font-size: 12px;
   }
 
   .field input {
-    font-size: 11px;
-    min-height: 36px;
-    padding: 7px;
+    font-size: 16px;
+    min-height: 44px;
+    padding: 10px;
+  }
+
+  .passwordToggle {
+    font-size: 10px;
+    min-height: 44px;
+    min-width: 44px;
   }
 
   .registerCard > div:first-child {
@@ -526,18 +532,23 @@
   }
 
   .registerFields .field > span {
-    font-size: 10px;
+    font-size: 12px;
   }
 
   .registerFields .field input {
-    font-size: 11px;
-    min-height: 36px;
-    padding: 7px;
+    font-size: 16px;
+    min-height: 44px;
+    padding: 10px;
   }
 
   .homeButton {
-    font-size: 9px;
-    padding: 8px 10px;
+    font-size: 11px;
+    min-height: 44px;
+    padding: 8px 12px;
+  }
+
+  .submitButton {
+    min-height: 44px;
   }
 }
 
@@ -561,8 +572,8 @@
   }
 
   .registerFields .field input {
-    min-height: 32px;
-    padding-block: 5px;
+    min-height: 44px;
+    padding-block: 10px;
   }
 
   .registerAction {
@@ -571,7 +582,7 @@
 
   .registerAction .submitButton,
   .registerAction .disabledButton {
-    min-height: 34px;
-    padding-block: 6px;
+    min-height: 44px;
+    padding-block: 8px;
   }
 }

@@ -148,8 +148,8 @@
 
   .sidebar a {
     flex: 0 0 auto;
-    font-size: 10px;
-    min-height: 38px;
+    font-size: 11px;
+    min-height: 44px;
     padding: 8px 9px;
     width: auto;
   }
@@ -165,6 +165,6 @@
   .sidebar > a {
     flex: 0 0 auto;
     margin: 0 0 0 5px;
-    min-height: 36px;
+    min-height: 44px;
   }
 }

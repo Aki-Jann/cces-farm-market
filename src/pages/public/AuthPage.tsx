@@ -254,7 +254,7 @@ export function AuthPage({ type }: { type: AuthType }) {
       }
 
       if (role === ROLES.CCES_ADMIN) {
-        window.location.hash = '/admin/analytics'
+        window.location.hash = '/admin'
         return
       }
 

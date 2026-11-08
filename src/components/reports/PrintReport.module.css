@@ -1,5 +1,5 @@
 .printButton {
-  background: #017632;
+  background: #087b3b;
   border: 0;
   border-radius: 6px;
   color: #fff;
@@ -11,8 +11,8 @@
 
 .printButton:hover,
 .printButton:focus-visible {
-  background: #066431;
-  outline: 2px solid rgb(1 118 50 / 22%);
+  background: #087b3b;
+  outline: 2px solid rgb(8 123 59 / 22%);
   outline-offset: 2px;
 }
 

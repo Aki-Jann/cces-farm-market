@@ -78,10 +78,11 @@ function StatusTimeline({ status }: { status: OrderStatus }) {
   )
 }
 
-function OrderDetails({ order, onAdvance, onBack, isUpdating, isArchived }: {
+function OrderDetails({ order, onAdvance, onBack, onMobileBack, isUpdating, isArchived }: {
   order: Order
   onAdvance: () => void
   onBack: () => void
+  onMobileBack: () => void
   isUpdating: boolean
   isArchived: boolean
 }) {
@@ -92,6 +93,9 @@ function OrderDetails({ order, onAdvance, onBack, isUpdating, isArchived }: {
   const isTerminal = order.status === 'CANCELLED' || order.paymentStatus === 'rejected'
   return (
     <section className={styles.details}>
+      <button className={styles.mobileDetailBack} type="button" onClick={onMobileBack}>
+        Back to orders
+      </button>
       <div className={styles.customer}>
         <div><h2>{order.customer}</h2><p>{order.id}</p><p>{order.date}</p><p>{order.email}</p></div>
         <StatusBadge status={order.status} />
@@ -144,6 +148,7 @@ function OrderDetails({ order, onAdvance, onBack, isUpdating, isArchived }: {
 export function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [mobileDetailsOpen, setMobileDetailsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [isUpdating, setIsUpdating] = useState(false)
@@ -157,6 +162,7 @@ export function AdminOrdersPage() {
       setArchive(isArchiveRoute)
       setStatusFilter(null)
       setShowAllOrders(false)
+      setMobileDetailsOpen(false)
     }
     window.addEventListener('hashchange', syncArchiveState)
     return () => window.removeEventListener('hashchange', syncArchiveState)
@@ -320,7 +326,11 @@ export function AdminOrdersPage() {
                   <button
                     aria-pressed={showAllOrders && !statusFilter}
                     className={showAllOrders && !statusFilter ? styles.activeStat : ''}
-                    onClick={() => { setStatusFilter(null); setShowAllOrders(true) }}
+                    onClick={() => {
+                      setStatusFilter(null)
+                      setShowAllOrders(true)
+                      setMobileDetailsOpen(false)
+                    }}
                     type="button"
                   >
                     ALL ORDERS <span>{orders.length}</span>
@@ -330,7 +340,11 @@ export function AdminOrdersPage() {
                       aria-pressed={statusFilter === status}
                       className={statusFilter === status ? styles.activeStat : ''}
                       key={status}
-                      onClick={() => { setStatusFilter((current) => current === status ? null : status); setShowAllOrders(false) }}
+                      onClick={() => {
+                        setStatusFilter((current) => current === status ? null : status)
+                        setShowAllOrders(false)
+                        setMobileDetailsOpen(false)
+                      }}
                       type="button"
                     >
                       {status} <span>{counts[status]}</span>
@@ -341,7 +355,7 @@ export function AdminOrdersPage() {
               </div>
             )}
             {error && orders.length > 0 && <p className={styles.workspaceError} role="alert">{error}</p>}
-            <div className={styles.ordersPanel}>
+            <div className={`${styles.ordersPanel} ${mobileDetailsOpen ? styles.mobileDetailsOpen : ''}`}>
               {isLoading ? (
                 <p className={styles.empty}>Loading orders...</p>
               ) : error && orders.length === 0 ? (
@@ -350,7 +364,7 @@ export function AdminOrdersPage() {
                 <p className={styles.empty}>{search.trim() ? 'No orders match your search.' : 'No orders found.'}</p>
               ) : (
                 <>
-                  <aside className={styles.orderList}>
+                  <aside className={`${styles.orderList} ${mobileDetailsOpen ? styles.mobileListHidden : ''}`}>
                     <div className={styles.orderListHeader}>
                       <div>
                         <strong>{archive ? 'Completed orders' : statusFilter ? `${statusFilter} orders` : showAllOrders ? 'All orders' : 'Active queue'}</strong>
@@ -363,7 +377,10 @@ export function AdminOrdersPage() {
                         className={selected?.id === order.id ? styles.selected : ''}
                         type="button"
                         key={order.id}
-                        onClick={() => setSelectedId(order.id)}
+                        onClick={() => {
+                          setSelectedId(order.id)
+                          setMobileDetailsOpen(true)
+                        }}
                       >
                         <div>
                           <strong>{order.customer}</strong>
@@ -381,6 +398,7 @@ export function AdminOrdersPage() {
                     order={selected}
                     onAdvance={advanceSelected}
                     onBack={reverseSelected}
+                    onMobileBack={() => setMobileDetailsOpen(false)}
                     isUpdating={isUpdating}
                     isArchived={archive}
                   />}

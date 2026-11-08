@@ -52,6 +52,10 @@
   min-width: 0;
 }
 
+.mobileConversationBack {
+  display: none;
+}
+
 .conversationHeader {
   align-items: center;
   background: linear-gradient(110deg, var(--color-surface) 0%, var(--color-surface-muted) 100%);
@@ -64,13 +68,12 @@
 
 .conversationAvatar {
   align-items: center;
-  background: linear-gradient(145deg, #15934b, #01632a);
+  background: var(--color-brand);
   border-radius: 50%;
-  box-shadow: 0 3px 10px rgb(1 118 50 / 20%);
+  box-shadow: 0 3px 10px rgb(8 123 59 / 20%);
   color: #fff;
   display: flex;
   flex: 0 0 42px;
-  font-family: 'Playfair Display', Georgia, serif;
   font-size: 21px;
   height: 42px;
   justify-content: center;
@@ -97,7 +100,7 @@
   background: #eaf5ed;
   border: 1px solid #d7eadc;
   border-radius: 999px;
-  color: #017632;
+  color: #087b3b;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.07em;
@@ -305,7 +308,7 @@
   height: 44px;
   justify-content: center;
   padding: 0 15px;
-  box-shadow: 0 3px 8px rgb(1 118 50 / 16%);
+  box-shadow: 0 3px 8px rgb(8 123 59 / 16%);
   transition: background 150ms ease, box-shadow 150ms ease, transform 150ms ease;
 }
 
@@ -356,34 +359,120 @@
 
   .messaging {
     border-radius: 13px;
+    flex: 1 1 0;
     flex-direction: column;
-    margin: 16px var(--page-gutter);
+    margin: 12px var(--page-gutter) max(12px, env(safe-area-inset-bottom));
   }
 
-  .farmerList {
-    border-bottom: 1px solid #e6ece7;
-    border-right: 0;
+  .farmerList,
+  .messaging.mobileChatOpen .farmerList {
+    background: #fbfdfb;
+    border: 0;
     display: flex;
-    flex: 0 0 112px;
-    flex-direction: row;
-    height: 112px;
-    overflow-x: auto;
-    overflow-y: hidden;
+    flex: 1 1 0;
+    flex-direction: column;
+    height: auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
     width: 100%;
+  }
+
+  .messaging.mobileChatOpen .farmerList {
+    display: none;
   }
 
   .farmerList > div:first-child {
     align-items: center;
-    border-bottom: 0;
-    border-right: 1px solid #e6ece7;
-    flex: 0 0 105px;
-    padding: 10px;
-    position: static;
+    border-bottom: 1px solid #e6ece7;
+    border-right: 0;
+    flex: 0 0 auto;
+    padding: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 1;
   }
 
   .farmerList > button {
-    flex: 0 0 200px;
-    width: 200px;
+    flex: 0 0 auto;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    min-height: 76px;
+    padding: 14px;
+    width: 100%;
+  }
+
+  .farmerList :global(.avatar) {
+    height: 40px;
+    width: 40px;
+  }
+
+  .farmerList :global(.customerSummary strong) {
+    font-size: 14px;
+  }
+
+  .farmerList :global(.customerSummary small) {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .mobileChatOpen .chat {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+
+  .messaging:not(.mobileChatOpen) .chat {
+    display: none;
+  }
+
+  .mobileConversationBack {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: var(--color-brand);
+    cursor: pointer;
+    display: inline-flex;
+    flex: 1 0 100%;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    gap: 3px;
+    justify-content: flex-start;
+    min-height: 40px;
+    padding: 0 2px;
+  }
+
+  .mobileConversationBack span {
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 1;
+  }
+
+  .conversationHeader {
+    flex-wrap: wrap;
+    gap: 6px 8px;
+    padding: 8px 12px;
+  }
+
+  .conversationAvatar {
+    flex-basis: 36px;
+    height: 36px;
+    width: 36px;
+  }
+
+  .conversationIdentity strong {
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .conversationIdentity span {
+    font-size: 11px;
+  }
+
+  .sellerBadge {
+    font-size: 9px;
+    padding: 5px 7px;
   }
 
   .conversationHeader {
@@ -402,7 +491,7 @@
 
   .composer {
     gap: 8px;
-    padding: 11px 12px max(11px, env(safe-area-inset-bottom));
+    padding: 10px 12px max(12px, env(safe-area-inset-bottom));
   }
 
   .composer input {
@@ -410,7 +499,23 @@
   }
 
   .composer button {
+    min-width: 44px;
     padding: 0 12px;
+  }
+}
+
+@media (max-width: 360px) {
+  .conversationHeader {
+    gap: 6px;
+    padding-inline: 8px;
+  }
+
+  .mobileConversationBack {
+    font-size: 11px;
+  }
+
+  .sellerBadge {
+    display: none;
   }
 }
 

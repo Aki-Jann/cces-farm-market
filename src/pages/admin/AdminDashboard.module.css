@@ -29,7 +29,7 @@
 
 .welcome {
   align-items: center;
-  background: linear-gradient(120deg, #075f32 0%, #0c8241 58%, #1d9250 100%);
+  background: var(--color-brand);
   border: 1px solid rgb(255 255 255 / 15%);
   border-radius: 14px;
   box-shadow: 0 8px 22px rgb(15 85 46 / 14%);
@@ -277,7 +277,7 @@
 }
 
 .barFill.green {
-  background: #16834a;
+  background: #087b3b;
 }
 
 .barFill.today {
@@ -469,7 +469,7 @@ a.inventoryRow:focus-visible {
   }
 
   .statCard h2 {
-    font-size: 8px;
+    font-size: 10px;
   }
 
   .statCard strong {
@@ -477,7 +477,7 @@ a.inventoryRow:focus-visible {
   }
 
   .statCard p {
-    font-size: 9px;
+    font-size: 11px;
   }
 
   .bottomPanels {

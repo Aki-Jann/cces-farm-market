@@ -27,7 +27,7 @@
 }
 
 .header > a {
-  color: #017632;
+  color: #087b3b;
   display: inline-block;
   flex: 0 0 auto;
   font-size: clamp(20px, 2.5vw, 32px);
@@ -367,9 +367,8 @@
 }
 
 .communityNote > span {
-  color: #78a77f;
+  color: #087b3b;
   display: block;
-  font-family: 'Playfair Display', Georgia, serif;
   font-size: 54px;
   height: 38px;
   line-height: 1;
@@ -377,10 +376,10 @@
 
 .communityNote blockquote {
   color: #34473a;
-  font-family: 'Playfair Display', Georgia, serif;
   font-size: 18px;
   line-height: 1.6;
   margin: 12px 0 18px;
+  font-weight: 800;
 }
 
 .communityNote small {
@@ -513,8 +512,8 @@
 }
 
 .productCard button:hover {
-  background: #066431;
-  border-color: #066431;
+  background: #087b3b;
+  border-color: #087b3b;
 }
 
 
@@ -647,8 +646,16 @@ footer .details {
 
 .details a:focus-visible {
   border-radius: 3px;
-  outline: 3px solid rgb(1 118 50 / 22%);
+  outline: 3px solid rgb(8 123 59 / 22%);
   outline-offset: 3px;
+}
+
+.copyright {
+  color: #52685a;
+  font-size: 10px;
+  line-height: 1.6;
+  margin: 4px 0 0;
+  width: 100%;
 }
 
 @media (max-width: 760px) {
@@ -673,13 +680,18 @@ footer .details {
   }
 
     .header nav a {
-    font-size: 9px;
-    padding: 8px;
+      font-size: 11px;
+      min-height: 44px;
+      padding: 8px 7px;
   }
 
   .header .loginLink {
+    background: var(--color-surface);
     margin-left: 2px;
     padding-inline: 11px;
+    position: sticky;
+    right: 0;
+    z-index: 1;
   }
 
   .hero {
@@ -724,7 +736,8 @@ footer .details {
   }
 
   .heroCard a {
-    font-size: 10px;
+    font-size: 11px;
+    min-height: 44px;
   }
 
   .promise {
@@ -793,7 +806,7 @@ footer .details {
   }
 
   .productInfo strong {
-    font-size: 10px;
+    font-size: 12px;
   }
 
   .productInfo {
@@ -805,11 +818,12 @@ footer .details {
   }
 
   .productInfo small {
-    font-size: 8px;
+    font-size: 10px;
   }
 
   .productCard button {
-    font-size: 9px;
+    font-size: 11px;
+    min-height: 44px;
     padding: 9px 6px;
   }
 
@@ -843,6 +857,11 @@ footer .details {
     text-align: center;
   }
 
+  footer .details a,
+  .copyright {
+    font-size: 12px;
+  }
+
   footer .logo {
     flex-basis: clamp(110px, 40vw, 160px);
     margin: 0 auto;
@@ -861,8 +880,8 @@ footer .details {
   }
 
   .header nav a {
-    font-size: 8px;
-    padding-inline: 5px;
+    font-size: 10px;
+    padding-inline: 6px;
   }
 
   .header .loginLink {

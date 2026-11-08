@@ -269,6 +269,8 @@ function ProductCard({
 
 function Cart({
   items,
+  isMobileCartOpen,
+  onCloseMobileCart,
   onChange,
   onClearAll,
   address,
@@ -284,6 +286,8 @@ function Cart({
   storeSettingsError,
 }: {
   items: CartItem[]
+  isMobileCartOpen: boolean
+  onCloseMobileCart: () => void
   onChange: (id: string, quantity: number) => void
   onClearAll: () => void
   address: string
@@ -378,11 +382,23 @@ function Cart({
   }
 
   return (
-    <aside className={styles.cart}>
+    <>
+      {isMobileCartOpen && (
+        <button
+          type="button"
+          className={styles.mobileCartBackdrop}
+          aria-label="Close cart"
+          onClick={onCloseMobileCart}
+        />
+      )}
+      <aside className={`${styles.cart} ${isMobileCartOpen ? styles.mobileCartOpen : ''}`}>
       <div className={styles.cartHeading}>
         <div className={styles.cartHeadingTitle}>
           <h1>My Cart</h1>
-          {items.length > 0 && <button type="button" className={styles.clearCartButton} onClick={onClearAll}>CLEAR CART</button>}
+          <div className={styles.cartHeadingActions}>
+            {items.length > 0 && <button type="button" className={styles.clearCartButton} onClick={onClearAll}>CLEAR CART</button>}
+            <button type="button" className={styles.mobileCartClose} onClick={onCloseMobileCart}>Continue shopping</button>
+          </div>
         </div>
         <div className={styles.deliveryAddress}>
           {isEditingAddress ? (
@@ -677,7 +693,8 @@ function Cart({
           </section>
         </div>
       )}
-    </aside>
+      </aside>
+    </>
   )
 }
 
@@ -700,6 +717,7 @@ export function ShopPage() {
   const [cartRestriction, setCartRestriction] = useState('')
   const [quantityNotice, setQuantityNotice] = useState<{ message: string } | null>(null)
   const [isCheckingOut, setIsCheckingOut] = useState(false)
+  const [isMobileCartOpen, setIsMobileCartOpen] = useState(false)
   const isSubmittingOrder = useRef(false)
   const cartOwnerId = useRef<string | null>(null)
   const cartQuantitiesRef = useRef<Record<string, number>>({})
@@ -951,6 +969,8 @@ export function ShopPage() {
   const cartItems = products
     .filter((product) => (quantities[product.id] ?? 0) > 0 && isFarmerActive(product, farmerStores))
     .map((product) => ({ ...product, quantity: quantities[product.id] }))
+  const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0)
+  const cartSubtotal = cartItems.reduce((sum, item) => sum + item.quantity * item.price, 0)
 
   function updateQuantity(id: string, quantity: number) {
     const product = products.find((item) => item.id === id)
@@ -1177,7 +1197,7 @@ export function ShopPage() {
   }
 
   return (
-    <main className={styles.shop}>
+    <main className={`${styles.shop} ${isMobileCartOpen ? styles.mobileCartVisible : ''}`}>
       <CustomerSidebar active="shop" />
       <section className={styles.catalog}>
         <Header
@@ -1224,7 +1244,7 @@ export function ShopPage() {
           )}
         </div>
       </section>
-      <Cart items={cartItems} onChange={updateQuantity} onClearAll={() => {
+      <Cart items={cartItems} isMobileCartOpen={isMobileCartOpen} onCloseMobileCart={() => setIsMobileCartOpen(false)} onChange={updateQuantity} onClearAll={() => {
         updateCartQuantities({})
         setCartRestriction('')
         setOrderMessage('')
@@ -1234,6 +1254,15 @@ export function ShopPage() {
       }} onPlaceOrder={placeOrder} onEmptyCartAttempt={() => {
         setQuantityNotice({ message: 'Add products to your cart before placing an order.' })
       }} onAddressError={setAddressError} orderMessage={orderMessage} cartRestriction={cartRestriction} addressError={addressError} isCheckingOut={isCheckingOut} farmerStores={farmerStores} storeSettingsError={storeSettingsError} />
+      <button
+        type="button"
+        className={styles.mobileCartToggle}
+        aria-expanded={isMobileCartOpen}
+        onClick={() => setIsMobileCartOpen((open) => !open)}
+      >
+        <span>{cartItemCount ? `VIEW CART · ${cartItemCount} ${cartItemCount === 1 ? 'ITEM' : 'ITEMS'}` : 'VIEW CART'}</span>
+        <strong>{currency(cartSubtotal)}</strong>
+      </button>
       {quantityNotice && <div className={styles.quantityToast} role="status" aria-live="polite">{quantityNotice.message}</div>}
     </main>
   )

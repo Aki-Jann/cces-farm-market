@@ -78,6 +78,10 @@
   scrollbar-width: thin;
 }
 
+.mobileCustomerBack {
+  display: none;
+}
+
 .customerListHeader {
   align-items: center;
   background: #fbfdfb;
@@ -138,7 +142,7 @@
 .tabs button:focus-visible,
 .sectionHeading button:focus-visible,
 .customerTypeButton:focus-visible {
-  outline: 3px solid rgb(1 118 50 / 28%);
+  outline: 3px solid rgb(8 123 59 / 28%);
   outline-offset: -3px;
 }
 
@@ -516,7 +520,8 @@
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  padding-top: 16px;
+  min-height: 0;
+  padding-top: 10px;
 }
 
 .messageList {
@@ -614,7 +619,7 @@
 
 .composer input:focus {
   border-color: #63a879;
-  outline: 3px solid rgb(1 118 50 / 10%);
+  outline: 3px solid rgb(8 123 59 / 10%);
 }
 
 .composer button {
@@ -630,7 +635,7 @@
 }
 
 .composer button:hover:not(:disabled) {
-  background: #066431;
+  background: #087b3b;
 }
 
 .composer button:disabled {
@@ -667,7 +672,7 @@
     box-sizing: border-box;
     display: block;
     height: 100dvh;
-    overflow-y: auto;
+    overflow: hidden;
   }
 
   .pageIntro {
@@ -676,17 +681,30 @@
   }
 
   .workspace {
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - 150px - env(safe-area-inset-bottom));
+    min-height: 0;
     margin: 12px var(--page-gutter) 20px;
+    width: auto;
   }
 
   .customerList {
-    flex-basis: 185px;
+    border-bottom: 0;
+    border-right: 0;
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    width: 100%;
   }
 
   .customerList button {
-    gap: 6px;
-    grid-template-columns: 30px minmax(0, 1fr);
-    padding: 10px 8px;
+    gap: 8px;
+    grid-template-columns: 40px minmax(0, 1fr);
+    min-height: 72px;
+    padding: 12px 14px;
   }
 
   .content > :global(header) {
@@ -713,8 +731,40 @@
     grid-column: 2;
   }
 
+  .workspace.mobileDetailOpen .customerList,
+  .workspace:not(.mobileDetailOpen) .details {
+    display: none;
+  }
+
   .details {
+    box-sizing: border-box;
+    flex: 1 1 0;
+    min-height: 0;
     padding: 16px 12px;
+    width: 100%;
+  }
+
+  .mobileCustomerBack {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    color: #087b3b;
+    cursor: pointer;
+    display: flex;
+    flex: 0 0 auto;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    gap: 4px;
+    min-height: 40px;
+    padding: 0 2px;
+    text-align: left;
+  }
+
+  .mobileCustomerBack span {
+    font-size: 24px;
+    font-weight: 400;
+    line-height: 1;
   }
 
   .customerHeader {
