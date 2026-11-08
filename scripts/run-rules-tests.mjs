@@ -112,12 +112,12 @@ async function runWithCachedEmulator(emulatorPath) {
   ])
 
   await waitForEmulator(emulator.child)
-  console.log('Firestore emulator is ready.')
+  console.info('Firestore emulator is ready.')
   await runTestProcess()
 }
 
 async function runWithFirebaseCli() {
-  console.log('No cached Firestore emulator found; starting it with Firebase CLI.')
+  console.info('No cached Firestore emulator found; starting it with Firebase CLI.')
   const firebase = startProcess('firebase', [
     'emulators:exec',
     '--only',

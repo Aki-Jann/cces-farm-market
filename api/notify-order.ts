@@ -4,7 +4,6 @@ import { getAuth } from 'firebase-admin/auth'
 import { FieldValue, getFirestore } from 'firebase-admin/firestore'
 import nodemailer from 'nodemailer'
 
-const LEGACY_FARMER_ROLE = 'admin'
 const MAX_ORDER_AGE_MS = 10 * 60 * 1000 // only notify for orders created in the last 10 minutes
 
 type Claim =
@@ -66,20 +65,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (claim.status === 'expired') return res.status(200).json({ sent: false, reason: 'order too old' })
     const order = claim.order
 
-    // 4. Recipients: the order's farmer, or legacy farmer admins for old orders.
+    // 4. Notify only the farmer assigned to this order.
     const recipients = new Set<string>()
-    if (Object.hasOwn(order, 'farmerId')) {
-      if (typeof order.farmerId === 'string' && order.farmerId) {
-        const farmer = await db.doc(`users/${order.farmerId}`).get()
-        const email = farmer.data()?.email
-        if (typeof email === 'string' && email) recipients.add(email)
-      }
-    } else {
-      const admins = await db.collection('users').where('role', '==', LEGACY_FARMER_ROLE).get()
-      admins.forEach((d) => {
-        const email = d.data().email
-        if (typeof email === 'string' && email) recipients.add(email)
-      })
+    if (typeof order.farmerId === 'string' && order.farmerId) {
+      const farmer = await db.doc(`users/${order.farmerId}`).get()
+      const email = farmer.data()?.email
+      if (typeof email === 'string' && email) recipients.add(email)
     }
     const storefront = await db.doc('settings/storefront').get()
     const extra = storefront.data()?.notificationEmail
