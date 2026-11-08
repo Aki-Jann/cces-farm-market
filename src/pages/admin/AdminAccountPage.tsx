@@ -7,7 +7,7 @@ import { Header } from '../../components/layout/Header'
 import { FarmerApplicationStatus } from '../../components/common/FarmerApplicationStatus'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
-import { normalizeRole, ROLES } from '../../constants/roles'
+import { LEGACY_FARMER_ROLE, normalizeRole, ROLES } from '../../constants/roles'
 import type { ManagementRole } from '../../constants/roles'
 import { uploadImageToCloudinary } from '../../utils/cloudinary'
 import { formatMonthDayYear } from '../../utils/dateFormat'
@@ -104,6 +104,7 @@ function displayBirthday(value: unknown) {
 export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRole }) {
   const [profile, setProfile] = useState<AdminProfile | null>(null)
   const [isCcesAdmin, setIsCcesAdmin] = useState(role === ROLES.CCES_ADMIN)
+  const [isLegacyFarmer, setIsLegacyFarmer] = useState(false)
   const [draft, setDraft] = useState<AdminProfile | null>(null)
   const [storeSettings, setStoreSettings] = useState<StoreSettings>(emptyStoreSettings)
   const [storeSettingsDraft, setStoreSettingsDraft] = useState<StoreSettings>(emptyStoreSettings)
@@ -168,6 +169,8 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
 
           const data = snapshot.data()
           const profileRole = normalizeRole(data.role)
+          const isLegacyFarmerAccount = data.role === LEGACY_FARMER_ROLE
+          setIsLegacyFarmer(isLegacyFarmerAccount)
           if (profileRole !== ROLES.FARMER && profileRole !== ROLES.CCES_ADMIN) {
             setProfile(null)
             setIsCcesAdmin(false)
@@ -209,16 +212,28 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
           }
           if (!unsubscribeSettings) {
             const farmerProfileRef = doc(db, 'farmerProfiles', user.uid)
-            const unsubscribeFarmerProfile = onSnapshot(farmerProfileRef, (settingsSnapshot) => {
-              if (!isMounted) return
-              const hasProfile = settingsSnapshot.exists()
-              const loadedSettings = hasProfile ? readStoreSettings(settingsSnapshot.data()) : emptyStoreSettings
-              setHasFarmerProfile(hasProfile)
+            const storefrontRef = doc(db, 'settings', 'storefront')
+            let farmerSettingsData: Record<string, unknown> | null = null
+            let legacySettingsData: Record<string, unknown> = {}
+            function applyStoreSettings() {
+              const isOriginalFarmer = isLegacyFarmerAccount
+                || legacySettingsData.legacyFarmerId === user?.uid
+              const loadedSettings = farmerSettingsData
+                ? readStoreSettings(farmerSettingsData)
+                : isOriginalFarmer
+                  ? readStoreSettings(legacySettingsData)
+                  : emptyStoreSettings
+              setHasFarmerProfile(farmerSettingsData !== null)
               setStoreSettings(loadedSettings)
               if (!storeSettingsDirty.current) setStoreSettingsDraft(loadedSettings)
               setSettingsError('')
               setHasLoadedSettings(true)
               setIsSettingsLoading(false)
+            }
+            const unsubscribeFarmerProfile = onSnapshot(farmerProfileRef, (settingsSnapshot) => {
+              if (!isMounted) return
+              farmerSettingsData = settingsSnapshot.exists() ? settingsSnapshot.data() : null
+              applyStoreSettings()
             }, (loadError) => {
               console.error('Loading farmer profile settings failed:', loadError)
               if (isMounted) {
@@ -227,7 +242,22 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
                 setIsSettingsLoading(false)
               }
             })
-            unsubscribeSettings = unsubscribeFarmerProfile
+            const unsubscribeStorefront = onSnapshot(storefrontRef, (settingsSnapshot) => {
+              if (!isMounted) return
+              legacySettingsData = settingsSnapshot.exists() ? settingsSnapshot.data() : {}
+              applyStoreSettings()
+            }, (loadError) => {
+              console.error('Loading legacy storefront settings failed:', loadError)
+              if (isMounted) {
+                setSettingsError('Unable to load legacy storefront settings.')
+                if (!farmerSettingsData) setHasLoadedSettings(false)
+                setIsSettingsLoading(false)
+              }
+            })
+            unsubscribeSettings = () => {
+              unsubscribeFarmerProfile()
+              unsubscribeStorefront()
+            }
           }
         },
         (loadError) => {
@@ -467,6 +497,26 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
           },
           { merge: true }
         )
+      } else if (isLegacyFarmer) {
+        await setDoc(
+          doc(db, 'settings', 'storefront'),
+          {
+            legacyFarmerId: user.uid,
+            storeReady: storeSettingsReady(nextSettings),
+            farmName: profile ? displayName(profile, 'Original farm') : 'Original farm',
+            pickupLocation: nextSettings.pickupLocation,
+            deliveryFee: nextSettings.deliveryFee,
+            pickupDays: nextSettings.pickupDays,
+            pickupHours: nextSettings.pickupHours,
+            gcashAccountName: nextSettings.gcashAccountName,
+            gcashAccountNumber: nextSettings.gcashAccountNumber,
+            gcashQrUrl: nextSettings.gcashQrUrl,
+            mayaAccountName: nextSettings.mayaAccountName,
+            mayaAccountNumber: nextSettings.mayaAccountNumber,
+            mayaQrUrl: nextSettings.mayaQrUrl,
+          },
+          { merge: true }
+        )
       } else {
         const applicationSnapshot = await getDoc(doc(db, 'farmerApplications', user.uid))
         if (!applicationSnapshot.exists() || applicationSnapshot.data().status !== 'approved') {
@@ -668,7 +718,7 @@ export function AdminAccountPage({ role = ROLES.FARMER }: { role?: ManagementRol
                 <p className={styles.error} role="alert">{settingsError || 'Unable to load store settings. Refresh the page to try again.'}</p>
               ) : (
                 <form onSubmit={(event) => void saveStoreSettings(event)}>
-                  {!hasFarmerProfile && (
+                  {!hasFarmerProfile && !isLegacyFarmer && (
                     <p className={styles.notice} role="status">
                       Your farmer profile is not set up yet. Complete these pickup and payment details to activate your storefront.
                     </p>

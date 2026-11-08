@@ -72,10 +72,10 @@ try {
     counts[collection.path] = await exportCollection(db, collection, outputDirectory)
   }
 
-  console.info(`Firestore backup written to backups/${timestamp}/`)
-  console.info('Document counts by collection path:')
+  console.log(`Firestore backup written to backups/${timestamp}/`)
+  console.log('Document counts by collection path:')
   for (const [path, count] of Object.entries(counts).sort(([first], [second]) => first.localeCompare(second))) {
-    console.info(`  ${path}: ${count}`)
+    console.log(`  ${path}: ${count}`)
   }
 } catch (error) {
   console.error('Firestore backup failed:', error instanceof Error ? error.message : 'Unknown error')

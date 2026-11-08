@@ -33,7 +33,7 @@ type FulfillmentType = 'delivery' | 'pickup'
 type PaymentMethod = 'COD' | 'GCASH' | 'MAYA'
 type FarmerStoreSettings = StoreSettings & {
   farmName: string
-  status: 'active' | 'suspended' | 'loading' | 'unconfigured'
+  status: 'active' | 'suspended' | 'legacy' | 'loading' | 'unconfigured'
 }
 type CheckoutDetails = {
   fulfillmentType: FulfillmentType
@@ -120,7 +120,7 @@ function cartGroups(items: CartItem[], stores: Record<string, FarmerStoreSetting
   const grouped = new Map<string, { farmerId: string; farmName: string; items: CartItem[]; subtotal: number; deliveryFee: number; tax: number; total: number; settings: FarmerStoreSettings }>()
   items.forEach((item) => {
     const farmerId = item.farmerId ?? ''
-    const key = farmerId || 'unassigned'
+    const key = farmerId || 'legacy'
     const group = grouped.get(key)
     if (group) {
       group.items.push(item)
@@ -148,8 +148,8 @@ function cartGroups(items: CartItem[], stores: Record<string, FarmerStoreSetting
 }
 
 function isFarmerActive(product: Product, stores: Record<string, FarmerStoreSettings>) {
-  const store = stores[product.farmerId || '']
-  return store?.status === 'active'
+  const store = stores[product.farmerId || 'legacy']
+  return (store?.status === 'active' || store?.status === 'legacy')
     && Boolean(store && hasRequiredStoreSettings(store))
 }
 
@@ -439,7 +439,7 @@ function Cart({
             <p>Fresh finds are waiting. Add a few favorites to get started.</p>
           </div>
         ) : groups.map((group) => (
-          <section className={styles.cartFarmerGroup} key={group.farmerId || 'unassigned'}>
+          <section className={styles.cartFarmerGroup} key={group.farmerId || 'legacy'}>
             <h2>Farm: {group.farmName}</h2>
             {group.items.map((item) => (
               <div
@@ -733,13 +733,21 @@ export function ShopPage() {
   useEffect(() => {
     let isMounted = true
     let unsubscribeProducts: (() => void) | undefined
+    let unsubscribeStoreSettings: (() => void) | undefined
     const farmerProfileUnsubscribers = new Map<string, () => void>()
+    const legacyFarmerIds = new Set<string>()
+    let legacyFarmerId = ''
+    let legacySettings = readStoreSettings({}, 'Original farm')
 
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       unsubscribeProducts?.()
       unsubscribeProducts = undefined
+      unsubscribeStoreSettings?.()
+      unsubscribeStoreSettings = undefined
       farmerProfileUnsubscribers.forEach((unsubscribe) => unsubscribe())
       farmerProfileUnsubscribers.clear()
+      legacyFarmerIds.clear()
+      legacyFarmerId = ''
       setFarmerStores({})
       setProducts([])
       setStoreSettingsError('')
@@ -759,6 +767,32 @@ export function ShopPage() {
 
       cartOwnerId.current = user.uid
       updateCartQuantities(readSavedCart(user.uid))
+      unsubscribeStoreSettings = onSnapshot(
+        doc(db, 'settings', 'storefront'),
+        (snapshot) => {
+          if (!isMounted || auth.currentUser?.uid !== user.uid) return
+          const settings = snapshot.exists() ? snapshot.data() : {}
+          legacySettings = readStoreSettings(settings, 'Original farm')
+          legacyFarmerId = typeof settings.legacyFarmerId === 'string' ? settings.legacyFarmerId : ''
+          legacyFarmerIds.forEach((farmerId) => {
+            if (farmerId === legacyFarmerId) {
+              setFarmerStores((current) => ({ ...current, [farmerId]: { ...legacySettings, status: 'legacy' } }))
+            }
+          })
+          setProducts((current) => current.map((product) =>
+            product.farmerId && product.farmerId === legacyFarmerId && legacyFarmerIds.has(product.farmerId)
+              ? { ...product, farmName: getFarmerDisplayName(settings, 'Original farm') }
+              : product
+          ))
+          setStoreSettingsError('')
+        },
+        (settingsError) => {
+          console.error('Loading store settings for checkout failed:', settingsError)
+          if (isMounted && auth.currentUser?.uid === user.uid) {
+            setStoreSettingsError('Legacy storefront settings could not be loaded. Contact the seller before arranging pickup or payment.')
+          }
+        }
+      )
 
       void getDoc(doc(db, 'users', user.uid))
         .then((profileSnapshot) => {
@@ -788,7 +822,7 @@ export function ShopPage() {
             return [{
               id: product.id,
               farmerId,
-              farmName: getFarmerDisplayName(data, 'Farmer'),
+              farmName: getFarmerDisplayName(data, farmerId ? 'Farmer' : 'Original farm'),
               name,
               category: categoryName,
               price: typeof data.price === 'number' ? data.price : 0,
@@ -804,6 +838,7 @@ export function ShopPage() {
             if (!farmerIds.has(farmerId)) {
               unsubscribe()
               farmerProfileUnsubscribers.delete(farmerId)
+              legacyFarmerIds.delete(farmerId)
             }
           })
           farmerIds.forEach((farmerId) => {
@@ -817,13 +852,17 @@ export function ShopPage() {
               (profileSnapshot) => {
                 if (!isMounted || auth.currentUser?.uid !== user.uid) return
                 if (profileSnapshot.exists()) {
+                  legacyFarmerIds.delete(farmerId)
                   const store = readStoreSettings(profileSnapshot.data(), 'Farm')
                   setFarmerStores((current) => ({ ...current, [farmerId]: store }))
                   setProducts((current) => current.map((product) =>
                     product.farmerId === farmerId ? { ...product, farmName: store.farmName } : product
                   ))
                 } else {
-                  const store = { ...readStoreSettings({}, 'Farm'), status: 'unconfigured' as const }
+                  legacyFarmerIds.add(farmerId)
+                  const store = farmerId === legacyFarmerId
+                    ? { ...legacySettings, status: 'legacy' as const }
+                    : { ...readStoreSettings({}, 'Farm'), status: 'unconfigured' as const }
                   setFarmerStores((current) => ({ ...current, [farmerId]: store }))
                   setProducts((current) => current.map((product) =>
                     product.farmerId === farmerId
@@ -888,6 +927,7 @@ export function ShopPage() {
       isMounted = false
       unsubscribeAuth()
       if (unsubscribeProducts) unsubscribeProducts()
+      unsubscribeStoreSettings?.()
       farmerProfileUnsubscribers.forEach((unsubscribe) => unsubscribe())
     }
   }, [])

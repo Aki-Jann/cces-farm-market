@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
-import { collection, doc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore'
+import { collection, doc, getDoc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore'
 import { AdminSidebar } from '../../components/layout/AdminSidebar'
 import { Header } from '../../components/layout/Header'
 import { auth } from '../../firebase/auth'
 import { db } from '../../firebase/firestore'
-import { ROLES } from '../../constants/roles'
+import { LEGACY_FARMER_ROLE, ROLES } from '../../constants/roles'
 import styles from './AdminCustomersPage.module.css'
 import { formatMonthDayYear, formatTime } from '../../utils/dateFormat'
 
-type Message = { id: string; text: string; timestamp: string; sender: typeof ROLES.CUSTOMER | typeof ROLES.FARMER; dayDivider?: string }
+type Message = { id: string; text: string; timestamp: string; sender: typeof ROLES.CUSTOMER | typeof ROLES.FARMER | typeof LEGACY_FARMER_ROLE; dayDivider?: string }
 type LoadedMessage = Omit<Message, 'dayDivider'> & { createdAt: Date | null }
 type Order = { id: string; date: string; status: 'DELIVERED' | 'PENDING' | 'CONFIRMED' | 'PACKED'; total: number }
 type Customer = {
@@ -149,7 +149,9 @@ function Messages({ customer }: { customer: Customer }) {
             const createdAt = parseMessageDate(data.createdAt)
             return {
               id: messageDocument.id,
-              sender: data.senderRole === ROLES.CUSTOMER ? ROLES.CUSTOMER : ROLES.FARMER,
+              sender: data.senderRole === ROLES.CUSTOMER
+                ? ROLES.CUSTOMER
+                : data.senderRole === LEGACY_FARMER_ROLE ? LEGACY_FARMER_ROLE : ROLES.FARMER,
               text: typeof data.text === 'string' ? data.text : '',
               timestamp: createdAt ? formatTime(createdAt) : 'Pending',
               createdAt,
@@ -253,6 +255,7 @@ export function AdminCustomersPage() {
   const [tab, setTab] = useState<'profile' | 'messages'>('messages')
   const [search, setSearch] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [isOriginalFarmer, setIsOriginalFarmer] = useState(false)
   const [notesByCustomer, setNotesByCustomer] = useState<Record<string, string>>({})
   const [error, setError] = useState('')
   const isLoading = !usersLoaded || !ordersLoaded
@@ -268,7 +271,8 @@ export function AdminCustomersPage() {
       const lastName = typeof data.lastName === 'string' ? data.lastName.trim() : ''
       const name = `${firstName} ${lastName}`.trim() || 'Unnamed customer'
       const customerType = normalizeCustomerType(data.customerType)
-      const farmNotes = notesByCustomer[id] ?? ''
+      const legacyFarmNotes = typeof data.farmNotes === 'string' ? data.farmNotes.trim() : ''
+      const farmNotes = notesByCustomer[id] ?? (isOriginalFarmer ? legacyFarmNotes : '')
       const orders = rawOrders.flatMap(({ id: orderId, data: orderData }) => {
         if (orderData.userId !== id) return []
         return [{
@@ -295,7 +299,7 @@ export function AdminCustomersPage() {
         messages: [],
       }]
     })
-  }, [notesByCustomer, rawUsers, rawOrders])
+  }, [isOriginalFarmer, notesByCustomer, rawUsers, rawOrders])
 
   const visibleCustomers = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -310,6 +314,20 @@ export function AdminCustomersPage() {
   }, [customers, search])
 
   const selected = visibleCustomers.find((customer) => customer.id === selectedId) ?? visibleCustomers[0]
+
+  useEffect(() => {
+    const farmer = auth.currentUser
+    if (!farmer) return
+    let isMounted = true
+    void getDoc(doc(db, 'settings', 'storefront')).then((storefrontSnapshot) => {
+      if (!isMounted) return
+      setIsOriginalFarmer(storefrontSnapshot.data()?.legacyFarmerId === farmer.uid)
+    }).catch((loadError) => {
+      console.error('Loading legacy farmer note fallback failed:', loadError)
+      if (isMounted) setError('Unable to load farmer account settings. Please try again.')
+    })
+    return () => { isMounted = false }
+  }, [])
 
   useEffect(() => {
     const farmer = auth.currentUser

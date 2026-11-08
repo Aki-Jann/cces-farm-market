@@ -46,11 +46,11 @@ beforeEach(async () => {
       }),
       setDoc(doc(db, 'users/customer-b'), { role: 'customer' }),
       setDoc(doc(db, 'users/customer-rejected'), { role: 'customer' }),
-      setDoc(doc(db, 'users/farmer-a'), { role: 'farmer' }),
+      setDoc(doc(db, 'users/admin-a'), { role: 'admin' }),
       setDoc(doc(db, 'users/farmer-b'), { role: 'farmer' }),
       setDoc(doc(db, 'users/farmer-no-profile'), { role: 'farmer' }),
       setDoc(doc(db, 'users/cces-admin-a'), { role: 'cces_admin' }),
-      setDoc(doc(db, 'farmerProfiles/farmer-a'), {
+      setDoc(doc(db, 'farmerProfiles/admin-a'), {
         status: 'active',
         storeReady: true,
         farmName: 'Original Farm',
@@ -106,7 +106,7 @@ beforeEach(async () => {
         rejectionReason: 'Please provide complete details.',
       }),
       setDoc(doc(db, 'products/product-a'), {
-        farmerId: 'farmer-a',
+        farmerId: 'admin-a',
         name: 'CARROTS',
         price: 10,
         stock: 10,
@@ -134,7 +134,7 @@ beforeEach(async () => {
       }),
       ...['B', 'C', 'D', 'E', 'F'].map((suffix, index) =>
         setDoc(doc(db, `products/product-${suffix.toLowerCase()}`), {
-          farmerId: 'farmer-a',
+          farmerId: 'admin-a',
           name: `PRODUCT ${index + 2}`,
           price: 10,
           stock: 10,
@@ -143,13 +143,28 @@ beforeEach(async () => {
           isAvailable: true,
         })
       ),
+      setDoc(doc(db, 'settings/storefront'), {
+        legacyFarmerId: 'admin-a',
+        storeReady: true,
+        farmName: 'Original Farm',
+        deliveryFee: 100,
+        pickupLocation: 'Farm gate',
+        pickupDays: 'Monday to Friday',
+        pickupHours: '8 AM to 4 PM',
+        gcashAccountName: 'Original Farm',
+        gcashAccountNumber: '09999999999',
+        gcashQrUrl: 'https://example.com/original-gcash.png',
+        mayaAccountName: '',
+        mayaAccountNumber: '',
+        mayaQrUrl: '',
+      }),
       setDoc(doc(db, 'orders/order-a'), {
-        farmerId: 'farmer-a',
+        farmerId: 'admin-a',
         userId: 'customer-a',
         status: 'pending',
       }),
       setDoc(doc(db, 'orders/order-b'), {
-        farmerId: 'farmer-a',
+        farmerId: 'admin-a',
         userId: 'customer-b',
         status: 'pending',
       }),
@@ -159,7 +174,7 @@ beforeEach(async () => {
         status: 'pending',
       }),
       setDoc(doc(db, 'orders/online-awaiting'), {
-        farmerId: 'farmer-a',
+        farmerId: 'admin-a',
         userId: 'customer-a',
         status: 'pending',
         paymentMethod: 'GCASH',
@@ -167,12 +182,17 @@ beforeEach(async () => {
         paymentReceiptUrl: 'https://example.com/receipt.png',
       }),
       setDoc(doc(db, 'orders/online-paid'), {
-        farmerId: 'farmer-a',
+        farmerId: 'admin-a',
         userId: 'customer-a',
         status: 'pending',
         paymentMethod: 'MAYA',
         paymentStatus: 'paid',
         paymentReceiptUrl: 'https://example.com/receipt.png',
+      }),
+      setDoc(doc(db, 'conversations/customer-b'), {
+        customerId: 'customer-b',
+        lastMessage: 'hello',
+        updatedAt: new Date(),
       }),
       setDoc(doc(db, 'conversations/customer-a/farmers/farmer-b'), {
         customerId: 'customer-a',
@@ -180,9 +200,9 @@ beforeEach(async () => {
         lastMessage: 'Hi from the valley farm',
         updatedAt: new Date(),
       }),
-      setDoc(doc(db, 'conversations/customer-a/farmers/farmer-a'), {
+      setDoc(doc(db, 'conversations/customer-a/farmers/admin-a'), {
         customerId: 'customer-a',
-        farmerId: 'farmer-a',
+        farmerId: 'admin-a',
         lastMessage: 'Hi from the original farm',
         updatedAt: new Date(),
       }),
@@ -211,6 +231,14 @@ test('customers can read only their own user profile', async () => {
   await assertFails(getDoc(doc(db, 'users/customer-b')))
 })
 
+test('legacy admin role retains farmer access before migration', async () => {
+  const db = environment.authenticatedContext('admin-a').firestore()
+  await assertSucceeds(getDoc(doc(db, 'users/customer-a')))
+  await assertSucceeds(getDoc(doc(db, 'orders/order-a')))
+  await assertSucceeds(updateDoc(doc(db, 'products/product-a'), { stock: 9 }))
+  await assertSucceeds(updateDoc(doc(db, 'orders/order-a'), { status: 'confirmed' }))
+})
+
 test('farmers cannot list orders without a farmerId filter', async () => {
   const db = environment.authenticatedContext('farmer-b').firestore()
   await assertFails(getDocs(collection(db, 'orders')))
@@ -232,9 +260,9 @@ test('CCES admin role retains application and read-only administration access', 
 test('customers can read active farmer storefront profiles but farmers cannot edit another farmer data', async () => {
   const customerDb = environment.authenticatedContext('customer-a').firestore()
   await assertSucceeds(getDoc(doc(customerDb, 'farmerProfiles/farmer-b')))
-  await assertSucceeds(getDoc(doc(customerDb, 'farmerProfiles/unconfigured-profile')))
+  await assertSucceeds(getDoc(doc(customerDb, 'farmerProfiles/legacy-profile-not-created-yet')))
 
-  const farmerDb = environment.authenticatedContext('farmer-a').firestore()
+  const farmerDb = environment.authenticatedContext('admin-a').firestore()
   await assertFails(updateDoc(doc(farmerDb, 'products/product-other-farmer'), { name: 'CHANGED' }))
   await assertFails(updateDoc(doc(farmerDb, 'orders/order-other-farmer'), { status: 'confirmed' }))
 })
@@ -242,7 +270,7 @@ test('customers can read active farmer storefront profiles but farmers cannot ed
 test('customers can list only active farmer profiles', async () => {
   const db = environment.authenticatedContext('customer-a').firestore()
   const snapshot = await getDocs(query(collection(db, 'farmerProfiles'), where('status', '==', 'active')))
-  assert.deepEqual(snapshot.docs.map((profile) => profile.id).sort(), ['farmer-a', 'farmer-b'])
+  assert.deepEqual(snapshot.docs.map((profile) => profile.id).sort(), ['admin-a', 'farmer-b'])
   await assertFails(getDocs(collection(db, 'farmerProfiles')))
 })
 
@@ -255,7 +283,7 @@ test('farmer customer notes are private to the owning farmer and are never writt
     updatedAt: serverTimestamp(),
   }))
   await assertSucceeds(getDoc(noteRef))
-  await assertFails(getDoc(doc(farmerDb, 'farmerProfiles/farmer-a/customerNotes/customer-a')))
+  await assertFails(getDoc(doc(farmerDb, 'farmerProfiles/admin-a/customerNotes/customer-a')))
   await assertFails(updateDoc(doc(farmerDb, 'users/customer-a'), { farmNotes: 'Shared note.' }))
 
   const customerDb = environment.authenticatedContext('customer-a').firestore()
@@ -267,9 +295,25 @@ test('farmer customer notes are private to the owning farmer and are never writt
   }))
 })
 
-test('farmers can update only their own profile settings', async () => {
+test('only the legacy farmer can claim an unmarked storefront fallback', async () => {
   await environment.withSecurityRulesDisabled(async (context) => {
-    await setDoc(doc(context.firestore(), 'farmerProfiles/farmer-a'), {
+    await updateDoc(doc(context.firestore(), 'settings/storefront'), { legacyFarmerId: '' })
+  })
+
+  const newFarmerDb = environment.authenticatedContext('farmer-b').firestore()
+  await assertFails(updateDoc(doc(newFarmerDb, 'settings/storefront'), {
+    legacyFarmerId: 'farmer-b',
+  }))
+
+  const legacyFarmerDb = environment.authenticatedContext('admin-a').firestore()
+  await assertSucceeds(updateDoc(doc(legacyFarmerDb, 'settings/storefront'), {
+    legacyFarmerId: 'admin-a',
+  }))
+})
+
+test('farmers can update only their own storefront settings', async () => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'farmerProfiles/admin-a'), {
       status: 'active',
       storeReady: false,
       farmName: 'Legacy Farm',
@@ -279,8 +323,8 @@ test('farmers can update only their own profile settings', async () => {
     })
   })
 
-  const farmerDb = environment.authenticatedContext('farmer-a').firestore()
-  await assertSucceeds(updateDoc(doc(farmerDb, 'farmerProfiles/farmer-a'), {
+  const farmerDb = environment.authenticatedContext('admin-a').firestore()
+  await assertSucceeds(updateDoc(doc(farmerDb, 'farmerProfiles/admin-a'), {
     storeReady: false,
     pickupLocation: 'Gate 2',
     pickupDays: 'Monday to Friday',
@@ -293,7 +337,7 @@ test('farmers can update only their own profile settings', async () => {
     mayaQrUrl: '',
   }))
   await assertFails(updateDoc(doc(farmerDb, 'farmerProfiles/farmer-b'), { pickupLocation: 'Changed' }))
-  await assertFails(updateDoc(doc(farmerDb, 'farmerProfiles/farmer-a'), { status: 'suspended' }))
+  await assertFails(updateDoc(doc(farmerDb, 'farmerProfiles/admin-a'), { status: 'suspended' }))
 })
 
 test('farmers can set only a valid delivery fee in their own profile', async () => {
@@ -487,7 +531,7 @@ function customerOrder(orderId, overrides = {}) {
   return {
     orderNumber: 'ORD-TEST',
     checkoutGroupId: 'checkout-group-test',
-    farmerId: 'farmer-a',
+    farmerId: 'admin-a',
     userId: 'customer-a',
     customerName: 'Casey Customer',
     customerEmail: 'customer-a@example.com',
@@ -898,13 +942,13 @@ test('customers cannot directly change inventory without a matching order', asyn
   await assertFails(updateDoc(doc(db, 'products/product-a'), { stock: 9, sold: 1 }))
 })
 
-test('farmers can update order status', async () => {
-  const db = environment.authenticatedContext('farmer-a').firestore()
+test('admins can update order status', async () => {
+  const db = environment.authenticatedContext('admin-a').firestore()
   await assertSucceeds(updateDoc(doc(db, 'orders/order-a'), { status: 'confirmed' }))
 })
 
-test('farmers cannot advance online orders before payment verification or write payment state directly', async () => {
-  const db = environment.authenticatedContext('farmer-a').firestore()
+test('admins cannot advance online orders before payment verification or write payment state directly', async () => {
+  const db = environment.authenticatedContext('admin-a').firestore()
   await assertFails(updateDoc(doc(db, 'orders/online-awaiting'), { status: 'confirmed' }))
   await assertFails(updateDoc(doc(db, 'orders/online-awaiting'), { paymentStatus: 'paid' }))
   await assertSucceeds(updateDoc(doc(db, 'orders/online-paid'), { status: 'confirmed' }))
@@ -918,23 +962,23 @@ test('Farmers can verify an online payment but cannot claim verification as a Cu
     paymentVerifiedBy: 'customer-a',
   }))
 
-  const farmerDb = environment.authenticatedContext('farmer-a').firestore()
+  const farmerDb = environment.authenticatedContext('admin-a').firestore()
   await assertSucceeds(updateDoc(doc(farmerDb, 'orders/online-awaiting'), {
     paymentStatus: 'paid',
     paymentVerifiedAt: serverTimestamp(),
-    paymentVerifiedBy: 'farmer-a',
+    paymentVerifiedBy: 'admin-a',
   }))
 
   await assertFails(updateDoc(doc(farmerDb, 'orders/online-awaiting'), {
     paymentStatus: 'paid',
     paymentVerifiedAt: serverTimestamp(),
-    paymentVerifiedBy: 'farmer-a',
+    paymentVerifiedBy: 'admin-a',
   }))
   await assertFails(updateDoc(doc(farmerDb, 'orders/online-awaiting'), {
     status: 'cancelled',
     paymentStatus: 'rejected',
     paymentRejectedAt: serverTimestamp(),
-    paymentRejectedBy: 'farmer-a',
+    paymentRejectedBy: 'admin-a',
   }))
 
   const ccesAdminDb = environment.authenticatedContext('cces-admin-a').firestore()
@@ -954,28 +998,28 @@ test('Farmers can verify an online payment but cannot claim verification as a Cu
 test('Farmers can mark an active unpaid COD order as paid only once', async () => {
   await environment.withSecurityRulesDisabled(async (context) => {
     await setDoc(doc(context.firestore(), 'orders/cod-unpaid'), {
-      farmerId: 'farmer-a',
+      farmerId: 'admin-a',
       userId: 'customer-a',
       paymentMethod: 'COD',
       paymentStatus: 'unpaid',
       status: 'pending',
     })
     await setDoc(doc(context.firestore(), 'orders/cod-cancelled'), {
-      farmerId: 'farmer-a',
+      farmerId: 'admin-a',
       userId: 'customer-a',
       paymentMethod: 'COD',
       paymentStatus: 'unpaid',
       status: 'cancelled',
     })
     await setDoc(doc(context.firestore(), 'orders/cod-rejected'), {
-      farmerId: 'farmer-a',
+      farmerId: 'admin-a',
       userId: 'customer-a',
       paymentMethod: 'COD',
       paymentStatus: 'rejected',
       status: 'cancelled',
     })
     await setDoc(doc(context.firestore(), 'orders/rejected-active'), {
-      farmerId: 'farmer-a',
+      farmerId: 'admin-a',
       userId: 'customer-a',
       paymentMethod: 'COD',
       paymentStatus: 'rejected',
@@ -983,26 +1027,26 @@ test('Farmers can mark an active unpaid COD order as paid only once', async () =
     })
   })
 
-  const farmerDb = environment.authenticatedContext('farmer-a').firestore()
+  const farmerDb = environment.authenticatedContext('admin-a').firestore()
   await assertSucceeds(updateDoc(doc(farmerDb, 'orders/cod-unpaid'), {
     paymentStatus: 'paid',
     paymentVerifiedAt: serverTimestamp(),
-    paymentVerifiedBy: 'farmer-a',
+    paymentVerifiedBy: 'admin-a',
   }))
   await assertFails(updateDoc(doc(farmerDb, 'orders/cod-unpaid'), {
     paymentStatus: 'paid',
     paymentVerifiedAt: serverTimestamp(),
-    paymentVerifiedBy: 'farmer-a',
+    paymentVerifiedBy: 'admin-a',
   }))
   await assertFails(updateDoc(doc(farmerDb, 'orders/cod-cancelled'), {
     paymentStatus: 'paid',
     paymentVerifiedAt: serverTimestamp(),
-    paymentVerifiedBy: 'farmer-a',
+    paymentVerifiedBy: 'admin-a',
   }))
   await assertFails(updateDoc(doc(farmerDb, 'orders/cod-rejected'), {
     paymentStatus: 'paid',
     paymentVerifiedAt: serverTimestamp(),
-    paymentVerifiedBy: 'farmer-a',
+    paymentVerifiedBy: 'admin-a',
   }))
   await assertFails(updateDoc(doc(farmerDb, 'orders/cod-cancelled'), { status: 'confirmed' }))
   await assertFails(updateDoc(doc(farmerDb, 'orders/rejected-active'), { status: 'confirmed' }))
@@ -1028,12 +1072,12 @@ test('Farmers can reject a pending online payment and restore stock atomically',
     }),
   ))
 
-  const farmerDb = environment.authenticatedContext('farmer-a').firestore()
+  const farmerDb = environment.authenticatedContext('admin-a').firestore()
   await assertFails(updateDoc(doc(farmerDb, 'orders/order-to-reject'), {
     status: 'cancelled',
     paymentStatus: 'rejected',
     paymentRejectedAt: serverTimestamp(),
-    paymentRejectedBy: 'farmer-a',
+    paymentRejectedBy: 'admin-a',
   }))
   await assertSucceeds(runTransaction(farmerDb, async (transaction) => {
     const orderRef = doc(farmerDb, 'orders/order-to-reject')
@@ -1056,7 +1100,7 @@ test('Farmers can reject a pending online payment and restore stock atomically',
       status: 'cancelled',
       paymentStatus: 'rejected',
       paymentRejectedAt: serverTimestamp(),
-      paymentRejectedBy: 'farmer-a',
+      paymentRejectedBy: 'admin-a',
     })
   }))
 
@@ -1093,7 +1137,7 @@ test('Farmers can reject a pending online payment and restore stock atomically',
       status: 'cancelled',
       paymentStatus: 'rejected',
       paymentRejectedAt: serverTimestamp(),
-      paymentRejectedBy: 'farmer-a',
+      paymentRejectedBy: 'admin-a',
     })
   }))
 
@@ -1110,7 +1154,7 @@ test('Farmers can cancel active orders and restore stock atomically', async () =
     customerOrder('order-to-cancel'),
   ))
 
-  const farmerDb = environment.authenticatedContext('farmer-a').firestore()
+  const farmerDb = environment.authenticatedContext('admin-a').firestore()
   await assertFails(updateDoc(doc(farmerDb, 'orders/order-to-cancel'), { status: 'cancelled' }))
   await assertSucceeds(runTransaction(farmerDb, async (transaction) => {
     const orderRef = doc(farmerDb, 'orders/order-to-cancel')
@@ -1149,6 +1193,7 @@ test('CCES admins can read the analytics order data but cannot manage records', 
   await assertFails(getDocs(collection(db, 'users')))
   await assertFails(updateDoc(doc(db, 'orders/order-a'), { status: 'confirmed' }))
   await assertFails(updateDoc(doc(db, 'products/product-a'), { stock: 0 }))
+  await assertFails(getDoc(doc(db, 'settings', 'storefront')))
   await assertFails(getDoc(doc(db, 'storeSettings', 'checkout')))
   await assertFails(getDoc(doc(db, 'conversations/customer-b')))
 })
@@ -1156,13 +1201,14 @@ test('CCES admins can read the analytics order data but cannot manage records', 
 test('CCES admins can update only their own account fields', async () => {
   const db = environment.authenticatedContext('cces-admin-a').firestore()
   await assertSucceeds(updateDoc(doc(db, 'users/cces-admin-a'), { firstName: 'Casey' }))
-  await assertFails(updateDoc(doc(db, 'users/cces-admin-a'), { role: 'farmer' }))
-  await assertFails(getDoc(doc(db, 'users/farmer-a')))
+  await assertFails(updateDoc(doc(db, 'users/cces-admin-a'), { role: 'admin' }))
+  await assertFails(getDoc(doc(db, 'users/admin-a')))
 })
 
 test('customers cannot read another customer order or conversation', async () => {
   const db = environment.authenticatedContext('customer-a').firestore()
   await assertFails(getDoc(doc(db, 'orders/order-b')))
+  await assertFails(getDoc(doc(db, 'conversations/customer-b')))
   await assertFails(getDoc(doc(db, 'conversations/customer-b/farmers/farmer-b')))
 })
 
@@ -1170,9 +1216,9 @@ test('farmers can read only conversations and messages assigned to their farmerI
   const valleyFarm = environment.authenticatedContext('farmer-b').firestore()
   await assertSucceeds(getDoc(doc(valleyFarm, 'conversations/customer-a/farmers/farmer-b')))
   await assertSucceeds(getDoc(doc(valleyFarm, 'conversations/customer-a/farmers/farmer-b/messages/message-a')))
-  await assertFails(getDoc(doc(valleyFarm, 'conversations/customer-a/farmers/farmer-a')))
-  await assertFails(getDocs(collection(valleyFarm, 'conversations/customer-a/farmers/farmer-a/messages')))
-  await assertFails(updateDoc(doc(valleyFarm, 'conversations/customer-a/farmers/farmer-a'), {
+  await assertFails(getDoc(doc(valleyFarm, 'conversations/customer-a/farmers/admin-a')))
+  await assertFails(getDocs(collection(valleyFarm, 'conversations/customer-a/farmers/admin-a/messages')))
+  await assertFails(updateDoc(doc(valleyFarm, 'conversations/customer-a/farmers/admin-a'), {
     lastMessage: 'A cross-farmer update.',
     updatedAt: serverTimestamp(),
   }))
@@ -1190,8 +1236,8 @@ test('farmers can read only conversations and messages assigned to their farmerI
   })
   await assertSucceeds(reply.commit())
 
-  const originalFarm = environment.authenticatedContext('farmer-a').firestore()
-  await assertSucceeds(getDoc(doc(originalFarm, 'conversations/customer-a/farmers/farmer-a')))
+  const originalFarm = environment.authenticatedContext('admin-a').firestore()
+  await assertSucceeds(getDoc(doc(originalFarm, 'conversations/customer-b')))
   await assertFails(getDoc(doc(originalFarm, 'conversations/customer-a/farmers/farmer-b')))
 })
 
@@ -1232,9 +1278,9 @@ test('customers cannot message a farmer role account without an active farmer pr
 
 test('a farmer cannot create a conversation under another farmer id', async () => {
   const db = environment.authenticatedContext('farmer-b').firestore()
-  await assertFails(setDoc(doc(db, 'conversations/customer-b/farmers/farmer-a'), {
+  await assertFails(setDoc(doc(db, 'conversations/customer-b/farmers/admin-a'), {
     customerId: 'customer-b',
-    farmerId: 'farmer-a',
+    farmerId: 'admin-a',
     lastMessage: 'Should not be visible to the wrong farmer.',
     updatedAt: serverTimestamp(),
   }))
